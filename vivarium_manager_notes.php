@@ -146,17 +146,40 @@ $records_per_page = 50;
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
+// Filter settings - default to "my_notes"
+$filter_view = isset($_GET['view']) && $_GET['view'] === 'all' ? 'all' : 'my_notes';
+$current_user_id = $_SESSION['user_id'];
+
 // Search functionality
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $where_clause = '';
 $search_params = [];
 $param_types = '';
 
+// Build WHERE clause based on filter and search
+$where_conditions = [];
+
+// Add user filter if viewing "my_notes"
+if ($filter_view === 'my_notes') {
+    $where_conditions[] = "m.user_id = ?";
+    $search_params[] = $current_user_id;
+    $param_types .= 'i';
+}
+
+// Add search filter if search term exists
 if (!empty($search)) {
     $search_pattern = '%' . $search . '%';
-    $where_clause = "WHERE m.cage_id LIKE ? OR m.comments LIKE ? OR u.name LIKE ? OR u.username LIKE ?";
-    $search_params = [$search_pattern, $search_pattern, $search_pattern, $search_pattern];
-    $param_types = 'ssss';
+    $where_conditions[] = "(m.cage_id LIKE ? OR m.comments LIKE ? OR u.name LIKE ? OR u.username LIKE ?)";
+    $search_params[] = $search_pattern;
+    $search_params[] = $search_pattern;
+    $search_params[] = $search_pattern;
+    $search_params[] = $search_pattern;
+    $param_types .= 'ssss';
+}
+
+// Combine conditions
+if (!empty($where_conditions)) {
+    $where_clause = "WHERE " . implode(" AND ", $where_conditions);
 }
 
 // Get total count for pagination
@@ -165,7 +188,7 @@ $count_query = "SELECT COUNT(*) as total
                 LEFT JOIN users u ON m.user_id = u.id
                 $where_clause";
 
-if (!empty($search)) {
+if (!empty($search_params)) {
     $count_stmt = $con->prepare($count_query);
     $count_stmt->bind_param($param_types, ...$search_params);
     $count_stmt->execute();
@@ -187,7 +210,7 @@ $query = "SELECT m.id, m.cage_id, m.comments, m.timestamp,
           ORDER BY m.timestamp DESC
           LIMIT ? OFFSET ?";
 
-if (!empty($search)) {
+if (!empty($search_params)) {
     $stmt = $con->prepare($query);
     $search_params[] = $records_per_page;
     $search_params[] = $offset;
@@ -330,9 +353,24 @@ require 'header.php';
         <div class="no-print">
             <h1 class="text-center"><i class="fas fa-clipboard-list"></i> Vivarium Maintenance Notes Manager</h1>
 
+            <!-- Filter Toggle -->
+            <div class="text-center mb-3">
+                <div class="btn-group" role="group" aria-label="Notes filter">
+                    <a href="?view=my_notes<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>"
+                       class="btn btn-<?php echo $filter_view === 'my_notes' ? 'primary' : 'outline-primary'; ?>">
+                        <i class="fas fa-user"></i> My Notes
+                    </a>
+                    <a href="?view=all<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>"
+                       class="btn btn-<?php echo $filter_view === 'all' ? 'primary' : 'outline-primary'; ?>">
+                        <i class="fas fa-users"></i> All Notes
+                    </a>
+                </div>
+            </div>
+
             <!-- Search and Action Bar -->
             <div class="header-actions">
                 <form method="GET" action="" class="search-box">
+                    <input type="hidden" name="view" value="<?php echo htmlspecialchars($filter_view); ?>">
                     <div class="input-group">
                         <input type="text"
                                class="form-control"
@@ -343,7 +381,7 @@ require 'header.php';
                             <i class="fas fa-search"></i> Search
                         </button>
                         <?php if (!empty($search)): ?>
-                            <a href="vivarium_manager_notes.php" class="btn btn-secondary">
+                            <a href="?view=<?php echo htmlspecialchars($filter_view); ?>" class="btn btn-secondary">
                                 <i class="fas fa-times"></i> Clear
                             </a>
                         <?php endif; ?>
@@ -434,7 +472,7 @@ require 'header.php';
                 <ul class="pagination justify-content-center">
                     <?php if ($current_page > 1): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?>&view=<?php echo $filter_view; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
                                 Previous
                             </a>
                         </li>
@@ -442,7 +480,7 @@ require 'header.php';
 
                     <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
                         <li class="page-item <?php echo $i == $current_page ? 'active' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $i; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
+                            <a class="page-link" href="?page=<?php echo $i; ?>&view=<?php echo $filter_view; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
                                 <?php echo $i; ?>
                             </a>
                         </li>
@@ -450,7 +488,7 @@ require 'header.php';
 
                     <?php if ($current_page < $total_pages): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?>&view=<?php echo $filter_view; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
                                 Next
                             </a>
                         </li>
