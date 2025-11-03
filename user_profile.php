@@ -295,11 +295,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
 </head>
 
 <body>
-    <div class="container content">
-        <br>
-        <h2>User Profile</h2>
-        <br>
-        <br>
+    <div class="container mt-4 content">
+        <h1 class="text-center">User Profile</h1>
         <form method="POST" action="">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
             <div class="form-group">

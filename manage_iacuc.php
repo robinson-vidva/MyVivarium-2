@@ -271,8 +271,8 @@ $iacucResult = $con->query($iacucQuery);
 </head>
 
 <body>
-    <div class="container content mt-5">
-        <h2>Manage IACUC</h2>
+    <div class="container mt-4 content">
+        <h1 class="text-center">Manage IACUC</h1>
         <?php if (isset($_SESSION['message'])) : ?>
             <div class="alert alert-info">
                 <?= $_SESSION['message']; ?>
