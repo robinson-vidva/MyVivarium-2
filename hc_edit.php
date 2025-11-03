@@ -735,6 +735,110 @@ require 'header.php';
             }
         }
 
+        // Information Completeness Tracking
+        $(document).ready(function() {
+            function calculateCompleteness() {
+                const fields = {
+                    critical: ['dob', 'sex'],
+                    important: ['pi_name', 'strain', 'iacuc', 'user'],
+                    useful: ['parent_cg']
+                };
+
+                let totalFields = 0;
+                let filledFields = 0;
+                let missingCritical = [];
+                let missingImportant = [];
+                let missingUseful = [];
+
+                // Count critical fields
+                fields.critical.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field && field.value && field.value.trim() !== '') {
+                        filledFields++;
+                    } else {
+                        missingCritical.push(field ? field.previousElementSibling.textContent.split(' ')[0] : fieldId);
+                    }
+                });
+
+                // Count important fields
+                fields.important.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field) {
+                        if (field.multiple) {
+                            // For Select2 multiselect
+                            const selectedValues = $(field).val();
+                            if (selectedValues && selectedValues.length > 0 && selectedValues[0] !== '') {
+                                filledFields++;
+                            } else {
+                                missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
+                            }
+                        } else if (field.value && field.value.trim() !== '') {
+                            filledFields++;
+                        } else {
+                            missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
+                        }
+                    }
+                });
+
+                // Count useful fields
+                fields.useful.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field && field.value && field.value.trim() !== '') {
+                        filledFields++;
+                    } else {
+                        missingUseful.push(field ? field.previousElementSibling.textContent.split(' ')[0] + ' ' + (field.previousElementSibling.textContent.split(' ')[1] || '') : fieldId);
+                    }
+                });
+
+                const percentage = Math.round((filledFields / totalFields) * 100);
+
+                // Update completeness bar
+                $('#completeness-bar').css('width', percentage + '%');
+                $('#completeness-bar').attr('aria-valuenow', percentage);
+                $('#completeness-bar').text(percentage + '%');
+                $('#completeness-percentage').text(percentage + '%');
+
+                // Change bar color based on completion
+                $('#completeness-bar').removeClass('bg-danger bg-warning bg-success');
+                if (percentage < 50) {
+                    $('#completeness-bar').addClass('bg-danger');
+                } else if (percentage < 80) {
+                    $('#completeness-bar').addClass('bg-warning');
+                } else {
+                    $('#completeness-bar').addClass('bg-success');
+                }
+
+                // Show missing fields
+                let missingText = '';
+                if (missingCritical.length > 0) {
+                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
+                }
+                if (missingImportant.length > 0) {
+                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
+                }
+                if (missingUseful.length > 0) {
+                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
+                }
+
+                if (percentage === 100) {
+                    missingText = '<strong class="text-success">✓ All information complete!</strong>';
+                }
+
+                $('#missing-fields').html(missingText);
+                $('#completeness-alert').show();
+            }
+
+            // Calculate on page load
+            calculateCompleteness();
+
+            // Recalculate when fields change
+            $('form input, form select, form textarea').on('change keyup', calculateCompleteness);
+            $('#user, #iacuc, #strain').on('select2:select select2:unselect', calculateCompleteness);
+        });
+
     </script>
 
 </head>
@@ -761,7 +865,17 @@ require 'header.php';
 
                     <div class="card-body">
                     <form id="editForm" method="POST" action="hc_edit.php?id=<?= $id; ?>&<?= getCurrentUrlParams(); ?>" enctype="multipart/form-data">
-                            <p class="warning-text">Fields marked with <span class="required-asterisk">*</span> are required.</p>
+                            <p class="warning-text">Only <span class="required-asterisk">Cage ID</span> is required. Other fields can be completed here.</p>
+
+                            <!-- Information Completeness Indicator -->
+                            <div id="completeness-alert" class="alert alert-warning" style="display: none; margin-bottom: 20px;">
+                                <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
+                                <div class="progress mt-2" style="height: 20px;">
+                                    <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                </div>
+                                <div id="missing-fields" class="mt-2"></div>
+                            </div>
+
                             <input type="hidden" id="mice_to_delete" name="mice_to_delete" value="">
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
 
@@ -771,10 +885,10 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="pi_name" class="form-label">PI Name <span class="required-asterisk">*</span></label>
-                                <select class="form-control" id="pi_name" name="pi_name" required>
+                                <label for="pi_name" class="form-label">PI Name</label>
+                                <select class="form-control" id="pi_name" name="pi_name" data-field-type="important">
                                     <!-- Display a placeholder option for selection -->
-                                    <option value="" disabled>Select PI</option>
+                                    <option value="">Select PI</option>
                                     <?php while ($row = $piResult->fetch_assoc()) : ?>
                                         <option value="<?= htmlspecialchars($row['id']); ?>" <?= ($row['id'] == $selectedPiId) ? 'selected' : ''; ?>>
                                             <?= htmlspecialchars($row['initials']) . ' [' . htmlspecialchars($row['name']) . ']'; ?>
@@ -784,8 +898,8 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="strain" class="form-label">Strain <span class="required-asterisk">*</span></label>
-                                <select class="form-control" id="strain" name="strain" required>
+                                <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
+                                <select class="form-control" id="strain" name="strain" data-field-type="important">
                                     <option value="" disabled <?= empty($holdingcage['strain']) ? 'selected' : ''; ?>>Select Strain</option>
                                     <?php
                                     // Initialize a flag to check if the current strain exists in the options
@@ -813,8 +927,8 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="iacuc" class="form-label">IACUC</label>
-                                <select class="form-control" id="iacuc" name="iacuc[]" multiple>
+                                <label for="iacuc" class="form-label">IACUC <span class="badge bg-info">Important</span></label>
+                                <select class="form-control" id="iacuc" name="iacuc[]" multiple data-field-type="important">
                                     <option value="" disabled>Select IACUC</option>
                                     <?php
                                     if ($iacucResult->num_rows > 0) {
@@ -834,8 +948,8 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="user" class="form-label">User <span class="required-asterisk">*</span></label>
-                                <select class="form-control" id="user" name="user[]" multiple required>
+                                <label for="user" class="form-label">User <span class="badge bg-info">Important</span></label>
+                                <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
                                     <?php
                                     // Populate the dropdown with options from the database
                                     while ($userRow = $userResult->fetch_assoc()) {
@@ -850,22 +964,22 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="dob" class="form-label">DOB <span class="required-asterisk">*</span></label>
-                                <input type="date" class="form-control" id="dob" name="dob" value="<?= htmlspecialchars($holdingcage['dob']); ?>" required min="1900-01-01">
+                                <label for="dob" class="form-label">DOB <span class="badge bg-warning">Critical</span></label>
+                                <input type="date" class="form-control" id="dob" name="dob" value="<?= htmlspecialchars($holdingcage['dob']); ?>" min="1900-01-01" data-field-type="critical">
                             </div>
 
                             <div class="mb-3">
-                                <label for="sex" class="form-label">Sex <span class="required-asterisk">*</span></label>
-                                <select class="form-control" id="sex" name="sex" required>
-                                    <option value="" disabled <?= empty($holdingcage['sex']) ? 'selected' : ''; ?>>Select Sex</option>
+                                <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
+                                <select class="form-control" id="sex" name="sex" data-field-type="critical">
+                                    <option value="">Select Sex</option>
                                     <option value="Male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
                                     <option value="Female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
                                 </select>
                             </div>
 
                             <div class="mb-3">
-                                <label for="parent_cg" class="form-label">Parent Cage <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control" id="parent_cg" name="parent_cg" value="<?= htmlspecialchars($holdingcage['parent_cg']); ?>" required>
+                                <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
+                                <input type="text" class="form-control" id="parent_cg" name="parent_cg" value="<?= htmlspecialchars($holdingcage['parent_cg']); ?>" data-field-type="useful">
                             </div>
 
                             <div class="mb-3">

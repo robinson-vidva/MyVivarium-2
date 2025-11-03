@@ -382,6 +382,16 @@ require 'header.php';
                 </div>
             </div>
             <br>
+
+            <!-- Information Completeness Indicator -->
+            <div id="completeness-alert" class="alert" style="display: none; margin-bottom: 20px;">
+                <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
+                <div class="progress mt-2" style="height: 20px;">
+                    <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                </div>
+                <div id="missing-fields" class="mt-2"></div>
+            </div>
+
             <div class="table-wrapper">
                 <table class="table table-bordered">
                     <tr>
@@ -390,11 +400,11 @@ require 'header.php';
                     </tr>
                     <tr>
                         <th>PI Name</th>
-                        <td><?= htmlspecialchars($holdingcage['pi_initials'] . ' [' . $holdingcage['pi_name'] . ']'); ?></td>
+                        <td id="pi-data" data-value="<?= !empty($holdingcage['pi_name']) && $holdingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['pi_initials'] . ' [' . $holdingcage['pi_name'] . ']'); ?></td>
                     </tr>
                     <tr>
                         <th>Strain</th>
-                        <td>
+                        <td id="strain-data" data-value="<?= !empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA' ? '1' : ''; ?>">
                             <a href="javascript:void(0);" onclick="viewStrainDetails(
                                 '<?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?>', 
                                 '<?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>', 
@@ -408,11 +418,11 @@ require 'header.php';
                     </tr>
                     <tr>
                         <th>IACUC</th>
-                        <td><?= $iacucDisplayString; ?></td>
+                        <td id="iacuc-data" data-value="<?= !empty($iacucCodes) ? '1' : ''; ?>"><?= $iacucDisplayString; ?></td>
                     </tr>
                     <tr>
                         <th>User</th>
-                        <td><?= $userDisplayString; ?></td>
+                        <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
                     </tr>
                     <tr>
                         <th>Qty</th>
@@ -420,7 +430,7 @@ require 'header.php';
                     </tr>
                     <tr>
                         <th>DOB</th>
-                        <td><?= htmlspecialchars($holdingcage['dob']); ?></td>
+                        <td id="dob-data" data-value="<?= !empty($holdingcage['dob']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['dob']); ?></td>
                     </tr>
                     <tr>
                         <th>Age</th>
@@ -428,11 +438,11 @@ require 'header.php';
                     </tr>
                     <tr>
                         <th>Sex</th>
-                        <td><?= htmlspecialchars(ucfirst($holdingcage['sex'])); ?></td>
+                        <td id="sex-data" data-value="<?= !empty($holdingcage['sex']) ? '1' : ''; ?>"><?= htmlspecialchars(ucfirst($holdingcage['sex'])); ?></td>
                     </tr>
                     <tr>
                         <th>Parent Cage</th>
-                        <td><?= htmlspecialchars($holdingcage['parent_cg']); ?></td>
+                        <td id="parent-data" data-value="<?= !empty($holdingcage['parent_cg']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['parent_cg']); ?></td>
                     </tr>
                     <tr>
                         <th>Remarks</th>
@@ -631,6 +641,102 @@ require 'header.php';
             document.getElementById('viewPopupOverlay').style.display = 'none';
             document.getElementById('viewPopupForm').style.display = 'none';
         }
+
+        // Information Completeness Calculation
+        document.addEventListener('DOMContentLoaded', function() {
+            const fields = {
+                critical: ['dob', 'sex'],
+                important: ['pi', 'strain', 'iacuc', 'user'],
+                useful: ['parent']
+            };
+
+            let totalFields = 0;
+            let filledFields = 0;
+            let missingCritical = [];
+            let missingImportant = [];
+            let missingUseful = [];
+
+            // Count critical fields
+            fields.critical.forEach(fieldId => {
+                totalFields++;
+                const field = document.getElementById(fieldId + '-data');
+                if (field && field.dataset.value) {
+                    filledFields++;
+                } else {
+                    const label = fieldId.charAt(0).toUpperCase() + fieldId.slice(1);
+                    missingCritical.push(label);
+                }
+            });
+
+            // Count important fields
+            fields.important.forEach(fieldId => {
+                totalFields++;
+                const field = document.getElementById(fieldId + '-data');
+                if (field && field.dataset.value) {
+                    filledFields++;
+                } else {
+                    const label = fieldId === 'pi' ? 'PI Name' : (fieldId.charAt(0).toUpperCase() + fieldId.slice(1));
+                    missingImportant.push(label);
+                }
+            });
+
+            // Count useful fields
+            fields.useful.forEach(fieldId => {
+                totalFields++;
+                const field = document.getElementById(fieldId + '-data');
+                if (field && field.dataset.value) {
+                    filledFields++;
+                } else {
+                    const label = 'Parent Cage';
+                    missingUseful.push(label);
+                }
+            });
+
+            const percentage = Math.round((filledFields / totalFields) * 100);
+
+            // Only show alert if not 100% complete
+            if (percentage < 100) {
+                const alert = document.getElementById('completeness-alert');
+                const bar = document.getElementById('completeness-bar');
+                const percentageText = document.getElementById('completeness-percentage');
+                const missingFieldsDiv = document.getElementById('missing-fields');
+
+                // Update percentage
+                bar.style.width = percentage + '%';
+                bar.setAttribute('aria-valuenow', percentage);
+                bar.textContent = percentage + '%';
+                percentageText.textContent = percentage + '%';
+
+                // Change bar and alert color based on completion
+                bar.classList.remove('bg-danger', 'bg-warning', 'bg-success');
+                alert.classList.remove('alert-danger', 'alert-warning', 'alert-success');
+                if (percentage < 50) {
+                    bar.classList.add('bg-danger');
+                    alert.classList.add('alert-danger');
+                } else if (percentage < 80) {
+                    bar.classList.add('bg-warning');
+                    alert.classList.add('alert-warning');
+                } else {
+                    bar.classList.add('bg-success');
+                    alert.classList.add('alert-success');
+                }
+
+                // Show missing fields
+                let missingText = '';
+                if (missingCritical.length > 0) {
+                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
+                }
+                if (missingImportant.length > 0) {
+                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
+                }
+                if (missingUseful.length > 0) {
+                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
+                }
+
+                missingFieldsDiv.innerHTML = missingText;
+                alert.style.display = 'block';
+            }
+        });
     </script>
 </body>
 

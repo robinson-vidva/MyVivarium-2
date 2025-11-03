@@ -25,6 +25,16 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// Get current user's ID for auto-selection
+$currentUserQuery = "SELECT id FROM users WHERE username = ?";
+$currentUserStmt = $con->prepare($currentUserQuery);
+$currentUserStmt->bind_param("s", $_SESSION['username']);
+$currentUserStmt->execute();
+$currentUserResult = $currentUserStmt->get_result();
+$currentUser = $currentUserResult->fetch_assoc();
+$currentUserId = $currentUser['id'] ?? null;
+$currentUserStmt->close();
+
 // Query to retrieve users with initials and names
 $userQuery = "SELECT id, initials, name FROM users WHERE status = 'approved'";
 $userResult = $con->query($userQuery);
@@ -32,6 +42,13 @@ $userResult = $con->query($userQuery);
 // Query to retrieve options where role is 'Principal Investigator'
 $piQuery = "SELECT id, initials, name FROM users WHERE position = 'Principal Investigator' AND status = 'approved'";
 $piResult = $con->query($piQuery);
+
+// Store PI results in array for auto-selection logic
+$piOptions = [];
+while ($row = $piResult->fetch_assoc()) {
+    $piOptions[] = $row;
+}
+$piResult->data_seek(0); // Reset pointer for form display
 
 // Query to retrieve IACUC values
 $iacucQuery = "SELECT iacuc_id, iacuc_title FROM iacuc";
@@ -73,15 +90,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('CSRF token validation failed');
     }
 
-    // Retrieve form data
+    // Retrieve form data (only cage_id is required)
     $cage_id = trim(mysqli_real_escape_string($con, $_POST['cage_id']));
-    $pi_name = mysqli_real_escape_string($con, $_POST['pi_name']);
-    $strain = mysqli_real_escape_string($con, $_POST['strain']);
+    $pi_name = !empty($_POST['pi_name']) ? mysqli_real_escape_string($con, $_POST['pi_name']) : null;
+    $strain = !empty($_POST['strain']) ? mysqli_real_escape_string($con, $_POST['strain']) : null;
     $iacuc = isset($_POST['iacuc']) ? mysqli_real_escape_string($con, implode(',', $_POST['iacuc'])) : '';
     $user = isset($_POST['user']) ? implode(',', array_map('trim', $_POST['user'])) : '';
-    $dob = mysqli_real_escape_string($con, $_POST['dob']);
-    $sex = mysqli_real_escape_string($con, $_POST['sex']);
-    $parent_cg = mysqli_real_escape_string($con, $_POST['parent_cg']);
+    $dob = !empty($_POST['dob']) ? mysqli_real_escape_string($con, $_POST['dob']) : null;
+    $sex = !empty($_POST['sex']) ? mysqli_real_escape_string($con, $_POST['sex']) : null;
+    $parent_cg = !empty($_POST['parent_cg']) ? mysqli_real_escape_string($con, $_POST['parent_cg']) : null;
     $remarks = mysqli_real_escape_string($con, $_POST['remarks']);
     $mouse_data = [];
 
@@ -121,13 +138,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_begin_transaction($con);
 
         try {
-            // Insert data into cages table
+            // Insert data into cages table (pi_name can be NULL)
             $query1 = "INSERT INTO cages (cage_id, pi_name, quantity, remarks) VALUES (?, ?, ?, ?)";
             $stmt = $con->prepare($query1);
             $stmt->bind_param("siss", $cage_id, $pi_name, $qty, $remarks);
             $stmt->execute();
 
-            // Insert data into holding table
+            // Insert data into holding table (strain, dob, sex, parent_cg can be NULL)
             $query2 = "INSERT INTO holding (cage_id, strain, dob, sex, parent_cg) VALUES (?, ?, ?, ?, ?)";
             $stmt2 = $con->prepare($query2);
             $stmt2->bind_param("sssss", $cage_id, $strain, $dob, $sex, $parent_cg);
@@ -404,6 +421,108 @@ require 'header.php';
                     return $result;
                 }
             });
+
+            // Information Completeness Tracking
+            function calculateCompleteness() {
+                const fields = {
+                    critical: ['dob', 'sex'],
+                    important: ['pi_name', 'strain', 'iacuc', 'user'],
+                    useful: ['parent_cg']
+                };
+
+                let totalFields = 0;
+                let filledFields = 0;
+                let missingCritical = [];
+                let missingImportant = [];
+                let missingUseful = [];
+
+                // Count critical fields
+                fields.critical.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field && field.value && field.value.trim() !== '') {
+                        filledFields++;
+                    } else {
+                        missingCritical.push(field ? field.previousElementSibling.textContent.split(' ')[0] : fieldId);
+                    }
+                });
+
+                // Count important fields
+                fields.important.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field) {
+                        if (field.multiple) {
+                            // For Select2 multiselect
+                            const selectedValues = $(field).val();
+                            if (selectedValues && selectedValues.length > 0 && selectedValues[0] !== '') {
+                                filledFields++;
+                            } else {
+                                missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
+                            }
+                        } else if (field.value && field.value.trim() !== '') {
+                            filledFields++;
+                        } else {
+                            missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
+                        }
+                    }
+                });
+
+                // Count useful fields
+                fields.useful.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field && field.value && field.value.trim() !== '') {
+                        filledFields++;
+                    } else {
+                        missingUseful.push(field ? field.previousElementSibling.textContent.split(' ')[0] : fieldId);
+                    }
+                });
+
+                const percentage = Math.round((filledFields / totalFields) * 100);
+
+                // Update completeness bar
+                $('#completeness-bar').css('width', percentage + '%');
+                $('#completeness-bar').attr('aria-valuenow', percentage);
+                $('#completeness-bar').text(percentage + '%');
+                $('#completeness-percentage').text(percentage + '%');
+
+                // Change bar color based on completion
+                $('#completeness-bar').removeClass('bg-danger bg-warning bg-success');
+                if (percentage < 50) {
+                    $('#completeness-bar').addClass('bg-danger');
+                } else if (percentage < 80) {
+                    $('#completeness-bar').addClass('bg-warning');
+                } else {
+                    $('#completeness-bar').addClass('bg-success');
+                }
+
+                // Show missing fields
+                let missingText = '';
+                if (missingCritical.length > 0) {
+                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
+                }
+                if (missingImportant.length > 0) {
+                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
+                }
+                if (missingUseful.length > 0) {
+                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
+                }
+
+                if (percentage === 100) {
+                    missingText = '<strong class="text-success">✓ All information complete!</strong>';
+                }
+
+                $('#missing-fields').html(missingText);
+                $('#completeness-alert').show();
+            }
+
+            // Calculate on page load
+            calculateCompleteness();
+
+            // Recalculate when fields change
+            $('form input, form select, form textarea').on('change keyup', calculateCompleteness);
+            $('#user, #iacuc, #strain').on('select2:select select2:unselect', calculateCompleteness);
         });
     </script>
 
@@ -416,9 +535,17 @@ require 'header.php';
 
         <?php include('message.php'); ?>
 
-        <p class="warning-text">Fields marked with <span class="required-asterisk">*</span> are required.</p>
+        <p class="warning-text">Only <span class="required-asterisk">Cage ID</span> is required. Other fields can be added later.</p>
 
-        <form method="POST">
+        <div id="completeness-alert" class="alert alert-warning" style="display: none;">
+            <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
+            <div class="progress mt-2" style="height: 20px;">
+                <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+            <div id="missing-fields" class="mt-2"></div>
+        </div>
+
+        <form method="POST" id="cage-form">
 
             <!-- CSRF token field -->
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
@@ -429,25 +556,30 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
-                <label for="pi_name" class="form-label">PI Name <span class="required-asterisk">*</span></label>
-                <select class="form-control" id="pi_name" name="pi_name" required>
-                    <option value="" disabled selected>Select PI</option>
+                <label for="pi_name" class="form-label">PI Name</label>
+                <select class="form-control" id="pi_name" name="pi_name" data-field-type="important">
+                    <option value="">Select PI</option>
                     <?php
                     // Populate dropdown with options from the database
-                    while ($row = $piResult->fetch_assoc()) {
+                    // Auto-select if only one PI exists
+                    $isFirst = true;
+                    $shouldAutoSelect = (count($piOptions) === 1);
+                    foreach ($piOptions as $row) {
                         $pi_id = htmlspecialchars($row['id']);
                         $pi_initials = htmlspecialchars($row['initials']);
                         $pi_name = htmlspecialchars($row['name']);
-                        echo "<option value='$pi_id'>$pi_initials [$pi_name]</option>";
+                        $selected = ($shouldAutoSelect || ($isFirst && count($piOptions) > 0)) ? 'selected' : '';
+                        echo "<option value='$pi_id' $selected>$pi_initials [$pi_name]</option>";
+                        $isFirst = false;
                     }
                     ?>
                 </select>
             </div>
 
             <div class="mb-3">
-                <label for="strain" class="form-label">Strain <span class="required-asterisk">*</span></label>
-                <select class="form-control" id="strain" name="strain" required>
-                    <option value="" disabled selected>Select Strain</option>
+                <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
+                <select class="form-control" id="strain" name="strain" data-field-type="important">
+                    <option value="">Select Strain</option>
                     <?php
                     // Populate the dropdown with all the options generated
                     foreach ($strainOptions as $option) {
@@ -458,8 +590,8 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
-                <label for="iacuc" class="form-label">IACUC</label>
-                <select class="form-control" id="iacuc" name="iacuc[]" multiple>
+                <label for="iacuc" class="form-label">IACUC <span class="badge bg-info">Important</span></label>
+                <select class="form-control" id="iacuc" name="iacuc[]" multiple data-field-type="important">
                     <option value="" disabled>Select IACUC</option>
                     <?php
                     // Populate the dropdown with IACUC values from the database
@@ -474,37 +606,39 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
-                <label for="user" class="form-label">User <span class="required-asterisk">*</span></label>
-                <select class="form-control" id="user" name="user[]" multiple required>
+                <label for="user" class="form-label">User <span class="badge bg-info">Important</span></label>
+                <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
                     <?php
                     // Populate the dropdown with options from the database
+                    // Auto-select current user
                     while ($userRow = $userResult->fetch_assoc()) {
                         $user_id = htmlspecialchars($userRow['id']);
                         $initials = htmlspecialchars($userRow['initials']);
                         $name = htmlspecialchars($userRow['name']);
-                        echo "<option value='$user_id'>$initials [$name]</option>";
+                        $selected = ($currentUserId && $user_id == $currentUserId) ? 'selected' : '';
+                        echo "<option value='$user_id' $selected>$initials [$name]</option>";
                     }
                     ?>
                 </select>
             </div>
 
             <div class="mb-3">
-                <label for="dob" class="form-label">DOB <span class="required-asterisk">*</span></label>
-                <input type="date" class="form-control" id="dob" name="dob" required min="1900-01-01">
+                <label for="dob" class="form-label">DOB <span class="badge bg-warning">Critical</span></label>
+                <input type="date" class="form-control" id="dob" name="dob" min="1900-01-01" data-field-type="critical">
             </div>
 
             <div class="mb-3">
-                <label for="sex" class="form-label">Sex <span class="required-asterisk">*</span></label>
-                <select class="form-control" id="sex" name="sex" required>
-                    <option value="" disabled selected>Select Sex</option>
+                <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
+                <select class="form-control" id="sex" name="sex" data-field-type="critical">
+                    <option value="">Select Sex</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                 </select>
             </div>
 
             <div class="mb-3">
-                <label for="parent_cg" class="form-label">Parent Cage <span class="required-asterisk">*</span></label>
-                <input type="text" class="form-control" id="parent_cg" name="parent_cg" required>
+                <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
+                <input type="text" class="form-control" id="parent_cg" name="parent_cg" data-field-type="useful">
             </div>
 
             <div class="mb-3">
