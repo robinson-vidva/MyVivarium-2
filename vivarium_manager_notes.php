@@ -4,7 +4,8 @@
  * Vivarium Manager - Maintenance Notes Management
  *
  * This page allows Vivarium Managers and Admins to:
- * - View all maintenance notes from all cages
+ * - View maintenance notes from Vivarium Managers (default) or all users
+ * - Toggle between Vivarium Manager notes and all notes
  * - Search and filter notes
  * - Add new maintenance notes
  * - Edit existing maintenance notes
@@ -146,8 +147,8 @@ $records_per_page = 50;
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
-// Filter settings - default to "my_notes"
-$filter_view = isset($_GET['view']) && $_GET['view'] === 'all' ? 'all' : 'my_notes';
+// Filter settings - default to "vivarium_managers"
+$filter_view = isset($_GET['view']) && $_GET['view'] === 'all' ? 'all' : 'vivarium_managers';
 $current_user_id = $_SESSION['user_id'];
 
 // Search functionality
@@ -159,11 +160,11 @@ $param_types = '';
 // Build WHERE clause based on filter and search
 $where_conditions = [];
 
-// Add user filter if viewing "my_notes"
-if ($filter_view === 'my_notes') {
-    $where_conditions[] = "m.user_id = ?";
-    $search_params[] = $current_user_id;
-    $param_types .= 'i';
+// Add role filter if viewing "vivarium_managers" only
+if ($filter_view === 'vivarium_managers') {
+    $where_conditions[] = "u.role = ?";
+    $search_params[] = 'vivarium_manager';
+    $param_types .= 's';
 }
 
 // Add search filter if search term exists
@@ -356,9 +357,9 @@ require 'header.php';
             <!-- Filter Toggle -->
             <div class="text-center mb-3">
                 <div class="btn-group" role="group" aria-label="Notes filter">
-                    <a href="?view=my_notes<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>"
-                       class="btn btn-<?php echo $filter_view === 'my_notes' ? 'primary' : 'outline-primary'; ?>">
-                        <i class="fas fa-user"></i> My Notes
+                    <a href="?view=vivarium_managers<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>"
+                       class="btn btn-<?php echo $filter_view === 'vivarium_managers' ? 'primary' : 'outline-primary'; ?>">
+                        <i class="fas fa-user-tie"></i> Vivarium Manager Notes
                     </a>
                     <a href="?view=all<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>"
                        class="btn btn-<?php echo $filter_view === 'all' ? 'primary' : 'outline-primary'; ?>">
