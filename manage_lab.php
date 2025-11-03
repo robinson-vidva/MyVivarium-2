@@ -161,8 +161,8 @@ require 'header.php';
 </head>
 
 <body>
-    <div class="container content">
-        <h2>Manage Lab</h2>
+    <div class="container mt-4 content">
+        <h1 class="text-center">Manage Lab</h1>
         <!-- Form for updating lab information -->
         <form method="POST" action="">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">

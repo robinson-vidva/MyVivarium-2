@@ -223,8 +223,8 @@ $strainResult = $con->query($strainQuery);
 </head>
 
 <body>
-    <div class="container content mt-5">
-        <h2>Manage Strains</h2>
+    <div class="container mt-4 content">
+        <h1 class="text-center">Manage Strains</h1>
         <?php if (isset($_SESSION['message'])) : ?>
             <div class="alert alert-info">
                 <?= $_SESSION['message']; ?>

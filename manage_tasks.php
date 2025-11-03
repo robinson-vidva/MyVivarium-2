@@ -494,12 +494,12 @@ ob_end_flush(); // Flush the output buffer
 </head>
 
 <body>
-    <div class="container content mt-5">
+    <div class="container mt-4 content">
 
         <!-- Include message for user notifications -->
         <?php include('message.php'); ?>
 
-        <h2>Manage Tasks <?= $cageIdFilter ? 'for Cage ' . htmlspecialchars($cageIdFilter) : ''; ?></h2>
+        <h1 class="text-center">Manage Tasks <?= $cageIdFilter ? 'for Cage ' . htmlspecialchars($cageIdFilter) : ''; ?></h1>
         <?php if (isset($_SESSION['message'])) : ?>
             <div class="alert alert-info">
                 <?= $_SESSION['message']; ?>
