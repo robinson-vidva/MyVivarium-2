@@ -614,6 +614,114 @@ require 'header.php';
             }
         }
 
+        // Information Completeness Tracking
+        $(document).ready(function() {
+            function calculateCompleteness() {
+                const fields = {
+                    critical: ['male_id', 'female_id'],
+                    important: ['pi_name', 'cross', 'iacuc', 'user'],
+                    useful: ['male_dob', 'female_dob']
+                };
+
+                let totalFields = 0;
+                let filledFields = 0;
+                let missingCritical = [];
+                let missingImportant = [];
+                let missingUseful = [];
+
+                // Count critical fields
+                fields.critical.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field && field.value && field.value.trim() !== '') {
+                        filledFields++;
+                    } else {
+                        const label = fieldId.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                        missingCritical.push(label);
+                    }
+                });
+
+                // Count important fields
+                fields.important.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field) {
+                        if (field.multiple) {
+                            // For Select2 multiselect
+                            const selectedValues = $(field).val();
+                            if (selectedValues && selectedValues.length > 0 && selectedValues[0] !== '') {
+                                filledFields++;
+                            } else {
+                                const label = fieldId.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                                missingImportant.push(label);
+                            }
+                        } else if (field.value && field.value.trim() !== '') {
+                            filledFields++;
+                        } else {
+                            const label = fieldId.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                            missingImportant.push(label);
+                        }
+                    }
+                });
+
+                // Count useful fields
+                fields.useful.forEach(fieldId => {
+                    totalFields++;
+                    const field = document.getElementById(fieldId);
+                    if (field && field.value && field.value.trim() !== '') {
+                        filledFields++;
+                    } else {
+                        const label = fieldId.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                        missingUseful.push(label);
+                    }
+                });
+
+                const percentage = Math.round((filledFields / totalFields) * 100);
+
+                // Update completeness bar
+                $('#completeness-bar').css('width', percentage + '%');
+                $('#completeness-bar').attr('aria-valuenow', percentage);
+                $('#completeness-bar').text(percentage + '%');
+                $('#completeness-percentage').text(percentage + '%');
+
+                // Change bar color based on completion
+                $('#completeness-bar').removeClass('bg-danger bg-warning bg-success');
+                if (percentage < 50) {
+                    $('#completeness-bar').addClass('bg-danger');
+                } else if (percentage < 80) {
+                    $('#completeness-bar').addClass('bg-warning');
+                } else {
+                    $('#completeness-bar').addClass('bg-success');
+                }
+
+                // Show missing fields
+                let missingText = '';
+                if (missingCritical.length > 0) {
+                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
+                }
+                if (missingImportant.length > 0) {
+                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
+                }
+                if (missingUseful.length > 0) {
+                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
+                }
+
+                if (percentage === 100) {
+                    missingText = '<strong class="text-success">✓ All information complete!</strong>';
+                }
+
+                $('#missing-fields').html(missingText);
+                $('#completeness-alert').show();
+            }
+
+            // Calculate on page load
+            calculateCompleteness();
+
+            // Recalculate when fields change
+            $('form input, form select, form textarea').on('change keyup', calculateCompleteness);
+            $('#user, #iacuc').on('select2:select select2:unselect', calculateCompleteness);
+        });
+
     </script>
 
     <title>Edit Breeding Cage | <?php echo htmlspecialchars($labName); ?></title>
@@ -753,7 +861,17 @@ require 'header.php';
 
                     <div class="card-body">
                     <form id="editForm" method="POST" action="bc_edit.php?id=<?= $id; ?>&<?= getCurrentUrlParams(); ?>" enctype="multipart/form-data">
-                            <p class="warning-text">Fields marked with <span class="required-asterisk">*</span> are required.</p>
+                            <p class="warning-text">Only <span class="required-asterisk">Cage ID</span> is required. Other fields can be completed here.</p>
+
+                            <!-- Information Completeness Indicator -->
+                            <div id="completeness-alert" class="alert alert-warning" style="display: none; margin-bottom: 20px;">
+                                <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
+                                <div class="progress mt-2" style="height: 20px;">
+                                    <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                </div>
+                                <div id="missing-fields" class="mt-2"></div>
+                            </div>
+
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
 
                             <div class="mb-3">
@@ -762,9 +880,10 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="pi_name" class="form-label">PI Name <span class="required-asterisk">*</span></label>
-                                <select class="form-control" id="pi_name" name="pi_name" required>
+                                <label for="pi_name" class="form-label">PI Name <span class="badge bg-info">Important</span></label>
+                                <select class="form-control" id="pi_name" name="pi_name" data-field-type="important">
                                     <!-- Display the currently selected PI, with the option to disable if "Unknown PI" -->
+                                    <option value="">Select PI</option>
                                     <option value="<?= htmlspecialchars($selectedPiId); ?>" <?= ($piDisplay === 'Unknown PI') ? 'disabled' : '' ?> selected>
                                         <?= htmlspecialchars($piDisplay); ?>
                                     </option>
@@ -780,13 +899,13 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="cross" class="form-label">Cross <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control" id="cross" name="cross" value="<?= htmlspecialchars($breedingcage['cross']); ?>" required>
+                                <label for="cross" class="form-label">Cross <span class="badge bg-info">Important</span></label>
+                                <input type="text" class="form-control" id="cross" name="cross" value="<?= htmlspecialchars($breedingcage['cross']); ?>" data-field-type="important">
                             </div>
 
                             <div class="mb-3">
-                                <label for="iacuc" class="form-label">IACUC</label>
-                                <select class="form-control" id="iacuc" name="iacuc[]" multiple>
+                                <label for="iacuc" class="form-label">IACUC <span class="badge bg-info">Important</span></label>
+                                <select class="form-control" id="iacuc" name="iacuc[]" multiple data-field-type="important">
                                     <option value="" disabled>Select IACUC</option>
                                     <?php
                                     // Check if there are any IACUC values from the database
@@ -808,8 +927,8 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="user" class="form-label">User <span class="required-asterisk">*</span></label>
-                                <select class="form-control" id="user" name="user[]" multiple required>
+                                <label for="user" class="form-label">User <span class="badge bg-info">Important</span></label>
+                                <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
                                     <?php
                                     // Populate the dropdown with options from the database
                                     while ($userRow = $userResult->fetch_assoc()) {
@@ -824,23 +943,23 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label for="male_id" class="form-label">Male ID <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control" id="male_id" name="male_id" value="<?= htmlspecialchars($breedingcage['male_id']); ?>" required>
+                                <label for="male_id" class="form-label">Male ID <span class="badge bg-warning">Critical</span></label>
+                                <input type="text" class="form-control" id="male_id" name="male_id" value="<?= htmlspecialchars($breedingcage['male_id']); ?>" data-field-type="critical">
                             </div>
 
                             <div class="mb-3">
-                                <label for="female_id" class="form-label">Female ID <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control" id="female_id" name="female_id" value="<?= htmlspecialchars($breedingcage['female_id']); ?>" required>
+                                <label for="female_id" class="form-label">Female ID <span class="badge bg-warning">Critical</span></label>
+                                <input type="text" class="form-control" id="female_id" name="female_id" value="<?= htmlspecialchars($breedingcage['female_id']); ?>" data-field-type="critical">
                             </div>
 
                             <div class="mb-3">
-                                <label for="male_dob" class="form-label">Male DOB <span class="required-asterisk">*</span></label>
-                                <input type="date" class="form-control" id="male_dob" name="male_dob" value="<?= htmlspecialchars($breedingcage['male_dob']); ?>" required min="1900-01-01">
+                                <label for="male_dob" class="form-label">Male DOB <span class="badge bg-secondary">Useful</span></label>
+                                <input type="date" class="form-control" id="male_dob" name="male_dob" value="<?= htmlspecialchars($breedingcage['male_dob']); ?>" min="1900-01-01" data-field-type="useful">
                             </div>
 
                             <div class="mb-3">
-                                <label for="female_dob" class="form-label">Female DOB <span class="required-asterisk">*</span></label>
-                                <input type="date" class="form-control" id="female_dob" name="female_dob" value="<?= htmlspecialchars($breedingcage['female_dob']); ?>" required min="1900-01-01">
+                                <label for="female_dob" class="form-label">Female DOB <span class="badge bg-secondary">Useful</span></label>
+                                <input type="date" class="form-control" id="female_dob" name="female_dob" value="<?= htmlspecialchars($breedingcage['female_dob']); ?>" min="1900-01-01" data-field-type="useful">
                             </div>
 
                             <div class="mb-3">
