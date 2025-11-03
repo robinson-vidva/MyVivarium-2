@@ -391,7 +391,7 @@ ob_end_flush(); // Flush the output buffer
 </head>
 
 <body>
-    <div class="container mt-4 content">
+    <div class="container-fluid mt-4 content" style="max-width: 1400px;">
         <?php include('message.php'); ?>
         <h1 class="text-center">Manage Reminders</h1>
         <?php if (isset($_SESSION['message'])) : ?>
