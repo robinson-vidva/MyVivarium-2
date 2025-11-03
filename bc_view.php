@@ -198,6 +198,102 @@ require 'header.php';
             const search = urlParams.get('search') || '';
             window.location.href = 'bc_dash.php?page=' + page + '&search=' + encodeURIComponent(search);
         }
+
+        // Information Completeness Calculation
+        document.addEventListener('DOMContentLoaded', function() {
+            const fields = {
+                critical: ['male-id', 'female-id'],
+                important: ['pi', 'cross', 'iacuc', 'user'],
+                useful: ['male-dob', 'female-dob']
+            };
+
+            let totalFields = 0;
+            let filledFields = 0;
+            let missingCritical = [];
+            let missingImportant = [];
+            let missingUseful = [];
+
+            // Count critical fields
+            fields.critical.forEach(fieldId => {
+                totalFields++;
+                const field = document.getElementById(fieldId + '-data');
+                if (field && field.dataset.value) {
+                    filledFields++;
+                } else {
+                    const label = fieldId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                    missingCritical.push(label);
+                }
+            });
+
+            // Count important fields
+            fields.important.forEach(fieldId => {
+                totalFields++;
+                const field = document.getElementById(fieldId + '-data');
+                if (field && field.dataset.value) {
+                    filledFields++;
+                } else {
+                    const label = fieldId === 'pi' ? 'PI Name' : (fieldId.charAt(0).toUpperCase() + fieldId.slice(1));
+                    missingImportant.push(label);
+                }
+            });
+
+            // Count useful fields
+            fields.useful.forEach(fieldId => {
+                totalFields++;
+                const field = document.getElementById(fieldId + '-data');
+                if (field && field.dataset.value) {
+                    filledFields++;
+                } else {
+                    const label = fieldId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                    missingUseful.push(label);
+                }
+            });
+
+            const percentage = Math.round((filledFields / totalFields) * 100);
+
+            // Only show alert if not 100% complete
+            if (percentage < 100) {
+                const alert = document.getElementById('completeness-alert');
+                const bar = document.getElementById('completeness-bar');
+                const percentageText = document.getElementById('completeness-percentage');
+                const missingFieldsDiv = document.getElementById('missing-fields');
+
+                // Update percentage
+                bar.style.width = percentage + '%';
+                bar.setAttribute('aria-valuenow', percentage);
+                bar.textContent = percentage + '%';
+                percentageText.textContent = percentage + '%';
+
+                // Change bar and alert color based on completion
+                bar.classList.remove('bg-danger', 'bg-warning', 'bg-success');
+                alert.classList.remove('alert-danger', 'alert-warning', 'alert-success');
+                if (percentage < 50) {
+                    bar.classList.add('bg-danger');
+                    alert.classList.add('alert-danger');
+                } else if (percentage < 80) {
+                    bar.classList.add('bg-warning');
+                    alert.classList.add('alert-warning');
+                } else {
+                    bar.classList.add('bg-success');
+                    alert.classList.add('alert-success');
+                }
+
+                // Show missing fields
+                let missingText = '';
+                if (missingCritical.length > 0) {
+                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
+                }
+                if (missingImportant.length > 0) {
+                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
+                }
+                if (missingUseful.length > 0) {
+                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
+                }
+
+                missingFieldsDiv.innerHTML = missingText;
+                alert.style.display = 'block';
+            }
+        });
     </script>
 
     <style>
@@ -330,6 +426,16 @@ require 'header.php';
                 </div>
             </div>
             <br>
+
+            <!-- Information Completeness Indicator -->
+            <div id="completeness-alert" class="alert" style="display: none; margin-bottom: 20px;">
+                <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
+                <div class="progress mt-2" style="height: 20px;">
+                    <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                </div>
+                <div id="missing-fields" class="mt-2"></div>
+            </div>
+
             <div class="table-wrapper">
                 <table class="table table-bordered" id="mouseTable">
                     <tr>
@@ -338,35 +444,35 @@ require 'header.php';
                     </tr>
                     <tr>
                         <th>PI Name</th>
-                        <td><?= htmlspecialchars($breedingcage['pi_initials'] . ' [' . $breedingcage['pi_name'] . ']'); ?></td>
+                        <td id="pi-data" data-value="<?= !empty($breedingcage['pi_name']) && $breedingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['pi_initials'] . ' [' . $breedingcage['pi_name'] . ']'); ?></td>
                     </tr>
                     <tr>
                         <th>Cross</th>
-                        <td><?= htmlspecialchars($breedingcage['cross']); ?></td>
+                        <td id="cross-data" data-value="<?= !empty($breedingcage['cross']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['cross']); ?></td>
                     </tr>
                     <tr>
                         <th>IACUC</th>
-                        <td><?= $iacucDisplayString; ?></td>
+                        <td id="iacuc-data" data-value="<?= !empty($iacucLinks) ? '1' : ''; ?>"><?= $iacucDisplayString; ?></td>
                     </tr>
                     <tr>
                         <th>User</th>
-                        <td><?= $userDisplayString; ?></td>
+                        <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
                     </tr>
                     <tr>
                         <th>Male ID</th>
-                        <td><?= htmlspecialchars($breedingcage['male_id']); ?></td>
+                        <td id="male-id-data" data-value="<?= !empty($breedingcage['male_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_id']); ?></td>
                     </tr>
                     <tr>
                         <th>Male DOB</th>
-                        <td><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
+                        <td id="male-dob-data" data-value="<?= !empty($breedingcage['male_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
                     </tr>
                     <tr>
                         <th>Female ID</th>
-                        <td><?= htmlspecialchars($breedingcage['female_id']); ?></td>
+                        <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></td>
                     </tr>
                     <tr>
                         <th>Female DOB</th>
-                        <td><?= htmlspecialchars($breedingcage['female_dob']); ?></td>
+                        <td id="female-dob-data" data-value="<?= !empty($breedingcage['female_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_dob']); ?></td>
                     </tr>
                     <tr>
                         <th>Remarks</th>
