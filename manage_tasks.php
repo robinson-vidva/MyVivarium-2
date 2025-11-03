@@ -494,7 +494,7 @@ ob_end_flush(); // Flush the output buffer
 </head>
 
 <body>
-    <div class="container mt-4 content">
+    <div class="container-fluid mt-4 content" style="max-width: 1400px;">
 
         <!-- Include message for user notifications -->
         <?php include('message.php'); ?>
