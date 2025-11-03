@@ -628,6 +628,9 @@ require 'header.php';
 
             // Function to validate date
             function validateDate(dateString) {
+                // Allow empty dates since DOB is now optional
+                if (!dateString || dateString.trim() === '') return true;
+
                 const regex = /^\d{4}-\d{2}-\d{2}$/;
                 if (!dateString.match(regex)) return false;
 

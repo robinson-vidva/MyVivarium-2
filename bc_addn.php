@@ -317,6 +317,9 @@ require 'header.php';
         document.addEventListener('DOMContentLoaded', function() {
             // Function to validate date
             function validateDate(dateString) {
+                // Allow empty dates since date fields are now optional
+                if (!dateString || dateString.trim() === '') return true;
+
                 const regex = /^\d{4}-\d{2}-\d{2}$/;
                 if (!dateString.match(regex)) return false;
 
