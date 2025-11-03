@@ -226,8 +226,12 @@ require 'header.php';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 
     <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
         .content {
-            padding: 20px;
             min-height: 80vh;
         }
 
@@ -236,6 +240,7 @@ require 'header.php';
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            margin-top: 20px;
             flex-wrap: wrap;
             gap: 10px;
         }
@@ -250,34 +255,13 @@ require 'header.php';
             gap: 10px;
         }
 
-        .notes-table {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        .notes-table table {
-            margin-bottom: 0;
-        }
-
-        .notes-table th {
-            background-color: #343a40;
-            color: white;
-            font-weight: 500;
-        }
-
-        .notes-table td {
-            vertical-align: middle;
-        }
-
         .timestamp {
             font-size: 0.9em;
             color: #666;
         }
 
         .comments-cell {
-            max-width: 300px;
+            max-width: 400px;
             word-wrap: break-word;
         }
 
@@ -289,6 +273,10 @@ require 'header.php';
         .modal-header {
             background-color: #343a40;
             color: white;
+        }
+
+        .table td {
+            vertical-align: middle;
         }
 
         @media print {
@@ -332,7 +320,7 @@ require 'header.php';
     </style>
 </head>
 <body>
-    <div class="container-fluid content">
+    <div class="container mt-4 content">
         <!-- Print Header (hidden on screen) -->
         <div class="print-header">
             <h2><?php echo htmlspecialchars($labName); ?></h2>
@@ -346,7 +334,7 @@ require 'header.php';
 
         <!-- Page Header -->
         <div class="no-print">
-            <h1><i class="fas fa-clipboard-list"></i> Vivarium Maintenance Notes Manager</h1>
+            <h1 class="text-center"><i class="fas fa-clipboard-list"></i> Vivarium Maintenance Notes Manager</h1>
 
             <!-- Search and Action Bar -->
             <div class="header-actions">
@@ -386,7 +374,7 @@ require 'header.php';
         </div>
 
         <!-- Maintenance Notes Table -->
-        <div class="notes-table">
+        <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
@@ -394,7 +382,7 @@ require 'header.php';
                         <th>Cage ID</th>
                         <th>Date/Time</th>
                         <th>Added By</th>
-                        <th class="comments-cell">Comments</th>
+                        <th>Comments</th>
                         <th class="no-print">Actions</th>
                     </tr>
                 </thead>
@@ -444,7 +432,7 @@ require 'header.php';
                     <?php endif; ?>
                 </tbody>
             </table>
-        </div>
+        </div><!-- End table-responsive -->
 
         <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
