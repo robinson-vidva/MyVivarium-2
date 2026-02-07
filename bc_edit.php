@@ -779,7 +779,7 @@ require 'header.php';
     <style>
         .container {
             max-width: 800px;
-            background-color: #f8f9fa;
+            background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
             margin-top: 20px;
@@ -892,11 +892,11 @@ require 'header.php';
                         <div class="action-buttons">
                             <!-- Button to go back to the previous page -->
                             <!-- Button to go back to the previous page -->
-                            <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Go Back">
+                            <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                                 <i class="fas fa-arrow-circle-left"></i>
                             </a>
                             <!-- Button to save the form -->
-                            <a href="javascript:void(0);" onclick="document.getElementById('editForm').submit();" class="btn btn-success btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Save">
+                            <a href="javascript:void(0);" onclick="document.getElementById('editForm').submit();" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Save">
                                 <i class="fas fa-save"></i>
                             </a>
                         </div>
@@ -1090,7 +1090,7 @@ require 'header.php';
                             <div class="card mt-4">
                                 <div class="card-header d-flex justify-content-between align-items-center">
                                     <h4 class="mb-0">Litter Details - <?= htmlspecialchars($id) ?>
-                                        <button type="button" class="btn btn-primary btn-icon" onclick="addLitter()" data-toggle="tooltip" data-placement="top" title="Add New Litter Data">
+                                        <button type="button" class="btn btn-primary btn-icon" onclick="addLitter()" data-bs-toggle="tooltip" data-bs-placement="top" title="Add New Litter Data">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </h4>
@@ -1146,7 +1146,7 @@ require 'header.php';
                                     <h4>Maintenance Log for Cage ID: <?= htmlspecialchars($id ?? 'Unknown'); ?></h4>
                                     <div class="action-icons mt-3 mt-md-0">
                                         <!-- Maintenance button with tooltip -->
-                                        <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-icon" data-toggle="tooltip" data-placement="top" title="Add Maintenance Record">
+                                        <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
                                             <i class="fas fa-wrench"></i>
                                         </a>
                                     </div>

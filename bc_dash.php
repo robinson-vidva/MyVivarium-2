@@ -36,7 +36,7 @@ require 'header.php';
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- FontAwesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Font Awesome loaded via header.php -->
     <!-- Bootstrap 5 CSS is already loaded via header.php -->
 
     <script>
@@ -46,9 +46,10 @@ require 'header.php';
         var showArchived = '0';
 
         // Initialize tooltips when the document is ready
-        $(document).ready(function() {
-            $('[data-toggle="tooltip"]').tooltip();
-        });
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
 
         // Confirm archive function with a dialog
         function confirmDeletion(id) {
@@ -190,7 +191,7 @@ require 'header.php';
 
         .container {
             max-width: 800px;
-            background-color: #f8f9fa;
+            background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
             margin-top: 20px;
@@ -263,15 +264,15 @@ require 'header.php';
                         <h4>Breeding Cage Dashboard</h4>
                         <div class="action-icons mt-3 mt-md-0">
                             <!-- Add new cage button with tooltip -->
-                            <a href="bc_addn.php" class="btn btn-primary btn-icon" data-toggle="tooltip" data-placement="top" title="Add New Cage">
+                            <a href="bc_addn.php" class="btn btn-primary btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add New Cage">
                                 <i class="fas fa-plus"></i>
                             </a>
                             <!-- Print cage card button with tooltip -->
-                            <a href="bc_slct_crd.php" class="btn btn-success btn-icon" data-toggle="tooltip" data-placement="top" title="Print Cage Card">
+                            <a href="bc_slct_crd.php" class="btn btn-success btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage Card">
                                 <i class="fas fa-print"></i>
                             </a>
                             <!-- Maintenance button with tooltip -->
-                            <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-icon" data-toggle="tooltip" data-placement="top" title="Cage Maintenance">
+                            <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Cage Maintenance">
                                 <i class="fas fa-wrench"></i>
                             </a>
                         </div>

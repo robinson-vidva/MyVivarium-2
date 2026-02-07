@@ -222,7 +222,7 @@ $result = $stmt->get_result();
             text-align: right;
         }
     </style>
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <!-- jQuery loaded via header.php -->
 </head>
 
 <body>

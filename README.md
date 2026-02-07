@@ -29,6 +29,8 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 ### New Features
 - **Cage Archiving** -- Soft-delete cages instead of permanent deletion, with restore capability
 - **Cage ID Editing** -- Rename cage IDs with automatic propagation across all related tables
+- **Cage Duplication** -- Clone an existing cage to quickly create a similar one (copies strain, IACUC, users, location, mice)
+- **Move Mouse Between Cages** -- Transfer mice from one holding cage to another with validation and quantity tracking
 - **Configurable Pagination** -- Choose 10, 20, 30, or 50 cages per page on dashboards
 - **Column Sorting** -- Sort cage lists by cage ID in ascending or descending order
 - **Location Tracking** -- Room and rack fields on all cage types
@@ -36,17 +38,22 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - **Flexible Cage Creation** -- Only cage ID is required; all other fields are optional
 - **Custom Strains** -- "None / Not Applicable" and "Custom" strain options with free-text input
 - **Vivarium Manager Role** -- Dedicated role with maintenance notes oversight across all cages
+- **Activity/Audit Log** -- Track who changed what and when (create, edit, archive, restore, delete, rename, transfer, role changes)
+- **Cage Lineage View** -- Visual tree showing parent-child cage relationships across breeding and holding cages
+- **Date Range Filters** -- Filter maintenance notes by date range with From/To date inputs
+- **Dark Mode** -- Toggle between light and dark themes (Bootstrap 5.3 native, preference saved in localStorage)
 - **Dashboard Stats** -- Home page shows active vs. archived cage counts
 
 ### Security Improvements
 - SQL injection fixes (prepared statements throughout)
 - CSRF token validation on all state-changing operations
 - XSS prevention with proper output encoding
+- Session security hardening (HttpOnly, SameSite, 30-min timeout, ID regeneration)
 - Authentication checks on all API endpoints
 - Removed deprecated `FILTER_SANITIZE_STRING` (PHP 8.2+ compatible)
 - Fixed double-escaping bugs with `mysqli_real_escape_string` + `bind_param`
 - CLI-only guard on `process_reminders.php`
-- Standardized on Bootstrap 5 (removed Bootstrap 4 conflicts)
+- Standardized on Bootstrap 5.3.3 (removed all Bootstrap 4 conflicts)
 
 ### Bug Fixes
 - Fixed broken cage permission checks (now uses `cage_users` junction table)
@@ -62,8 +69,14 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - Admin functionalities for managing users and labs
 - Vivarium Manager role for maintenance oversight
 - Cage archiving with restore and permanent delete options
+- Cage duplication (clone) for quick cage creation
+- Mouse transfer between holding cages
+- Cage lineage view (visual parent-child tree)
+- Activity/audit log with search, date range, and entity filters
 - Configurable pagination and sorting on cage dashboards
+- Date range filters on maintenance notes
 - Location tracking (room/rack) and genotype fields
+- Dark mode with localStorage persistence
 - Real-time environmental monitoring using IoT sensors ([RPi-IoT Repository](https://github.com/myvivarium/RPi-IoT))
 - Secure and compliant data management
 
@@ -299,8 +312,12 @@ See `database/README.md` for full migration details.
 ### Vivarium Management
 | File | Description |
 |------|-------------|
-| `vivarium_manager_notes.php` | Maintenance notes CRUD with search, pagination, print |
+| `vivarium_manager_notes.php` | Maintenance notes CRUD with search, date range filter, pagination, print |
 | `maintenance.php` | Add maintenance records from cage view |
+| `activity_log.php` | Activity/audit log viewer with search, date range, entity type filter |
+| `log_activity.php` | Helper function for recording audit trail entries |
+| `cage_lineage.php` | Visual tree view of parent-child cage relationships |
+| `mouse_transfer.php` | Backend for transferring mice between holding cages |
 
 ### Tasks & Reminders
 | File | Description |
