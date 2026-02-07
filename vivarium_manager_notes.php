@@ -16,7 +16,7 @@
  */
 
 // Start session
-session_start();
+require 'session_config.php';
 
 // Include database connection
 require 'dbcon.php';

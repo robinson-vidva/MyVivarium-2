@@ -10,7 +10,7 @@
  * 
  */
 
-session_start(); // Start the session to use session variables
+require 'session_config.php'; // Start the session to use session variables
 require 'dbcon.php'; // Include database connection
 
 // Check if the user is logged in, redirect to login page if not

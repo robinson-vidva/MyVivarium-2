@@ -10,7 +10,7 @@
  * 
  */
 
-session_start();
+require 'session_config.php';
 require 'dbcon.php';  // Include database connection file
 require 'config.php';  // Include configuration file
 require 'vendor/autoload.php';  // Include PHPMailer autoload file

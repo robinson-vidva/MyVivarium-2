@@ -8,7 +8,7 @@
  * 
  */
 
-session_start();
+require 'session_config.php';
 require 'dbcon.php';
 
 // Check if the user is not logged in

@@ -9,7 +9,7 @@
  * The script uses PHP sessions for message handling and includes basic input sanitization for security.
  */
 ob_start();
-session_start();
+require 'session_config.php';
 
 // Check if the user is logged in
 if (!isset($_SESSION['name'])) {

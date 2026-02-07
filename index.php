@@ -14,7 +14,7 @@ ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';

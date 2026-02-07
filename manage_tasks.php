@@ -11,7 +11,7 @@
  */
 
 ob_start(); // Start output buffering
-session_start(); // Start the session to use session variables
+require 'session_config.php'; // Start the session to use session variables
 require 'header.php'; // Include header file
 require 'dbcon.php'; // Include database connection
 

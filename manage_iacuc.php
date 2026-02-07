@@ -9,7 +9,7 @@
  * 
  */
 
-session_start(); // Start the session to use session variables
+require 'session_config.php'; // Start the session to use session variables
 require 'dbcon.php'; // Include database connection
 require 'header.php'; // Include the header for consistent page structure
 

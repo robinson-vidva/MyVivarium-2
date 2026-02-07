@@ -11,7 +11,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';

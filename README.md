@@ -1,6 +1,6 @@
 ![Logo](https://myvivarium.online/images/logo1.jpg)
 
-# MyVivarium
+# MyVivarium v2
 
 ![Project Status](https://img.shields.io/badge/status-active-brightgreen) [![LGPL License](https://img.shields.io/badge/License-LGPL--3.0-blue.svg)](https://choosealicense.com/licenses/lgpl-3.0/)
 
@@ -10,28 +10,68 @@
 
 MyVivarium is an online platform designed to manage your vivarium effectively. It provides features such as user registration, profile management, lab management, and real-time environmental monitoring with IoT sensors.
 
+**MyVivarium-2** is the enhanced version with improved security, new features, and a better user experience. The original [MyVivarium](https://github.com/myvivarium/MyVivarium) repository is preserved as the initial release.
+
 ## Table of Contents
+- [What's New in v2](#whats-new-in-v2)
 - [Features](#features)
 - [Screenshot](#screenshot)
 - [Installation](#installation)
+- [Upgrading from v1](#upgrading-from-v1)
 - [Usage](#usage)
-- [Function of Each File](#function-of-each-file)
+- [File Reference](#file-reference)
 - [Citations](#citations)
 - [Contributing](#contributing)
 - [License](#license)
 
+## What's New in v2
+
+### New Features
+- **Cage Archiving** -- Soft-delete cages instead of permanent deletion, with restore capability
+- **Cage ID Editing** -- Rename cage IDs with automatic propagation across all related tables
+- **Configurable Pagination** -- Choose 10, 20, 30, or 50 cages per page on dashboards
+- **Column Sorting** -- Sort cage lists by cage ID in ascending or descending order
+- **Location Tracking** -- Room and rack fields on all cage types
+- **Genotype Fields** -- Track genotype on holding cages and male/female genotype on breeding cages
+- **Flexible Cage Creation** -- Only cage ID is required; all other fields are optional
+- **Custom Strains** -- "None / Not Applicable" and "Custom" strain options with free-text input
+- **Vivarium Manager Role** -- Dedicated role with maintenance notes oversight across all cages
+- **Dashboard Stats** -- Home page shows active vs. archived cage counts
+
+### Security Improvements
+- SQL injection fixes (prepared statements throughout)
+- CSRF token validation on all state-changing operations
+- XSS prevention with proper output encoding
+- Authentication checks on all API endpoints
+- Removed deprecated `FILTER_SANITIZE_STRING` (PHP 8.2+ compatible)
+- Fixed double-escaping bugs with `mysqli_real_escape_string` + `bind_param`
+- CLI-only guard on `process_reminders.php`
+- Standardized on Bootstrap 5 (removed Bootstrap 4 conflicts)
+
+### Bug Fixes
+- Fixed broken cage permission checks (now uses `cage_users` junction table)
+- Fixed login error messages not displaying
+- Fixed account lock time mismatch
+- Prevented username enumeration on login
+- Fixed premature `</body></html>` in header.php
+- Added search debounce (300ms) to prevent excessive AJAX requests
+
 ## Features
-- User registration and login with email verification.
-- User profile management and password reset.
-- Admin functionalities for managing users and labs.
-- Real-time environmental monitoring using IoT sensors. For more details, refer to the [RPi-IoT Repository](https://github.com/myvivarium/RPi-IoT).
-- Secure and compliant data management.
+- User registration and login with email verification
+- User profile management and password reset
+- Admin functionalities for managing users and labs
+- Vivarium Manager role for maintenance oversight
+- Cage archiving with restore and permanent delete options
+- Configurable pagination and sorting on cage dashboards
+- Location tracking (room/rack) and genotype fields
+- Real-time environmental monitoring using IoT sensors ([RPi-IoT Repository](https://github.com/myvivarium/RPi-IoT))
+- Secure and compliant data management
 
 ![image](https://myvivarium.online/images/illustration.jpg)
 
 ## Installation
 
-### 1. DigitalOcean One-Click Install (Recommended for Ease of Use)
+### 1. DigitalOcean One-Click Install (Recommended)
 
 [![DigitalOcean Referral Badge](https://web-platforms.sfo2.cdn.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=fdb1aa3adb7d&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
 
@@ -40,110 +80,95 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 1. **Sign up for a DigitalOcean account** using the referral link above to get your credits.
 
 2. **Create a PHPMyAdmin Droplet**:
-   - Use this link to deploy DigitalOcean's [PHPMyAdmin Droplet](https://marketplace.digitalocean.com/apps/phpmyadmin), which installs PHPMyAdmin, MySQL Server, Apache, PHP, and Certbot as a 1-click setup.
-   - After clicking **Create PHPMyAdmin Droplet**, log in to your DigitalOcean account and follow these steps:
-     - Choose the **Region** and **Datacenter** for your server.
-     - Ensure the **PHPMyAdmin** image from the Marketplace is selected.
-     - Under **Choose a plan**, select **Basic** and **Regular (1 GB / 1 CPU)** for the CPU options.
-     - Set up access by creating an **SSH Key** or choosing a **password**.
-     - Finally, click on **Create Droplet**.
+   - Deploy DigitalOcean's [PHPMyAdmin Droplet](https://marketplace.digitalocean.com/apps/phpmyadmin) (1-click setup: PHPMyAdmin, MySQL, Apache, PHP, Certbot).
+   - Choose your **Region** and **Datacenter**.
+   - Select **Basic** plan with **Regular (1 GB / 1 CPU)**.
+   - Set up **SSH Key** or **password** access.
+   - Click **Create Droplet**.
 
 3. **Access the Droplet**:
-   - Once your droplet is ready, use the console option in the DigitalOcean dashboard to access the server.
-   - If you have a domain, use the droplet’s IPv4 address to set up an A record in your domain DNS settings.
+   - Use the console in the DigitalOcean dashboard.
+   - If you have a domain, point an A record to the droplet's IPv4 address.
 
-4. **Download the Installation Script**:
-    After connecting to your Linux server's console, use the following command to download the installation shell script:
-
+4. **Download and run the installation script**:
    ```bash
    curl -O https://raw.githubusercontent.com/myvivarium/MyVivarium/main/setup/setup.sh
-    ```
-5. **Make the Script Executable**:
-   ```bash
    chmod +x setup.sh
-    ```
-6. **Run the Script**:
-   ```bash
    sudo ./setup.sh
-    ```
-7. **Follow the Script Prompts**:
-   - Provide details such as email, domain name, set database password, and SMTP settings to complete the installation and configuration.
+   ```
 
-8. **Complete Setup**:
-   - Once DNS settings propagate (if using a domain), the site will be accessible, and you can begin using MyVivarium
+5. **Follow the prompts** to configure email, domain, database password, and SMTP settings.
 
 ### 2. Custom Installation
 
 #### Prerequisites
-- PHP [8.1.2]
-- MySQL Server [8.0.32]
-- Apache [2.4.41]
-- phpMyAdmin [5.2.1]
-- Tutorial to install Linux, Apache, MySQL, PHP (LAMP) Stack on Ubuntu - [DigitalOcean LAMP Stack Tutorial](https://www.digitalocean.com/community/tutorials/how-to-install-lamp-stack-on-ubuntu)
+- PHP 8.1+
+- MySQL 8.0+
+- Apache 2.4+
 - Composer
+- [LAMP Stack Tutorial](https://www.digitalocean.com/community/tutorials/how-to-install-lamp-stack-on-ubuntu)
 
 #### Steps
 
 1. **Clone the repository:**
     ```bash
-    git clone https://github.com/myvivarium/MyVivarium.git
+    git clone https://github.com/robinson-vidva/MyVivarium-2.git
+    cd MyVivarium-2
     ```
-    or
-    ```bash
-    git clone git@github.com:myvivarium/MyVivarium.git
-    ```
-    ```bash
-    cd MyVivarium
-    ````
 
 2. **Set up the environment configuration:**
-    - Copy the `.env.example` to `.env`:
-        ```bash
-        cp .env.example .env
-        ```
-    - Update the `.env` file with your database and SMTP settings. See [Configuration](#configuration)
+    ```bash
+    cp .env.example .env
+    ```
+    Update `.env` with your database and SMTP settings (see [Configuration](#configuration)).
 
-3. **Place the project files in the web server directory:**
-    - Move all the contents of the MyVivarium directory to your web server’s public directory (e.g., `public_html`, `www`):
-        ```bash
-        mv * /path/to/your/public_html/
-        cp .env /path/to/your/public_html/
-        ```
+3. **Place files in the web server directory:**
+    ```bash
+    mv * /path/to/your/public_html/
+    cp .env /path/to/your/public_html/
+    ```
 
-4. **Install dependencies using Composer:**
+4. **Install dependencies:**
     ```bash
     composer install
     ```
 
 5. **Set up the database:**
-    - Log in to your MySQL server:
-        ```bash
-        mysql -u yourusername -p
-        ```
-    - Create the database and import the schema:
-        ```sql
-        CREATE DATABASE myvivarium;
-        USE myvivarium;
-        SOURCE /path/to/your/public_html/database/schema.sql;
-        ```
-    - Alternatively, you can use your own database or an already existing database:
-        ```sql
-        SOURCE /path/to/your/public_html/database/schema.sql;
-        ```
+    ```bash
+    mysql -u yourusername -p
+    ```
+    ```sql
+    CREATE DATABASE myvivarium;
+    USE myvivarium;
+    SOURCE /path/to/your/public_html/database/schema.sql;
+    ```
 
-6. **Set up a cron job for `send_email.php` & `process_reminders.php`:**
-    Follow the instructions on [Cloudways Blog](https://www.cloudways.com/blog/schedule-cron-jobs-in-php/#run-a-cron-job-in-php) to schedule a cron job for `send_email.php`.
+6. **Set up cron jobs:**
+    ```bash
+    # Process reminders every 5 minutes
+    */5 * * * * php /path/to/your/public_html/process_reminders.php
+    # Send queued emails every minute
+    * * * * * php /path/to/your/public_html/send_email.php
+    ```
 
-7. **Set ownership and permissions (if required):**
+7. **Set ownership and permissions:**
     ```bash
     sudo chown -R www-data:www-data /path/to/your/public_html
     sudo chmod -R 755 /path/to/your/public_html
     ```
 
 #### Configuration
+
+##### Database Configuration
+```bash
+DB_HOST=localhost
+DB_USERNAME=username
+DB_PASSWORD=password
+DB_DATABASE=myvivarium
+```
+
 ##### SMTP Configuration
-Update the following environment variables in your `.env` file:
- ```bash
+```bash
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USERNAME=username
@@ -151,122 +176,166 @@ SMTP_PASSWORD=password
 SMTP_ENCRYPTION=tls
 SENDER_EMAIL=sender@example.com
 SENDER_NAME=MyVivarium
- ```
+```
 
-##### Database Configuration
-Ensure the database credentials are set correctly in the `.env` file:
- ```bash
-DB_HOST=localhost
-DB_USERNAME=username
-DB_PASSWORD=password
-DB_DATABASE=myvivarium
- ```
+## Upgrading from v1
+
+If you're upgrading from the original MyVivarium, you have two options:
+
+### Option A: In-Place SQL Migration (Recommended)
+Run the migration script directly on your existing database:
+```bash
+# Back up first!
+mysqldump -u root -p myvivarium > backup_before_v2.sql
+
+# Apply migration
+mysql -u root -p myvivarium < database/migrate_v1_to_v2.sql
+```
+
+### Option B: Interactive Shell Migration
+Use the interactive script to migrate data from one database to another:
+```bash
+chmod +x database/migrate_v1_to_v2.sh
+./database/migrate_v1_to_v2.sh
+```
+This will prompt for source/destination database credentials, create automatic backups, and migrate data table-by-table.
+
+### What the Migration Does
+| Change | Details |
+|--------|---------|
+| Vivarium Manager role | Auto-assigns role to users with matching positions |
+| Cage status column | Adds `status` ENUM ('active', 'archived') with default 'active' |
+| Location fields | Adds `room` and `rack` to cages |
+| Genotype (holding) | Adds `genotype` to holding table |
+| Genotype (breeding) | Adds `male_genotype` and `female_genotype` to breeding table |
+| Optional fields | Makes DOB, parent cage, cross, male/female IDs nullable |
+
+See `database/README.md` for full migration details.
 
 ## Screenshot
 
 ![image](https://myvivarium.online/images/myvivarium.gif)
 
 ## Usage
-1. Access the application in your web browser:
-    ```
-    http://yourdomain.com
-    ```
 
+1. Access the application at `http://yourdomain.com`
 2. Register a new user or log in with existing credentials.
-
 3. Manage your lab, users, and monitor environmental conditions in real-time.
 
 ### Default Admin User
+- **Email**: `admin@myvivarium.online`
+- **Password**: `P@ssw0rd`
 
-For initial setup, use the following default admin credentials:
+**Important**: Delete this default admin user and create a new admin after initial setup.
 
-- **Email**: admin@myvivarium.online
-- **Password**: P@ssw0rd
+### User Roles
+| Role | Permissions |
+|------|------------|
+| **Admin** | Full access: manage users, IACUC, strains, labs, export data, all cage operations |
+| **Vivarium Manager** | View/add/edit/delete maintenance notes across all cages, standard cage operations |
+| **User** | Standard cage operations on assigned cages only |
 
-**Important**: Delete this default admin user and create a new admin user after the initial setup for security reasons.
+## File Reference
 
-## Function of Each File
-- `dbcon.php`: Manages database connections.
-- `config.php`: Contains SMTP configuration.
-- `session_config.php`: Configures secure session settings including HttpOnly cookies, HTTPS-only transmission, CSRF protection, and 30-minute timeout. See file comments for deployment instructions.
-- `index.php`: Main entry point for the application, handles user login.
-- `register.php`: Handles user registration and email verification.
-- `home.php`: Displays the home page with a welcome message, cage statistics, and general notes.
-- `forgot_password.php`: Handles the password reset process, including generating and sending reset emails.
-- `reset_password.php`: Manages the password reset process.
-- `confirm_email.php`: Manages email confirmation by verifying tokens and updating user status.
-- `user_profile.php`: Allows users to update their profile and request password resets.
-- `manage_users.php`: Provides functionalities for admin to manage users.
-- `manage_lab.php`: Allows admins to manage lab details.
-- `manage_strain.php`: Allows admins to manage mouse strain details.
-- `manage_iacuc.php`: Allows admins to manage IACUC details.
-- `iot_sensors.php`: Displays IoT sensor data for different rooms using iframes.
-- `bc_dash.php`: Displays a dashboard for managing breeding cages with search and pagination.
-- `bc_fetch_data.php`: Handles pagination and search functionality for breeding cages.
-- `bc_addn.php`: Handles the creation of new breeding cages and associated litter data.
-- `bc_view.php`: Viewing the details of a breeding cage.
-- `bc_edit.php`: Manages editing of breeding cage details, including litter information and file uploads.
-- `bc_drop.php`: Handles the deletion of breeding cages and their related data.
-- `bc_slct_crd.php`: Selects breeding cages for printing cage cards.
-- `bc_prnt_crd.php`: Generates printable cards for breeding cages with their latest litter records.
-- `hc_dash.php`: Displays a dashboard for managing holding cages.
-- `hc_fetch_data.php`: Handles pagination and search functionality for holding cages.
-- `hc_addn.php`: Adds new holding cages.
-- `hc_view.php`: Viewing the details of a holding cage.
-- `hc_edit.php`: Manages editing of holding cage details.
-- `hc_drop.php`: Handles the deletion of holding cages.
-- `hc_slct_crd.php`: Selects holding cages for printing cage cards.
-- `hc_prnt_crd.php`: Generates printable cards for holding cages.
-- `nt_app.php`: Main script for the sticky note application.
-- `nt_add.php`: Adds new sticky notes.
-- `nt_edit.php`: Edits existing sticky notes.
-- `nt_rmv.php`: Removes sticky notes.
-- `header.php`: Generates the header and navigation menu for the web application.
-- `footer.php`: Provides the footer section with dynamic lab name and current year.
-- `message.php`: Displays session messages as Bootstrap alerts.
-- `logout.php`: Logs out the user by destroying the session and redirecting to the login page.
-- `delete_file.php`: Script handles deleting uploaded files from the server and database.
-- `export_data.php`: Allows admins to export all database tables into CSV files.
-- `manage_tasks.php`: Manages tasks in a database, allowing users to add, edit, and delete tasks.
-- `get_task.php`: Retrieves specific task details from the database with the provided task ID.
-- `send_email.php`: Processes a queue of pending emails, requires setting it up as a cron job.
-- `demo-banner.php`: Displays a banner at the top of the page in demo mode.
-- `demo-credentials.php`: Displays the demo admin credentials on the login page.
-- `demo-disclaimer.php`: Displays the demo disclaimer on the login page.
-- `maintenance.php`: Adds maintenance records for cages with optional comments.
-- `vivarium_manager_notes.php`: Comprehensive maintenance notes management interface for Vivarium Managers and Admins. Features include viewing all maintenance notes across all cages, searching/filtering, adding, editing, and deleting notes, plus print functionality.
-- `get_reminder.php`: Retrieves scheduled reminders from the database, likely for notifications.
-- `manage_reminder.php`: Manages reminders within the application, allowing users to add, edit, or delete reminders.
-- `process_reminders.php`: Processes and sends scheduled reminders, possibly running as a cron job.
+### Core
+| File | Description |
+|------|-------------|
+| `dbcon.php` | Database connection |
+| `config.php` | SMTP configuration |
+| `session_config.php` | Secure session settings (HttpOnly, HTTPS, CSRF, 30-min timeout) |
+| `header.php` | Navigation header |
+| `footer.php` | Footer with dynamic lab name |
+| `message.php` | Session message display |
+
+### Authentication
+| File | Description |
+|------|-------------|
+| `index.php` | Login page |
+| `register.php` | User registration with email verification |
+| `forgot_password.php` | Password reset emails |
+| `reset_password.php` | Password reset form |
+| `confirm_email.php` | Email verification |
+| `logout.php` | Session destruction |
+
+### Dashboard & Home
+| File | Description |
+|------|-------------|
+| `home.php` | Home page with cage stats (active/archived counts) |
+| `user_profile.php` | User profile management |
+
+### Admin
+| File | Description |
+|------|-------------|
+| `manage_users.php` | User management (roles: admin, vivarium_manager, user) |
+| `manage_lab.php` | Lab settings |
+| `manage_strain.php` | Strain management |
+| `manage_iacuc.php` | IACUC protocol management |
+| `export_data.php` | CSV export of all tables |
+
+### Holding Cages
+| File | Description |
+|------|-------------|
+| `hc_dash.php` | Dashboard with pagination, sort, archive toggle |
+| `hc_fetch_data.php` | AJAX data fetch with dynamic limit/sort/filter |
+| `hc_addn.php` | Add cage (room, rack, genotype, custom strain) |
+| `hc_view.php` | View cage details |
+| `hc_edit.php` | Edit cage (includes cage ID rename) |
+| `hc_drop.php` | Archive/restore/permanent delete |
+| `hc_slct_crd.php` | Select cages for card printing |
+| `hc_prnt_crd.php` | Print cage cards |
+
+### Breeding Cages
+| File | Description |
+|------|-------------|
+| `bc_dash.php` | Dashboard with pagination, sort, archive toggle |
+| `bc_fetch_data.php` | AJAX data fetch with dynamic limit/sort/filter |
+| `bc_addn.php` | Add cage (room, rack, genotypes, custom strain) |
+| `bc_view.php` | View cage details |
+| `bc_edit.php` | Edit cage (includes cage ID rename) |
+| `bc_drop.php` | Archive/restore/permanent delete |
+| `bc_slct_crd.php` | Select cages for card printing |
+| `bc_prnt_crd.php` | Print cage cards |
+
+### Vivarium Management
+| File | Description |
+|------|-------------|
+| `vivarium_manager_notes.php` | Maintenance notes CRUD with search, pagination, print |
+| `maintenance.php` | Add maintenance records from cage view |
+
+### Tasks & Reminders
+| File | Description |
+|------|-------------|
+| `manage_tasks.php` | Task management (add/edit/delete) |
+| `get_task.php` | Retrieve task details (AJAX) |
+| `manage_reminder.php` | Reminder management |
+| `get_reminder.php` | Retrieve reminder details (AJAX) |
+| `process_reminders.php` | Process scheduled reminders (cron job, CLI only) |
+| `send_email.php` | Send queued emails (cron job) |
+
+### Other
+| File | Description |
+|------|-------------|
+| `nt_app.php` | Sticky notes application |
+| `nt_add.php` / `nt_edit.php` / `nt_rmv.php` | Sticky note CRUD |
+| `iot_sensors.php` | IoT sensor data display |
+| `delete_file.php` | File attachment deletion |
+
+### Database
+| File | Description |
+|------|-------------|
+| `database/schema.sql` | Full v2 database schema (use for fresh installs) |
+| `database/migrate_v1_to_v2.sql` | In-place SQL migration from v1 to v2 |
+| `database/migrate_v1_to_v2.sh` | Interactive shell migration script |
+| `database/README.md` | Detailed migration documentation |
 
 ## Demo Website
 
-### Explore MyVivarium
-
-We have a demo website available for you to explore the features of MyVivarium. Click the button below to access the demo site:
-
 [![Visit Demo Site](https://img.shields.io/badge/Visit-Demo%20Site-blue?style=for-the-badge)](https://demo.myvivarium.online)
 
-### Access Details
+- **Email**: `admin@myvivarium.online`
+- **Password**: `P@ssw0rd`
 
-To log in and explore the functionalities, please use the following access details:
-
-- **Email**: 
-    ```
-    admin@myvivarium.online
-    ```
-- **Password**: 
-    ```
-    P@ssw0rd
-    ```
-
-### Important Notice
-
-**Disclaimer**: This is a demo site for exploring features. All data will be cleared periodically. Do not enter any sensitive or critical information.
-
-Feel free to explore, test, and provide feedback. Enjoy your experience with MyVivarium!
-
----
+**Disclaimer**: This is a demo site for exploring features. All data will be cleared periodically. Do not enter sensitive information.
 
 ## Citations
 
@@ -291,7 +360,7 @@ Vidva, R., Raza, M. A., Prabhakaran, J., Sheikh, A., Sharp, A., Ott, H., Moore, 
 ```
 
 ## Contributing
-We welcome contributions to improve MyVivarium. Please follow these steps to contribute:
+We welcome contributions to improve MyVivarium. Please follow these steps:
 
 1. Fork the repository.
 2. Create a new branch: `git checkout -b feature/your-feature-name`
@@ -301,4 +370,3 @@ We welcome contributions to improve MyVivarium. Please follow these steps to con
 
 ## License
 This project is licensed under the LGPL License - see the [LICENSE](LICENSE) file for details.
-

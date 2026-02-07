@@ -10,7 +10,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -23,7 +23,7 @@ if (!isset($_SESSION['username'])) {
 }
 
 // Fetch all distinct cage IDs from the database
-$query = "SELECT DISTINCT `cage_id` FROM holding";
+$query = "SELECT DISTINCT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = 'active'";
 $result = mysqli_query($con, $query);
 
 // Initialize an array to store cage IDs

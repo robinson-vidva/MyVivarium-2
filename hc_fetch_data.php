@@ -10,7 +10,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
