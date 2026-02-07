@@ -18,6 +18,11 @@ if (!isset($_SESSION['username'])) {
     exit;
 }
 
+// Generate CSRF token if not already present
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -370,6 +375,9 @@ require 'header.php';
                     <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
+                    <a href="hc_addn.php?clone=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-info btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Duplicate Cage">
+                        <i class="fas fa-clone"></i>
+                    </a>
                     <a href="manage_tasks.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
@@ -470,11 +478,17 @@ require 'header.php';
                                 <th>Mouse ID</th>
                                 <th>Genotype</th>
                                 <th>Notes</th>
+                                <th>Actions</th>
                             </tr>
                             <tr>
                                 <td><?= htmlspecialchars($mouse['mouse_id']); ?></td>
                                 <td><?= htmlspecialchars($mouse['genotype']); ?></td>
                                 <td><?= htmlspecialchars($mouse['notes']); ?></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="openTransferModal(<?= $mouse['id']; ?>, '<?= htmlspecialchars($mouse['mouse_id']); ?>')" title="Transfer Mouse">
+                                        <i class="fas fa-exchange-alt"></i>
+                                    </button>
+                                </td>
                             </tr>
                         </table>
                     <?php endforeach; ?>
@@ -604,6 +618,42 @@ require 'header.php';
         </div>
     </div>
 
+    <!-- Mouse Transfer Modal -->
+    <div class="popup-overlay" id="transferOverlay"></div>
+    <div class="popup-form" id="transferForm" style="max-width: 500px;">
+        <h4>Transfer Mouse</h4>
+        <form method="POST" action="mouse_transfer.php">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+            <input type="hidden" id="transfer_mouse_db_id" name="mouse_db_id">
+            <input type="hidden" name="source_cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>">
+            <div class="mb-3">
+                <label class="form-label"><strong>Mouse ID:</strong></label>
+                <p id="transfer_mouse_id_display"></p>
+            </div>
+            <div class="mb-3">
+                <label for="target_cage_id" class="form-label"><strong>Transfer to Cage:</strong></label>
+                <select class="form-control" id="target_cage_id" name="target_cage_id" required>
+                    <option value="">Select Target Cage</option>
+                    <?php
+                    $targetCageQuery = "SELECT h.cage_id FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = 'active' AND h.cage_id != ? ORDER BY h.cage_id";
+                    $targetStmt = $con->prepare($targetCageQuery);
+                    $targetStmt->bind_param("s", $id);
+                    $targetStmt->execute();
+                    $targetResult = $targetStmt->get_result();
+                    while ($targetRow = $targetResult->fetch_assoc()) {
+                        echo '<option value="' . htmlspecialchars($targetRow['cage_id']) . '">' . htmlspecialchars($targetRow['cage_id']) . '</option>';
+                    }
+                    $targetStmt->close();
+                    ?>
+                </select>
+            </div>
+            <div class="form-buttons">
+                <button type="submit" class="btn btn-primary">Transfer</button>
+                <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+
     <script>
         function showQrCodePopup(cageId) {
             var popup = window.open("", "QR Code for Cage " + cageId, "width=400,height=400");
@@ -658,6 +708,18 @@ require 'header.php';
         function closeViewForm() {
             document.getElementById('viewPopupOverlay').style.display = 'none';
             document.getElementById('viewPopupForm').style.display = 'none';
+        }
+
+        function openTransferModal(dbId, mouseId) {
+            document.getElementById('transfer_mouse_db_id').value = dbId;
+            document.getElementById('transfer_mouse_id_display').textContent = mouseId;
+            document.getElementById('transferOverlay').style.display = 'block';
+            document.getElementById('transferForm').style.display = 'block';
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferOverlay').style.display = 'none';
+            document.getElementById('transferForm').style.display = 'none';
         }
 
         // Information Completeness Calculation

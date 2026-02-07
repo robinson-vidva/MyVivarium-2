@@ -214,6 +214,23 @@ CREATE TABLE `maintenance` (
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 );
 
+-- Table for storing activity/audit log
+CREATE TABLE `activity_log` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int DEFAULT NULL,
+  `action` varchar(50) NOT NULL,
+  `entity_type` varchar(50) NOT NULL,
+  `entity_id` varchar(255) DEFAULT NULL,
+  `details` text DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_activity_log_user` (`user_id`),
+  KEY `idx_activity_log_entity` (`entity_type`, `entity_id`),
+  KEY `idx_activity_log_created` (`created_at`),
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+);
+
 -- Table for storing system settings
 CREATE TABLE `settings` (
   `name` varchar(255) NOT NULL,

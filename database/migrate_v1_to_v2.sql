@@ -48,6 +48,23 @@ ALTER TABLE `breeding` MODIFY COLUMN `female_dob` DATE DEFAULT NULL;
 -- Step 8: Set all existing cages as active
 UPDATE `cages` SET `status` = 'active' WHERE `status` IS NULL OR `status` = '';
 
+-- Step 9: Create activity log table (for audit trail)
+CREATE TABLE IF NOT EXISTS `activity_log` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int DEFAULT NULL,
+  `action` varchar(50) NOT NULL,
+  `entity_type` varchar(50) NOT NULL,
+  `entity_id` varchar(255) DEFAULT NULL,
+  `details` text DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_activity_log_user` (`user_id`),
+  KEY `idx_activity_log_entity` (`entity_type`, `entity_id`),
+  KEY `idx_activity_log_created` (`created_at`),
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+);
+
 -- =============================================================================
 -- Verification queries - run these to confirm migration success
 -- =============================================================================
@@ -56,3 +73,4 @@ UPDATE `cages` SET `status` = 'active' WHERE `status` IS NULL OR `status` = '';
 -- DESCRIBE holding;
 -- DESCRIBE breeding;
 -- SELECT DISTINCT role FROM users;
+-- SHOW CREATE TABLE activity_log;

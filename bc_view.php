@@ -413,6 +413,9 @@ require 'header.php';
                     <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
+                    <a href="bc_addn.php?clone=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-info btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Duplicate Cage">
+                        <i class="fas fa-clone"></i>
+                    </a>
                     <!-- Button to mange tasks for the cage -->
                     <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>

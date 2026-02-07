@@ -13,6 +13,9 @@ require 'session_config.php';
 // Include the database connection file
 require 'dbcon.php';
 
+// Include the activity log helper
+require_once 'log_activity.php';
+
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -402,6 +405,12 @@ if (isset($_GET['id'])) {
                 }
             }
 
+            // Log activity
+            log_activity($con, 'edit', 'cage', $cage_id, 'Cage details updated');
+            if ($cageIdChanged) {
+                log_activity($con, 'rename', 'cage', $cage_id, 'Cage renamed from ' . $oldCageId);
+            }
+
             // Redirect to the same page to prevent resubmission on refresh
             header("Location: hc_dash.php?" . getCurrentUrlParams());
             exit();
@@ -451,7 +460,7 @@ require 'header.php';
     <title>Edit Holding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
     <!-- Include Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- Bootstrap 5.3 loaded via header.php -->
 
     <!-- Include Select2 CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet">

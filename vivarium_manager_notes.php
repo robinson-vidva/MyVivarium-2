@@ -153,6 +153,8 @@ $current_user_id = $_SESSION['user_id'];
 
 // Search functionality
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$date_from = isset($_GET['date_from']) ? trim($_GET['date_from']) : '';
+$date_to = isset($_GET['date_to']) ? trim($_GET['date_to']) : '';
 $where_clause = '';
 $search_params = [];
 $param_types = '';
@@ -176,6 +178,18 @@ if (!empty($search)) {
     $search_params[] = $search_pattern;
     $search_params[] = $search_pattern;
     $param_types .= 'ssss';
+}
+
+// Add date range filter
+if (!empty($date_from)) {
+    $where_conditions[] = "DATE(m.timestamp) >= ?";
+    $search_params[] = $date_from;
+    $param_types .= 's';
+}
+if (!empty($date_to)) {
+    $where_conditions[] = "DATE(m.timestamp) <= ?";
+    $search_params[] = $date_to;
+    $param_types .= 's';
 }
 
 // Combine conditions
@@ -347,6 +361,9 @@ require 'header.php';
             <?php if (!empty($search)): ?>
                 <p>Search Filter: "<?php echo htmlspecialchars($search); ?>"</p>
             <?php endif; ?>
+            <?php if (!empty($date_from) || !empty($date_to)): ?>
+                <p>Date Range: <?php echo htmlspecialchars($date_from ?: 'any'); ?> to <?php echo htmlspecialchars($date_to ?: 'any'); ?></p>
+            <?php endif; ?>
             <hr>
         </div>
 
@@ -354,14 +371,21 @@ require 'header.php';
         <div class="no-print">
             <h1 class="text-center"><i class="fas fa-clipboard-list"></i> Vivarium Maintenance Notes Manager</h1>
 
+            <?php
+            // Build extra URL params for preserving filters across navigation
+            $extraParams = '';
+            if (!empty($search)) $extraParams .= '&search=' . urlencode($search);
+            if (!empty($date_from)) $extraParams .= '&date_from=' . urlencode($date_from);
+            if (!empty($date_to)) $extraParams .= '&date_to=' . urlencode($date_to);
+            ?>
             <!-- Filter Toggle -->
             <div class="text-center mb-3">
                 <div class="btn-group" role="group" aria-label="Notes filter">
-                    <a href="?view=vivarium_managers<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>"
+                    <a href="?view=vivarium_managers<?php echo $extraParams; ?>"
                        class="btn btn-<?php echo $filter_view === 'vivarium_managers' ? 'primary' : 'outline-primary'; ?>">
                         <i class="fas fa-user-tie"></i> Vivarium Manager Notes
                     </a>
-                    <a href="?view=all<?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>"
+                    <a href="?view=all<?php echo $extraParams; ?>"
                        class="btn btn-<?php echo $filter_view === 'all' ? 'primary' : 'outline-primary'; ?>">
                         <i class="fas fa-users"></i> All Notes
                     </a>
@@ -370,33 +394,46 @@ require 'header.php';
 
             <!-- Search and Action Bar -->
             <div class="header-actions">
-                <form method="GET" action="" class="search-box">
+                <form method="GET" action="" class="w-100">
                     <input type="hidden" name="view" value="<?php echo htmlspecialchars($filter_view); ?>">
-                    <div class="input-group">
-                        <input type="text"
-                               class="form-control"
-                               name="search"
-                               placeholder="Search cage ID, comments, or user..."
-                               value="<?php echo htmlspecialchars($search); ?>">
-                        <button class="btn btn-primary" type="submit">
-                            <i class="fas fa-search"></i> Search
-                        </button>
-                        <?php if (!empty($search)): ?>
-                            <a href="?view=<?php echo htmlspecialchars($filter_view); ?>" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Clear
-                            </a>
-                        <?php endif; ?>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <div class="input-group">
+                                <input type="text"
+                                       class="form-control"
+                                       name="search"
+                                       placeholder="Search cage ID, comments, or user..."
+                                       value="<?php echo htmlspecialchars($search); ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-0">From</label>
+                            <input type="date" class="form-control form-control-sm" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-0">To</label>
+                            <input type="date" class="form-control form-control-sm" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-search"></i> Search
+                                </button>
+                                <?php if (!empty($search) || !empty($date_from) || !empty($date_to)): ?>
+                                    <a href="?view=<?php echo htmlspecialchars($filter_view); ?>" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> Clear
+                                    </a>
+                                <?php endif; ?>
+                                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                                    <i class="fas fa-plus"></i> Add Note
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="window.print()">
+                                    <i class="fas fa-print"></i> Print
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </form>
-
-                <div class="action-buttons">
-                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">
-                        <i class="fas fa-plus"></i> Add Note
-                    </button>
-                    <button class="btn btn-info" onclick="window.print()">
-                        <i class="fas fa-print"></i> Print
-                    </button>
-                </div>
             </div>
 
             <!-- Pagination Info -->
@@ -473,7 +510,7 @@ require 'header.php';
                 <ul class="pagination justify-content-center">
                     <?php if ($current_page > 1): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?>&view=<?php echo $filter_view; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
                                 Previous
                             </a>
                         </li>
@@ -481,7 +518,7 @@ require 'header.php';
 
                     <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
                         <li class="page-item <?php echo $i == $current_page ? 'active' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $i; ?>&view=<?php echo $filter_view; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
+                            <a class="page-link" href="?page=<?php echo $i; ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
                                 <?php echo $i; ?>
                             </a>
                         </li>
@@ -489,7 +526,7 @@ require 'header.php';
 
                     <?php if ($current_page < $total_pages): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?>&view=<?php echo $filter_view; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
                                 Next
                             </a>
                         </li>

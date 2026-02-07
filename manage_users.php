@@ -14,6 +14,9 @@ require 'session_config.php';
 // Include the database connection file
 require 'dbcon.php';
 
+// Include the activity log helper
+require_once 'log_activity.php';
+
 // Check if the user is logged in and has admin role
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     // Redirect non-admin users to the index page
@@ -69,6 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_bind_param($statement, "s", $username);
             mysqli_stmt_execute($statement);
             mysqli_stmt_close($statement);
+
+            // Log role changes
+            if (in_array($action, ['admin', 'vivarium_manager', 'user'])) {
+                log_activity($con, 'role_change', 'user', $username, "Changed role to $action");
+            }
         } else {
             // Log error and handle it gracefully
             error_log("Database error: " . mysqli_error($con));
@@ -96,7 +104,7 @@ mysqli_close($con);
     <title>User Management | <?php echo htmlspecialchars($labName); ?></title>
 
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- Bootstrap 5.3 loaded via header.php -->
 
     <!-- Inline CSS for styling -->
     <style>

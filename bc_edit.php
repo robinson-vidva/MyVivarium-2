@@ -14,6 +14,9 @@ require 'session_config.php';
 // Include the database connection
 require 'dbcon.php';
 
+// Include the activity log helper
+require_once 'log_activity.php';
+
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -258,6 +261,12 @@ if (isset($_GET['id'])) {
 
                 // Commit transaction
                 $con->commit();
+
+                // Log activity
+                log_activity($con, 'edit', 'cage', $cage_id, 'Cage details updated');
+                if ($cageIdChanged) {
+                    log_activity($con, 'rename', 'cage', $cage_id, 'Cage renamed from ' . $oldCageId);
+                }
 
                 $_SESSION['message'] = ($cageIdChanged ? "Cage ID changed from '$oldCageId' to '$cage_id'. " : '') . 'Entry updated successfully.';
             } catch (Exception $e) {
