@@ -32,8 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('CSRF token validation failed');
     }
 
-    $username = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_STRING);
-    $action = filter_input(INPUT_POST, 'action', FILTER_SANITIZE_STRING);
+    $username = trim($_POST['username'] ?? '');
+    $action = trim($_POST['action'] ?? '');
 
     // Initialize query variables
     $query = "";

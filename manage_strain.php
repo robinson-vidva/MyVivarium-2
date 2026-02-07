@@ -12,6 +12,13 @@
 
 session_start(); // Start the session to use session variables
 require 'dbcon.php'; // Include database connection
+
+// Check if the user is logged in, redirect to login page if not
+if (!isset($_SESSION['name'])) {
+    header("Location: index.php");
+    exit;
+}
+
 require 'header.php'; // Include the header for consistent page structure
 
 // Generate CSRF token if not already set
@@ -30,13 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     if (isset($_POST['add'])) {
-        // Add new strain
-        $strainId = htmlspecialchars($_POST['strain_id']); // Sanitize input
-        $strainName = htmlspecialchars($_POST['strain_name']); // Sanitize input
-        $strainAka = htmlspecialchars($_POST['strain_aka']); // Sanitize input
-        $strainUrl = htmlspecialchars($_POST['strain_url']); // Sanitize input
-        $strainRrid = htmlspecialchars($_POST['strain_rrid']); // Sanitize input
-        $strainNotes = htmlspecialchars($_POST['strain_notes']); // Sanitize input
+        // Add new strain - prepared statements handle SQL safety
+        $strainId = trim($_POST['strain_id']);
+        $strainName = trim($_POST['strain_name']);
+        $strainAka = trim($_POST['strain_aka']);
+        $strainUrl = trim($_POST['strain_url']);
+        $strainRrid = trim($_POST['strain_rrid']);
+        $strainNotes = trim($_POST['strain_notes']);
 
         // Check if strain ID already exists
         $checkStmt = $con->prepare("SELECT COUNT(*) FROM strains WHERE str_id = ?");
@@ -59,13 +66,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->close(); // Close the statement
         }
     } elseif (isset($_POST['edit'])) {
-        // Update existing strain
-        $strainId = htmlspecialchars($_POST['strain_id']); // Sanitize input
-        $strainName = htmlspecialchars($_POST['strain_name']); // Sanitize input
-        $strainAka = htmlspecialchars($_POST['strain_aka']); // Sanitize input
-        $strainUrl = htmlspecialchars($_POST['strain_url']); // Sanitize input
-        $strainRrid = htmlspecialchars($_POST['strain_rrid']); // Sanitize input
-        $strainNotes = htmlspecialchars($_POST['strain_notes']); // Sanitize input
+        // Update existing strain - prepared statements handle SQL safety
+        $strainId = trim($_POST['strain_id']);
+        $strainName = trim($_POST['strain_name']);
+        $strainAka = trim($_POST['strain_aka']);
+        $strainUrl = trim($_POST['strain_url']);
+        $strainRrid = trim($_POST['strain_rrid']);
+        $strainNotes = trim($_POST['strain_notes']);
         $stmt = $con->prepare("UPDATE strains SET str_name = ?, str_aka = ?, str_url = ?, str_rrid = ?, str_notes = ? WHERE str_id = ?");
         $stmt->bind_param("ssssss", $strainName, $strainAka, $strainUrl, $strainRrid, $strainNotes, $strainId);
         if ($stmt->execute()) {
@@ -75,8 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $stmt->close(); // Close the statement
     } elseif (isset($_POST['delete'])) {
-        // Delete strain
-        $strainId = htmlspecialchars($_POST['strain_id']); // Sanitize input
+        // Delete strain - prepared statements handle SQL safety
+        $strainId = trim($_POST['strain_id']);
         $stmt = $con->prepare("DELETE FROM strains WHERE str_id = ?");
         $stmt->bind_param("s", $strainId);
         if ($stmt->execute()) {
@@ -227,7 +234,7 @@ $strainResult = $con->query($strainQuery);
         <h1 class="text-center">Manage Strains</h1>
         <?php if (isset($_SESSION['message'])) : ?>
             <div class="alert alert-info">
-                <?= $_SESSION['message']; ?>
+                <?= htmlspecialchars($_SESSION['message']); ?>
                 <?php unset($_SESSION['message']); ?>
             </div>
         <?php endif; ?>
@@ -329,11 +336,11 @@ $strainResult = $con->query($strainQuery);
                         <td data-label="RRID"><?= htmlspecialchars($row['str_rrid']); ?></td>
                         <td data-label="Actions" class="table-actions">
                             <div class="action-buttons">
-                                <button class="btn btn-info btn-sm" title="View" onclick="viewStrain('<?= $row['str_id']; ?>', '<?= htmlspecialchars($row['str_name']); ?>', '<?= htmlspecialchars($row['str_aka']); ?>', '<?= htmlspecialchars($row['str_url']); ?>', '<?= htmlspecialchars($row['str_rrid']); ?>', `<?= htmlspecialchars($row['str_notes']); ?>`)"><i class="fas fa-eye"></i></button>
-                                <button class="btn btn-warning btn-sm" title="Edit" onclick="editStrain('<?= $row['str_id']; ?>', '<?= htmlspecialchars($row['str_name']); ?>', '<?= htmlspecialchars($row['str_aka']); ?>', '<?= htmlspecialchars($row['str_url']); ?>', '<?= htmlspecialchars($row['str_rrid']); ?>', `<?= htmlspecialchars($row['str_notes']); ?>`)"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-info btn-sm" title="View" onclick="viewStrain(this)" data-id="<?= htmlspecialchars($row['str_id']); ?>" data-name="<?= htmlspecialchars($row['str_name']); ?>" data-aka="<?= htmlspecialchars($row['str_aka']); ?>" data-url="<?= htmlspecialchars($row['str_url']); ?>" data-rrid="<?= htmlspecialchars($row['str_rrid']); ?>" data-notes="<?= htmlspecialchars($row['str_notes']); ?>"><i class="fas fa-eye"></i></button>
+                                <button class="btn btn-warning btn-sm" title="Edit" onclick="editStrain(this)" data-id="<?= htmlspecialchars($row['str_id']); ?>" data-name="<?= htmlspecialchars($row['str_name']); ?>" data-aka="<?= htmlspecialchars($row['str_aka']); ?>" data-url="<?= htmlspecialchars($row['str_url']); ?>" data-rrid="<?= htmlspecialchars($row['str_rrid']); ?>" data-notes="<?= htmlspecialchars($row['str_notes']); ?>"><i class="fas fa-edit"></i></button>
                                 <form action="manage_strain.php" method="post" style="display:inline-block;">
                                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                                    <input type="hidden" name="strain_id" value="<?= $row['str_id']; ?>">
+                                    <input type="hidden" name="strain_id" value="<?= htmlspecialchars($row['str_id']); ?>">
                                     <button type="submit" name="delete" class="btn btn-danger btn-sm" title="Delete" onclick="return confirm('Are you sure you want to delete this strain?');"><i class="fas fa-trash-alt"></i></button>
                                 </form>
                             </div>
@@ -368,7 +375,13 @@ $strainResult = $con->query($strainQuery);
         }
 
         // Function to populate the form for editing
-        function editStrain(id, name, aka, url, rrid, notes) {
+        function editStrain(btn) {
+            var id = btn.getAttribute('data-id');
+            var name = btn.getAttribute('data-name');
+            var aka = btn.getAttribute('data-aka');
+            var url = btn.getAttribute('data-url');
+            var rrid = btn.getAttribute('data-rrid');
+            var notes = btn.getAttribute('data-notes');
             openForm();
             document.getElementById('formTitle').innerText = 'Edit Strain';
             document.getElementById('addButton').style.display = 'none';
@@ -379,20 +392,32 @@ $strainResult = $con->query($strainQuery);
             document.getElementById('strain_aka').value = aka;
             document.getElementById('strain_url').value = url;
             document.getElementById('strain_rrid').value = rrid;
-            document.getElementById('strain_notes').value = notes.replace(/\\n/g, '\n'); // Set notes value with new lines
+            document.getElementById('strain_notes').value = notes;
         }
 
         // Function to open the view popup form
-        function viewStrain(id, name, aka, url, rrid, notes) {
+        function viewStrain(btn) {
+            var id = btn.getAttribute('data-id');
+            var name = btn.getAttribute('data-name');
+            var aka = btn.getAttribute('data-aka');
+            var url = btn.getAttribute('data-url');
+            var rrid = btn.getAttribute('data-rrid');
+            var notes = btn.getAttribute('data-notes');
             document.getElementById('viewPopupOverlay').style.display = 'block';
             document.getElementById('viewPopupForm').style.display = 'block';
-            document.getElementById('view_strain_id').innerText = id;
-            document.getElementById('view_strain_name').innerText = name;
-            document.getElementById('view_strain_aka').innerText = aka;
-            document.getElementById('view_strain_url').innerText = url;
-            document.getElementById('view_strain_url').href = url; // Set the href for the URL link
-            document.getElementById('view_strain_rrid').innerText = rrid;
-            document.getElementById('view_strain_notes').innerHTML = notes.replace(/\n/g, '<br>'); // Replace \n with <br> for display
+            document.getElementById('view_strain_id').textContent = id;
+            document.getElementById('view_strain_name').textContent = name;
+            document.getElementById('view_strain_aka').textContent = aka;
+            document.getElementById('view_strain_url').textContent = url;
+            document.getElementById('view_strain_url').href = url;
+            document.getElementById('view_strain_rrid').textContent = rrid;
+            // Use textContent and create line breaks safely
+            var notesEl = document.getElementById('view_strain_notes');
+            notesEl.textContent = '';
+            notes.split('\n').forEach(function(line, i) {
+                if (i > 0) notesEl.appendChild(document.createElement('br'));
+                notesEl.appendChild(document.createTextNode(line));
+            });
         }
 
         // Function to close the view popup form

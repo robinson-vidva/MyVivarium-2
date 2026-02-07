@@ -66,13 +66,13 @@ function scheduleEmail($task_id, $recipients, $subject, $body, $scheduledAt)
     $stmt->bind_param("issss", $task_id, $recipientList, $subject, $body, $scheduledAt);
 
     if ($stmt->execute()) {
+        $stmt->close();
         return true;
     } else {
         error_log("Error scheduling email: " . $stmt->error);
+        $stmt->close();
         return false;
     }
-
-    $stmt->close();
 }
 
 // Fetch users for the dropdown
@@ -87,13 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die('CSRF token validation failed');
     }
 
-    $title = htmlspecialchars($_POST['title']);
-    $description = htmlspecialchars($_POST['description']);
-    $assignedBy = htmlspecialchars($_POST['assigned_by_id']);
-    $assignedTo = htmlspecialchars(implode(',', $_POST['assigned_to'] ?? []));
-    $status = htmlspecialchars($_POST['status']);
-    $completionDate = !empty($_POST['completion_date']) ? htmlspecialchars($_POST['completion_date']) : NULL;
-    $cageId = empty($_POST['cage_id']) ? NULL : htmlspecialchars($_POST['cage_id']);
+    $title = trim($_POST['title']);
+    $description = trim($_POST['description']);
+    $assignedBy = $_POST['assigned_by_id'];
+    $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
+    $status = $_POST['status'];
+    $completionDate = !empty($_POST['completion_date']) ? $_POST['completion_date'] : NULL;
+    $cageId = empty($_POST['cage_id']) ? NULL : $_POST['cage_id'];
     $taskAction = '';
     $task_id = null; // Initialize task_id variable
 
@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             redirectToPage("Error: " . $stmt->error);
         }
     } elseif (isset($_POST['edit'])) {
-        $id = htmlspecialchars($_POST['id']);
+        $id = intval($_POST['id']);
         $stmt = $con->prepare("UPDATE tasks SET title = ?, description = ?, assigned_by = ?, assigned_to = ?, status = ?, completion_date = ?, cage_id = ? WHERE id = ?");
         $stmt->bind_param("sssssssi", $title, $description, $assignedBy, $assignedTo, $status, $completionDate, $cageId, $id);
         if ($stmt->execute()) {
@@ -118,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             redirectToPage("Error: " . $stmt->error);
         }
     } elseif (isset($_POST['delete'])) {
-        $id = htmlspecialchars($_POST['id']);
+        $id = intval($_POST['id']);
 
         // Fetch task details before deletion for email notification
         $taskQuery = $con->prepare("SELECT title, description, assigned_by, assigned_to, status, completion_date, cage_id FROM tasks WHERE id = ?");
@@ -214,29 +214,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 
 // Fetch tasks for display
-$search = htmlspecialchars($_GET['search'] ?? '');
-$cageIdFilter = htmlspecialchars($_GET['id'] ?? '');
-$filter = htmlspecialchars($_GET['filter'] ?? '');
+$search = $_GET['search'] ?? '';
+$cageIdFilter = $_GET['id'] ?? '';
+$filter = $_GET['filter'] ?? '';
 
-// Construct the task query with search and filter options
-$taskQueries = "SELECT * FROM tasks WHERE 1";
+// Construct the task query with search and filter options using prepared statements
+$taskQuery = "SELECT * FROM tasks WHERE 1";
+$params = [];
+$types = '';
+
 if ($search) {
-    $taskQueries .= " AND (title LIKE '%$search%' OR assigned_by LIKE '%$search%' OR assigned_to LIKE '%$search%' OR status LIKE '%$search%' OR cage_id LIKE '%$search%')";
+    $taskQuery .= " AND (title LIKE ? OR assigned_by LIKE ? OR assigned_to LIKE ? OR status LIKE ? OR cage_id LIKE ?)";
+    $searchParam = '%' . $search . '%';
+    $params = array_merge($params, [$searchParam, $searchParam, $searchParam, $searchParam, $searchParam]);
+    $types .= 'sssss';
 }
 
 if ($filter == 'assigned_by_me') {
-    $taskQueries .= " AND assigned_by = '$currentUserId'";
+    $taskQuery .= " AND assigned_by = ?";
+    $params[] = $currentUserId;
+    $types .= 'i';
 } elseif ($filter == 'assigned_to_me') {
-    $taskQueries .= " AND FIND_IN_SET('$currentUserId', assigned_to)";
+    $taskQuery .= " AND FIND_IN_SET(?, assigned_to)";
+    $params[] = $currentUserId;
+    $types .= 'i';
 } elseif (!$isAdmin) {
-    $taskQueries .= " AND (assigned_by = '$currentUserId' OR FIND_IN_SET('$currentUserId', assigned_to))";
+    $taskQuery .= " AND (assigned_by = ? OR FIND_IN_SET(?, assigned_to))";
+    $params[] = $currentUserId;
+    $params[] = $currentUserId;
+    $types .= 'ii';
 }
 
 if ($cageIdFilter) {
-    $taskQueries .= " AND cage_id = '$cageIdFilter'";
+    $taskQuery .= " AND cage_id = ?";
+    $params[] = $cageIdFilter;
+    $types .= 's';
 }
 
-$taskResult = $con->query($taskQueries);
+$taskStmt = $con->prepare($taskQuery);
+if (!empty($params)) {
+    $taskStmt->bind_param($types, ...$params);
+}
+$taskStmt->execute();
+$taskResult = $taskStmt->get_result();
 
 // Fetch cages for the dropdown
 $cageQuery = "SELECT cage_id FROM cages";
@@ -502,7 +522,7 @@ ob_end_flush(); // Flush the output buffer
         <h1 class="text-center">Manage Tasks <?= $cageIdFilter ? 'for Cage ' . htmlspecialchars($cageIdFilter) : ''; ?></h1>
         <?php if (isset($_SESSION['message'])) : ?>
             <div class="alert alert-info">
-                <?= $_SESSION['message']; ?>
+                <?= htmlspecialchars($_SESSION['message']); ?>
                 <?php unset($_SESSION['message']); ?>
             </div>
         <?php endif; ?>
@@ -657,7 +677,7 @@ ob_end_flush(); // Flush the output buffer
     <script>
         // Embed the PHP-encoded JSON into a JavaScript variable
         const users = <?= json_encode($users); ?>;
-        const cageIdFilter = '<?= $cageIdFilter; ?>';
+        const cageIdFilter = <?= json_encode($cageIdFilter); ?>;
 
         $(document).ready(function() {
             $('#assigned_to').select2({

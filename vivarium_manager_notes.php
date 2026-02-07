@@ -52,8 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
     switch ($action) {
         case 'add':
             // Add new maintenance note
-            $cage_id = filter_input(INPUT_POST, 'cage_id', FILTER_SANITIZE_STRING);
-            $comments = filter_input(INPUT_POST, 'comments', FILTER_SANITIZE_STRING);
+            $cage_id = trim($_POST['cage_id'] ?? '');
+            $comments = trim($_POST['comments'] ?? '');
             $user_id = $_SESSION['user_id'];
 
             if (empty($cage_id)) {
@@ -75,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
         case 'edit':
             // Edit existing maintenance note
             $note_id = filter_input(INPUT_POST, 'note_id', FILTER_VALIDATE_INT);
-            $cage_id = filter_input(INPUT_POST, 'cage_id', FILTER_SANITIZE_STRING);
-            $comments = filter_input(INPUT_POST, 'comments', FILTER_SANITIZE_STRING);
+            $cage_id = trim($_POST['cage_id'] ?? '');
+            $comments = trim($_POST['comments'] ?? '');
 
             if (!$note_id) {
                 echo json_encode(['success' => false, 'message' => 'Invalid note ID']);

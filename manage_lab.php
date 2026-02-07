@@ -66,7 +66,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_lab'])) {
     $inputFields = ['lab_name', 'url', 'timezone', 'r1_temp', 'r1_humi', 'r1_illu', 'r1_pres', 'r2_temp', 'r2_humi', 'r2_illu', 'r2_pres', 'cf-turnstile-secretKey', 'cf-turnstile-sitekey'];
     $inputData = [];
     foreach ($inputFields as $field) {
-        $inputData[$field] = filter_input(INPUT_POST, $field, FILTER_SANITIZE_STRING);
+        $inputData[$field] = trim($_POST[$field] ?? '');
     }
 
     // Update or insert new data
@@ -217,7 +217,7 @@ require 'header.php';
             </div>
             <div class="form-group">
                 <label for="cf-turnstile-secretKey">Cloudflare Turnstile Secret Key</label>
-                <input type="text" class="form-control" id="cf-turnstile-secretKey" name="cf-turnstile-secretKey" value="<?php echo htmlspecialchars($labData['cf-turnstile-secretKey']); ?>">
+                <input type="password" class="form-control" id="cf-turnstile-secretKey" name="cf-turnstile-secretKey" value="<?php echo htmlspecialchars($labData['cf-turnstile-secretKey']); ?>">
             </div>
             <button type="submit" class="btn1 btn-primary" name="update_lab">Update Lab Information</button>
         </form>

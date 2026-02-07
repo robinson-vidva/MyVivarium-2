@@ -45,16 +45,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die('CSRF token validation failed');
     }
 
-    $title = htmlspecialchars($_POST['title']);
-    $description = htmlspecialchars($_POST['description']);
+    $title = trim($_POST['title']);
+    $description = trim($_POST['description']);
     $assignedBy = $currentUserId;
-    $assignedTo = htmlspecialchars(implode(',', $_POST['assigned_to'] ?? []));
-    $recurrenceType = htmlspecialchars($_POST['recurrence_type']);
-    $dayOfWeek = !empty($_POST['day_of_week']) ? htmlspecialchars($_POST['day_of_week']) : null;
+    $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
+    $recurrenceType = trim($_POST['recurrence_type']);
+    $dayOfWeek = !empty($_POST['day_of_week']) ? trim($_POST['day_of_week']) : null;
     $dayOfMonth = !empty($_POST['day_of_month']) ? (int)$_POST['day_of_month'] : null;
-    $timeOfDay = htmlspecialchars($_POST['time_of_day']);
-    $status = htmlspecialchars($_POST['status']);
-    $cageId = empty($_POST['cage_id']) ? NULL : htmlspecialchars($_POST['cage_id']);
+    $timeOfDay = trim($_POST['time_of_day']);
+    $status = trim($_POST['status']);
+    $cageId = empty($_POST['cage_id']) ? NULL : trim($_POST['cage_id']);
     $reminder_id = null;
 
     // Determine the action to perform (add, edit, or delete)
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $stmt->close();
     } elseif (isset($_POST['edit'])) {
-        $id = htmlspecialchars($_POST['id']);
+        $id = (int)$_POST['id'];
         $stmt = $con->prepare("UPDATE reminders SET cage_id = ?, title = ?, description = ?, assigned_to = ?, recurrence_type = ?, day_of_week = ?, day_of_month = ?, time_of_day = ?, status = ? WHERE id = ?");
         $stmt->bind_param("sssisssssi", $cageId, $title, $description, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status, $id);
         if ($stmt->execute()) {
@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $stmt->close();
     } elseif (isset($_POST['delete'])) {
-        $id = htmlspecialchars($_POST['id']);
+        $id = (int)$_POST['id'];
         $stmt = $con->prepare("DELETE FROM reminders WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
@@ -396,7 +396,7 @@ ob_end_flush(); // Flush the output buffer
         <h1 class="text-center">Manage Reminders</h1>
         <?php if (isset($_SESSION['message'])) : ?>
             <div class="alert alert-info">
-                <?= $_SESSION['message']; ?>
+                <?= htmlspecialchars($_SESSION['message']); ?>
                 <?php unset($_SESSION['message']); ?>
             </div>
         <?php endif; ?>

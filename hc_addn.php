@@ -91,15 +91,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Retrieve form data (only cage_id is required)
-    $cage_id = trim(mysqli_real_escape_string($con, $_POST['cage_id']));
-    $pi_name = !empty($_POST['pi_name']) ? mysqli_real_escape_string($con, $_POST['pi_name']) : null;
-    $strain = !empty($_POST['strain']) ? mysqli_real_escape_string($con, $_POST['strain']) : null;
-    $iacuc = isset($_POST['iacuc']) ? mysqli_real_escape_string($con, implode(',', $_POST['iacuc'])) : '';
+    $cage_id = trim($_POST['cage_id']);
+    $pi_name = !empty($_POST['pi_name']) ? trim($_POST['pi_name']) : null;
+    $strain = !empty($_POST['strain']) ? trim($_POST['strain']) : null;
+    $iacuc = isset($_POST['iacuc']) ? trim(implode(',', $_POST['iacuc'])) : '';
     $user = isset($_POST['user']) ? implode(',', array_map('trim', $_POST['user'])) : '';
-    $dob = !empty($_POST['dob']) ? mysqli_real_escape_string($con, $_POST['dob']) : null;
-    $sex = !empty($_POST['sex']) ? mysqli_real_escape_string($con, $_POST['sex']) : null;
-    $parent_cg = !empty($_POST['parent_cg']) ? mysqli_real_escape_string($con, $_POST['parent_cg']) : null;
-    $remarks = mysqli_real_escape_string($con, $_POST['remarks']);
+    $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
+    $sex = !empty($_POST['sex']) ? trim($_POST['sex']) : null;
+    $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
+    $remarks = trim($_POST['remarks']);
     $mouse_data = [];
 
     // Collect mouse data
@@ -114,9 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty(trim($mouse_id))) {
             $mouse_data[] = [
-                'mouse_id' => mysqli_real_escape_string($con, $mouse_id),
-                'genotype' => mysqli_real_escape_string($con, $genotype),
-                'notes' => mysqli_real_escape_string($con, $note)
+                'mouse_id' => trim($mouse_id),
+                'genotype' => trim($genotype),
+                'notes' => trim($note)
             ];
         }
     }

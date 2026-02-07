@@ -131,16 +131,16 @@ if (isset($_GET['id'])) {
             }
 
             /// Retrieve and sanitize form data
-            $cage_id = trim(mysqli_real_escape_string($con, $_POST['cage_id']));
-            $pi_name = mysqli_real_escape_string($con, $_POST['pi_name']);
-            $cross = mysqli_real_escape_string($con, $_POST['cross']);
+            $cage_id = trim($_POST['cage_id']);
+            $pi_name = trim($_POST['pi_name']);
+            $cross = trim($_POST['cross']);
             $iacuc = isset($_POST['iacuc']) ? $_POST['iacuc'] : []; // Array of selected IACUC values
             $users = isset($_POST['user']) ? $_POST['user'] : []; // Array of selected users
-            $male_id = mysqli_real_escape_string($con, $_POST['male_id']);
-            $female_id = mysqli_real_escape_string($con, $_POST['female_id']);
-            $male_dob = mysqli_real_escape_string($con, $_POST['male_dob']);
-            $female_dob = mysqli_real_escape_string($con, $_POST['female_dob']);
-            $remarks = mysqli_real_escape_string($con, $_POST['remarks']);
+            $male_id = trim($_POST['male_id']);
+            $female_id = trim($_POST['female_id']);
+            $male_dob = trim($_POST['male_dob']);
+            $female_dob = trim($_POST['female_dob']);
+            $remarks = trim($_POST['remarks']);
 
             // Begin transaction
             $con->begin_transaction();
@@ -200,7 +200,7 @@ if (isset($_GET['id'])) {
 
                     for ($i = 0; $i < count($logIds); $i++) {
                         $edit_log_id = intval($logIds[$i]);
-                        $edit_comment = trim(mysqli_real_escape_string($con, $logComments[$i]));
+                        $edit_comment = trim($logComments[$i]);
 
                         $updateLogQuery = "UPDATE maintenance SET comments = ? WHERE id = ?";
                         $stmtUpdateLog = $con->prepare($updateLogQuery);
@@ -301,14 +301,14 @@ if (isset($_GET['id'])) {
             if (isset($_POST['dom']) && isset($_POST['litter_dob'])) {
                 // Iterate over each new litter entry
                 for ($i = 0; $i < count($_POST['dom']); $i++) {
-                    $dom_i = mysqli_real_escape_string($con, $_POST['dom'][$i]);
-                    $litter_dob_i = mysqli_real_escape_string($con, $_POST['litter_dob'][$i]);
+                    $dom_i = trim($_POST['dom'][$i]);
+                    $litter_dob_i = trim($_POST['litter_dob'][$i]);
                     $pups_alive_i = !empty($_POST['pups_alive'][$i]) ? intval($_POST['pups_alive'][$i]) : 0;
                     $pups_dead_i = !empty($_POST['pups_dead'][$i]) ? intval($_POST['pups_dead'][$i]) : 0;
                     $pups_male_i = !empty($_POST['pups_male'][$i]) ? intval($_POST['pups_male'][$i]) : 0;
                     $pups_female_i = !empty($_POST['pups_female'][$i]) ? intval($_POST['pups_female'][$i]) : 0;
-                    $remarks_litter_i = mysqli_real_escape_string($con, $_POST['remarks_litter'][$i]);
-                    $litter_id_i = isset($_POST['litter_id'][$i]) ? mysqli_real_escape_string($con, $_POST['litter_id'][$i]) : '';
+                    $remarks_litter_i = trim($_POST['remarks_litter'][$i]);
+                    $litter_id_i = isset($_POST['litter_id'][$i]) ? trim($_POST['litter_id'][$i]) : '';
 
                     // If litter_id exists, update the entry
                     if (!empty($litter_id_i)) {

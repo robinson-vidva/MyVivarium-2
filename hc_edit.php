@@ -155,19 +155,15 @@ if (isset($_GET['id'])) {
             }
 
             // Retrieve and sanitize form data
-            $cage_id = trim(mysqli_real_escape_string($con, $_POST['cage_id']));
-            $pi_name = mysqli_real_escape_string($con, $_POST['pi_name']);
-            $strain = mysqli_real_escape_string($con, $_POST['strain']);
-            $iacuc = isset($_POST['iacuc']) ? array_map(function ($value) use ($con) {
-                return mysqli_real_escape_string($con, $value);
-            }, $_POST['iacuc']) : [];
-            $users = isset($_POST['user']) ? array_map(function ($user_id) use ($con) {
-                return mysqli_real_escape_string($con, trim($user_id));
-            }, $_POST['user']) : [];
-            $dob = mysqli_real_escape_string($con, $_POST['dob']);
-            $sex = mysqli_real_escape_string($con, $_POST['sex']);
-            $parent_cg = mysqli_real_escape_string($con, $_POST['parent_cg']);
-            $remarks = mysqli_real_escape_string($con, $_POST['remarks']);
+            $cage_id = trim($_POST['cage_id']);
+            $pi_name = trim($_POST['pi_name']);
+            $strain = trim($_POST['strain']);
+            $iacuc = isset($_POST['iacuc']) ? array_map('trim', $_POST['iacuc']) : [];
+            $users = isset($_POST['user']) ? array_map('trim', $_POST['user']) : [];
+            $dob = trim($_POST['dob']);
+            $sex = trim($_POST['sex']);
+            $parent_cg = trim($_POST['parent_cg']);
+            $remarks = trim($_POST['remarks']);
 
             // Update query for holding table
             $updateQueryHolding = "UPDATE holding SET
@@ -231,10 +227,10 @@ if (isset($_GET['id'])) {
 
             // Handle existing and new mouse records
             for ($i = 0; $i < count($mouse_ids); $i++) {
-                $mouse_id = mysqli_real_escape_string($con, $mouse_ids[$i]);
-                $genotype = mysqli_real_escape_string($con, $genotypes[$i]);
-                $note = mysqli_real_escape_string($con, $notes[$i]);
-                $existing_mouse_id = isset($existing_mouse_ids[$i]) ? mysqli_real_escape_string($con, $existing_mouse_ids[$i]) : null;
+                $mouse_id = trim($mouse_ids[$i]);
+                $genotype = trim($genotypes[$i]);
+                $note = trim($notes[$i]);
+                $existing_mouse_id = isset($existing_mouse_ids[$i]) ? trim($existing_mouse_ids[$i]) : null;
 
                 if (!empty($mouse_id)) {
                     if ($existing_mouse_id) {
@@ -289,7 +285,7 @@ if (isset($_GET['id'])) {
 
                 for ($i = 0; $i < count($logIds); $i++) {
                     $edit_log_id = intval($logIds[$i]);
-                    $edit_comment = trim(mysqli_real_escape_string($con, $logComments[$i]));
+                    $edit_comment = trim($logComments[$i]);
 
                     $updateLogQuery = "UPDATE maintenance SET comments = ? WHERE id = ?";
                     $stmtUpdateLog = $con->prepare($updateLogQuery);

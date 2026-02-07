@@ -217,20 +217,20 @@ if (isset($_POST['login'])) {
                             $lock_stmt = mysqli_prepare($con, $lock_time);
                             mysqli_stmt_bind_param($lock_stmt, "s", $username);
                             mysqli_stmt_execute($lock_stmt);
-                            $error_message = "Account is temporarily locked for 10 mins due to too many failed login attempts.";
+                            $error_message = "Account is temporarily locked for 15 minutes due to too many failed login attempts.";
                         } else {
                             $update_attempts = "UPDATE users SET login_attempts = ? WHERE username=?";
                             $update_stmt = mysqli_prepare($con, $update_attempts);
                             mysqli_stmt_bind_param($update_stmt, "is", $new_attempts, $username);
                             mysqli_stmt_execute($update_stmt);
-                            $error_message = "Invalid password. Please try again.";
+                            $error_message = "Invalid credentials. Please try again.";
                         }
                     }
                 }
             }
         }
     } else {
-        $error_message = "No user found with that username.";
+        $error_message = "Invalid credentials. Please try again.";
     }
     mysqli_stmt_close($statement);
 }
@@ -255,7 +255,6 @@ mysqli_close($con);
     <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 
     <!-- Bootstrap CSS -->
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Google Font: Poppins -->
@@ -263,7 +262,7 @@ mysqli_close($con);
 
     <!-- Bootstrap and jQuery JS -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Custom CSS -->
     <style>
@@ -379,7 +378,7 @@ mysqli_close($con);
             <div class="row">
                 <!-- Slideshow Column -->
                 <div class="col-md-6">
-                    <div id="labCarousel" class="carousel slide" data-ride="carousel">
+                    <div id="labCarousel" class="carousel slide" data-bs-ride="carousel">
                         <div class="carousel-inner">
                             <div class="carousel-item active"> <img class="d-block w-100" src="images/DSC_0536.webp" alt="Image 1"> </div>
                             <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0537.webp" alt="Image 2"> </div>
@@ -404,10 +403,15 @@ mysqli_close($con);
                         <h3>Login</h3>
                         <?php if (isset($_SESSION['error_message'])) { ?>
                             <div class="alert alert-danger">
-                                <?php 
-                                    echo $_SESSION['error_message']; 
-                                    unset($_SESSION['error_message']); // Clear the error message
+                                <?php
+                                    echo htmlspecialchars($_SESSION['error_message']);
+                                    unset($_SESSION['error_message']);
                                 ?>
+                            </div>
+                        <?php } ?>
+                        <?php if (isset($error_message)) { ?>
+                            <div class="alert alert-danger">
+                                <?php echo htmlspecialchars($error_message); ?>
                             </div>
                         <?php } ?>
                         <form method="POST" action="">
