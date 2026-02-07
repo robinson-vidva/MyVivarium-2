@@ -33,7 +33,7 @@ if ($row = mysqli_fetch_assoc($labResult)) {
 if (isset($_GET['id'])) {
     $id = mysqli_real_escape_string($con, $_GET['id']);
 
-    $query = "SELECT h.*, pi.initials AS pi_initials, pi.name AS pi_name, s.*, c.quantity, c.remarks
+    $query = "SELECT h.*, pi.initials AS pi_initials, pi.name AS pi_name, s.*, c.quantity, c.remarks, c.room, c.rack
               FROM holding h
               LEFT JOIN cages c ON h.cage_id = c.cage_id
               LEFT JOIN users pi ON c.pi_name = pi.id
@@ -403,6 +403,14 @@ require 'header.php';
                         <td id="pi-data" data-value="<?= !empty($holdingcage['pi_name']) && $holdingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['pi_initials'] . ' [' . $holdingcage['pi_name'] . ']'); ?></td>
                     </tr>
                     <tr>
+                        <th>Room</th>
+                        <td><?= htmlspecialchars($holdingcage['room'] ?? ''); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Rack</th>
+                        <td><?= htmlspecialchars($holdingcage['rack'] ?? ''); ?></td>
+                    </tr>
+                    <tr>
                         <th>Strain</th>
                         <td id="strain-data" data-value="<?= !empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA' ? '1' : ''; ?>">
                             <a href="javascript:void(0);" onclick="viewStrainDetails(
@@ -443,6 +451,10 @@ require 'header.php';
                     <tr>
                         <th>Parent Cage</th>
                         <td id="parent-data" data-value="<?= !empty($holdingcage['parent_cg']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['parent_cg']); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Genotype</th>
+                        <td><?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?></td>
                     </tr>
                     <tr>
                         <th>Remarks</th>

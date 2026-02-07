@@ -68,6 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Retrieve and sanitize form data (only cage_id is required)
     $cage_id = trim($_POST['cage_id']);
     $pi_id = !empty($_POST['pi_name']) ? $_POST['pi_name'] : null;
+    $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
+    $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
     $cross = !empty($_POST['cross']) ? $_POST['cross'] : null;
     $iacuc_ids = $_POST['iacuc'] ?? [];
     $user_ids = $_POST['user'] ?? [];
@@ -75,6 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $female_id = !empty($_POST['female_id']) ? $_POST['female_id'] : null;
     $male_dob = !empty($_POST['male_dob']) ? $_POST['male_dob'] : null;
     $female_dob = !empty($_POST['female_dob']) ? $_POST['female_dob'] : null;
+    $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
+    $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
     $remarks = $_POST['remarks'];
 
     // Check if the cage_id already exists in the cages table
@@ -88,12 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['message'] = "Cage ID '$cage_id' already exists. Please use a different Cage ID.";
     } else {
         // Insert into the cages table
-        $insert_cage_query = $con->prepare("INSERT INTO cages (`cage_id`, `pi_name`, `remarks`) VALUES (?, ?, ?)");
-        $insert_cage_query->bind_param("sss", $cage_id, $pi_id, $remarks);
+        $insert_cage_query = $con->prepare("INSERT INTO cages (`cage_id`, `pi_name`, `remarks`, `room`, `rack`) VALUES (?, ?, ?, ?, ?)");
+        $insert_cage_query->bind_param("sssss", $cage_id, $pi_id, $remarks, $room, $rack);
 
         // Insert into the breeding table
-        $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`) VALUES (?, ?, ?, ?, ?, ?)");
-        $insert_breeding_query->bind_param("ssssss", $cage_id, $cross, $male_id, $female_id, $male_dob, $female_dob);
+        $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`, `male_genotype`, `female_genotype`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $insert_breeding_query->bind_param("ssssssss", $cage_id, $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $female_genotype);
 
         // Execute the statements and check if they were successful
         if ($insert_cage_query->execute() && $insert_breeding_query->execute()) {
@@ -568,6 +572,16 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
+                <label for="room" class="form-label">Room</label>
+                <input type="text" class="form-control" id="room" name="room">
+            </div>
+
+            <div class="mb-3">
+                <label for="rack" class="form-label">Rack</label>
+                <input type="text" class="form-control" id="rack" name="rack">
+            </div>
+
+            <div class="mb-3">
                 <label for="cross" class="form-label">Cross <span class="badge bg-info">Important</span></label>
                 <input type="text" class="form-control" id="cross" name="cross" data-field-type="important">
             </div>
@@ -616,8 +630,18 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
+                <label for="male_genotype" class="form-label">Male Genotype</label>
+                <input type="text" class="form-control" id="male_genotype" name="male_genotype">
+            </div>
+
+            <div class="mb-3">
                 <label for="male_dob" class="form-label">Male DOB <span class="badge bg-secondary">Useful</span></label>
                 <input type="date" class="form-control" id="male_dob" name="male_dob" min="1900-01-01" data-field-type="useful">
+            </div>
+
+            <div class="mb-3">
+                <label for="female_genotype" class="form-label">Female Genotype</label>
+                <input type="text" class="form-control" id="female_genotype" name="female_genotype">
             </div>
 
             <div class="mb-3">

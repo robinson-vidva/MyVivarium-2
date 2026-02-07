@@ -49,7 +49,7 @@ if (isset($_GET['id'])) {
     $id = mysqli_real_escape_string($con, $_GET['id']);
 
     // Fetch the breeding cage record with the specified ID including PI name details
-    $query = "SELECT b.*, c.remarks AS remarks, c.pi_name AS pi_name
+    $query = "SELECT b.*, c.remarks AS remarks, c.pi_name AS pi_name, c.room, c.rack
           FROM breeding b
           LEFT JOIN cages c ON b.cage_id = c.cage_id
           WHERE b.cage_id = ?";
@@ -132,7 +132,10 @@ if (isset($_GET['id'])) {
 
             /// Retrieve and sanitize form data
             $cage_id = trim($_POST['cage_id']);
+            $new_cage_id = trim($_POST['new_cage_id']);
             $pi_name = trim($_POST['pi_name']);
+            $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
+            $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
             $cross = trim($_POST['cross']);
             $iacuc = isset($_POST['iacuc']) ? $_POST['iacuc'] : []; // Array of selected IACUC values
             $users = isset($_POST['user']) ? $_POST['user'] : []; // Array of selected users
@@ -140,30 +143,61 @@ if (isset($_GET['id'])) {
             $female_id = trim($_POST['female_id']);
             $male_dob = trim($_POST['male_dob']);
             $female_dob = trim($_POST['female_dob']);
+            $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
+            $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
             $remarks = trim($_POST['remarks']);
 
             // Begin transaction
             $con->begin_transaction();
 
             try {
+                // Handle cage ID change if new_cage_id differs from current cage_id
+                $cageIdChanged = false;
+                $oldCageId = $cage_id;
+                if ($new_cage_id !== $cage_id) {
+                    // Check if the new cage_id already exists
+                    $checkDup = $con->prepare("SELECT cage_id FROM cages WHERE cage_id = ?");
+                    $checkDup->bind_param("s", $new_cage_id);
+                    $checkDup->execute();
+                    $dupResult = $checkDup->get_result();
+                    if ($dupResult->num_rows > 0) {
+                        $checkDup->close();
+                        throw new Exception("Cage ID '" . htmlspecialchars($new_cage_id) . "' already exists. Please choose a different ID.");
+                    }
+                    $checkDup->close();
+
+                    // Update cage_id in cages table (ON UPDATE CASCADE propagates to all related tables)
+                    $updateCageIdQuery = $con->prepare("UPDATE cages SET cage_id = ? WHERE cage_id = ?");
+                    $updateCageIdQuery->bind_param("ss", $new_cage_id, $cage_id);
+                    $updateCageIdQuery->execute();
+                    $updateCageIdQuery->close();
+
+                    $cageIdChanged = true;
+                    $cage_id = $new_cage_id;
+                }
+
                 // Update cages table
-                $updateCageQuery = $con->prepare("UPDATE cages SET 
-                                pi_name = ?, 
-                                remarks = ? 
+                $updateCageQuery = $con->prepare("UPDATE cages SET
+                                pi_name = ?,
+                                remarks = ?,
+                                room = ?,
+                                rack = ?
                                 WHERE cage_id = ?");
-                $updateCageQuery->bind_param("sss", $pi_name, $remarks, $cage_id);
+                $updateCageQuery->bind_param("sssss", $pi_name, $remarks, $room, $rack, $cage_id);
                 $updateCageQuery->execute();
                 $updateCageQuery->close();
 
                 // Update breeding table
-                $updateBreedingQuery = $con->prepare("UPDATE breeding SET 
-                                    `cross` = ?, 
-                                    male_id = ?, 
-                                    female_id = ?, 
-                                    male_dob = ?, 
-                                    female_dob = ? 
+                $updateBreedingQuery = $con->prepare("UPDATE breeding SET
+                                    `cross` = ?,
+                                    male_id = ?,
+                                    female_id = ?,
+                                    male_dob = ?,
+                                    female_dob = ?,
+                                    male_genotype = ?,
+                                    female_genotype = ?
                                     WHERE cage_id = ?");
-                $updateBreedingQuery->bind_param("ssssss", $cross, $male_id, $female_id, $male_dob, $female_dob, $cage_id);
+                $updateBreedingQuery->bind_param("ssssssss", $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $female_genotype, $cage_id);
                 $updateBreedingQuery->execute();
                 $updateBreedingQuery->close();
 
@@ -225,7 +259,7 @@ if (isset($_GET['id'])) {
                 // Commit transaction
                 $con->commit();
 
-                $_SESSION['message'] = 'Entry updated successfully.';
+                $_SESSION['message'] = ($cageIdChanged ? "Cage ID changed from '$oldCageId' to '$cage_id'. " : '') . 'Entry updated successfully.';
             } catch (Exception $e) {
                 // Rollback transaction on error
                 $con->rollback();
@@ -875,8 +909,13 @@ require 'header.php';
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
 
                             <div class="mb-3">
-                                <label for="cage_id" class="form-label">Cage ID <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control" id="cage_id" name="cage_id" value="<?= htmlspecialchars($breedingcage['cage_id']); ?>" readonly required>
+                                <label for="cage_id" class="form-label">Current Cage ID</label>
+                                <input type="text" class="form-control" id="cage_id" name="cage_id" value="<?= htmlspecialchars($breedingcage['cage_id']); ?>" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_cage_id" class="form-label">New Cage ID <span class="required-asterisk">*</span></label>
+                                <input type="text" class="form-control" id="new_cage_id" name="new_cage_id" value="<?= htmlspecialchars($breedingcage['cage_id']); ?>" required style="border: 2px solid #0d6efd;">
+                                <small class="form-text text-muted">Change the cage ID if needed.</small>
                             </div>
 
                             <div class="mb-3">
@@ -896,6 +935,16 @@ require 'header.php';
                                         <?php endif; ?>
                                     <?php endwhile; ?>
                                 </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="room" class="form-label">Room</label>
+                                <input type="text" class="form-control" id="room" name="room" value="<?= htmlspecialchars($breedingcage['room'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="rack" class="form-label">Rack</label>
+                                <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($breedingcage['rack'] ?? ''); ?>">
                             </div>
 
                             <div class="mb-3">
@@ -953,8 +1002,18 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
+                                <label for="male_genotype" class="form-label">Male Genotype</label>
+                                <input type="text" class="form-control" id="male_genotype" name="male_genotype" value="<?= htmlspecialchars($breedingcage['male_genotype'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
                                 <label for="male_dob" class="form-label">Male DOB <span class="badge bg-secondary">Useful</span></label>
                                 <input type="date" class="form-control" id="male_dob" name="male_dob" value="<?= htmlspecialchars($breedingcage['male_dob']); ?>" min="1900-01-01" data-field-type="useful">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="female_genotype" class="form-label">Female Genotype</label>
+                                <input type="text" class="form-control" id="female_genotype" name="female_genotype" value="<?= htmlspecialchars($breedingcage['female_genotype'] ?? ''); ?>">
                             </div>
 
                             <div class="mb-3">

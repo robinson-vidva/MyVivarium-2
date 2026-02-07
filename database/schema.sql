@@ -31,6 +31,9 @@ CREATE TABLE `cages` (
   `pi_name` int DEFAULT NULL,
   `quantity` int DEFAULT NULL,
   `remarks` text DEFAULT NULL,
+  `status` enum('active', 'archived') NOT NULL DEFAULT 'active',
+  `room` varchar(255) DEFAULT NULL,
+  `rack` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`cage_id`),
   FOREIGN KEY (`pi_name`) REFERENCES `users` (`id`) ON DELETE SET NULL
 );
@@ -71,9 +74,10 @@ CREATE TABLE `holding` (
   `id` int NOT NULL AUTO_INCREMENT,
   `cage_id` varchar(255) NOT NULL,
   `strain` varchar(255) DEFAULT NULL,
-  `dob` date NOT NULL,
+  `dob` date DEFAULT NULL,
   `sex` enum('male', 'female') DEFAULT NULL,
-  `parent_cg` varchar(255) NOT NULL,
+  `parent_cg` varchar(255) DEFAULT NULL,
+  `genotype` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE,
   FOREIGN KEY (`strain`) REFERENCES `strains` (`str_id`) ON DELETE SET NULL
@@ -83,11 +87,13 @@ CREATE TABLE `holding` (
 CREATE TABLE `breeding` (
   `id` int NOT NULL AUTO_INCREMENT,
   `cage_id` varchar(255) NOT NULL,
-  `cross` varchar(255) NOT NULL,
-  `male_id` varchar(255) NOT NULL,
-  `female_id` varchar(255) NOT NULL,
-  `male_dob` date NOT NULL,
-  `female_dob` date NOT NULL,
+  `cross` varchar(255) DEFAULT NULL,
+  `male_id` varchar(255) DEFAULT NULL,
+  `female_id` varchar(255) DEFAULT NULL,
+  `male_dob` date DEFAULT NULL,
+  `female_dob` date DEFAULT NULL,
+  `male_genotype` varchar(255) DEFAULT NULL,
+  `female_genotype` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE
 );

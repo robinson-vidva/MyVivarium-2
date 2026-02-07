@@ -93,7 +93,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Retrieve form data (only cage_id is required)
     $cage_id = trim($_POST['cage_id']);
     $pi_name = !empty($_POST['pi_name']) ? trim($_POST['pi_name']) : null;
+    $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
+    $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
     $strain = !empty($_POST['strain']) ? trim($_POST['strain']) : null;
+    if ($strain === 'custom') {
+        $strain = !empty($_POST['custom_strain']) ? trim($_POST['custom_strain']) : null;
+    }
+    $cage_genotype = !empty($_POST['cage_genotype']) ? trim($_POST['cage_genotype']) : null;
     $iacuc = isset($_POST['iacuc']) ? trim(implode(',', $_POST['iacuc'])) : '';
     $user = isset($_POST['user']) ? implode(',', array_map('trim', $_POST['user'])) : '';
     $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
@@ -139,15 +145,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Insert data into cages table (pi_name can be NULL)
-            $query1 = "INSERT INTO cages (cage_id, pi_name, quantity, remarks) VALUES (?, ?, ?, ?)";
+            $query1 = "INSERT INTO cages (cage_id, pi_name, quantity, remarks, room, rack) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $con->prepare($query1);
-            $stmt->bind_param("siss", $cage_id, $pi_name, $qty, $remarks);
+            $stmt->bind_param("sissss", $cage_id, $pi_name, $qty, $remarks, $room, $rack);
             $stmt->execute();
 
             // Insert data into holding table (strain, dob, sex, parent_cg can be NULL)
-            $query2 = "INSERT INTO holding (cage_id, strain, dob, sex, parent_cg) VALUES (?, ?, ?, ?, ?)";
+            $query2 = "INSERT INTO holding (cage_id, strain, dob, sex, parent_cg, genotype) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt2 = $con->prepare($query2);
-            $stmt2->bind_param("sssss", $cage_id, $strain, $dob, $sex, $parent_cg);
+            $stmt2->bind_param("ssssss", $cage_id, $strain, $dob, $sex, $parent_cg, $cage_genotype);
             $stmt2->execute();
 
             // Insert mouse data into mouse table
@@ -412,6 +418,16 @@ require 'header.php';
                 allowClear: true
             });
 
+            // Show/hide custom strain input based on strain selection
+            $('#strain').on('change', function() {
+                if ($(this).val() === 'custom') {
+                    $('#custom_strain_div').show();
+                } else {
+                    $('#custom_strain_div').hide();
+                    $('#custom_strain').val('');
+                }
+            });
+
             $('#iacuc').select2({
                 placeholder: "Select IACUC",
                 allowClear: true,
@@ -580,16 +596,32 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
+                <label for="room" class="form-label">Room</label>
+                <input type="text" class="form-control" id="room" name="room">
+            </div>
+
+            <div class="mb-3">
+                <label for="rack" class="form-label">Rack</label>
+                <input type="text" class="form-control" id="rack" name="rack">
+            </div>
+
+            <div class="mb-3">
                 <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
                 <select class="form-control" id="strain" name="strain" data-field-type="important">
-                    <option value="">Select Strain</option>
+                    <option value="">None / Not Applicable</option>
                     <?php
                     // Populate the dropdown with all the options generated
                     foreach ($strainOptions as $option) {
                         echo "<option value='" . explode(" | ", $option)[0] . "'>$option</option>";
                     }
                     ?>
+                    <option value="custom">Custom</option>
                 </select>
+            </div>
+
+            <div class="mb-3" id="custom_strain_div" style="display: none;">
+                <label for="custom_strain" class="form-label">Custom Strain Name</label>
+                <input type="text" class="form-control" id="custom_strain" name="custom_strain">
             </div>
 
             <div class="mb-3">
@@ -642,6 +674,11 @@ require 'header.php';
             <div class="mb-3">
                 <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
                 <input type="text" class="form-control" id="parent_cg" name="parent_cg" data-field-type="useful">
+            </div>
+
+            <div class="mb-3">
+                <label for="cage_genotype" class="form-label">Genotype</label>
+                <input type="text" class="form-control" id="cage_genotype" name="cage_genotype">
             </div>
 
             <div class="mb-3">

@@ -80,9 +80,9 @@ if (isset($_GET['id'])) {
     $id = $_GET['id'];
 
     // Fetch the holding cage record with the specified ID including PI name details
-    $query = "SELECT h.*, c.pi_name AS pi_name, c.quantity, c.remarks
+    $query = "SELECT h.*, c.pi_name AS pi_name, c.quantity, c.remarks, c.room, c.rack
               FROM holding h
-              LEFT JOIN cages c ON h.cage_id = c.cage_id 
+              LEFT JOIN cages c ON h.cage_id = c.cage_id
               WHERE h.cage_id = ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("s", $id);
@@ -156,8 +156,15 @@ if (isset($_GET['id'])) {
 
             // Retrieve and sanitize form data
             $cage_id = trim($_POST['cage_id']);
+            $new_cage_id = trim($_POST['new_cage_id']);
             $pi_name = trim($_POST['pi_name']);
+            $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
+            $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
             $strain = trim($_POST['strain']);
+            if ($strain === 'custom') {
+                $strain = !empty($_POST['custom_strain']) ? trim($_POST['custom_strain']) : null;
+            }
+            $cage_genotype = !empty($_POST['cage_genotype']) ? trim($_POST['cage_genotype']) : null;
             $iacuc = isset($_POST['iacuc']) ? array_map('trim', $_POST['iacuc']) : [];
             $users = isset($_POST['user']) ? array_map('trim', $_POST['user']) : [];
             $dob = trim($_POST['dob']);
@@ -165,27 +172,59 @@ if (isset($_GET['id'])) {
             $parent_cg = trim($_POST['parent_cg']);
             $remarks = trim($_POST['remarks']);
 
+            // Handle cage ID change if new_cage_id differs from current cage_id
+            $cageIdChanged = false;
+            $oldCageId = $cage_id;
+            if ($new_cage_id !== $cage_id) {
+                // Check if the new cage_id already exists
+                $checkDup = $con->prepare("SELECT cage_id FROM cages WHERE cage_id = ?");
+                $checkDup->bind_param("s", $new_cage_id);
+                $checkDup->execute();
+                $dupResult = $checkDup->get_result();
+                if ($dupResult->num_rows > 0) {
+                    $checkDup->close();
+                    $_SESSION['message'] = "Cage ID '" . htmlspecialchars($new_cage_id) . "' already exists. Please choose a different ID.";
+                    header("Location: hc_edit.php?id=" . urlencode($cage_id) . "&" . getCurrentUrlParams());
+                    exit();
+                }
+                $checkDup->close();
+
+                // Update cage_id in cages table (ON UPDATE CASCADE propagates to all related tables)
+                $updateCageIdQuery = $con->prepare("UPDATE cages SET cage_id = ? WHERE cage_id = ?");
+                $updateCageIdQuery->bind_param("ss", $new_cage_id, $cage_id);
+                $updateCageIdQuery->execute();
+                $updateCageIdQuery->close();
+
+                $cageIdChanged = true;
+                $cage_id = $new_cage_id;
+            }
+
+            $_SESSION['message'] = ($cageIdChanged ? "Cage ID changed from '$oldCageId' to '$cage_id'. " : '') . 'Entry updated successfully.';
+
             // Update query for holding table
             $updateQueryHolding = "UPDATE holding SET
                                     `strain` = ?,
                                     `dob` = ?,
                                     `sex` = ?,
-                                    `parent_cg` = ?
+                                    `parent_cg` = ?,
+                                    `genotype` = ?
                                     WHERE `cage_id` = ?";
 
             $stmtHolding = $con->prepare($updateQueryHolding);
-            $stmtHolding->bind_param("sssss", $strain, $dob, $sex, $parent_cg, $cage_id);
+            $stmtHolding->bind_param("ssssss", $strain, $dob, $sex, $parent_cg, $cage_genotype, $cage_id);
             $resultHolding = $stmtHolding->execute();
             $stmtHolding->close();
 
             // Update query for cages table
             $updateQueryCages = "UPDATE cages SET
                                  `pi_name` = ?,
-                                 `remarks` = ?
+                                 `remarks` = ?,
+                                 `room` = ?,
+                                 `rack` = ?
                                  WHERE `cage_id` = ?";
 
             $stmtCages = $con->prepare($updateQueryCages);
-            $stmtCages->bind_param("iss", $pi_name, $remarks, $cage_id);
+            $stmtCages->bind_param("issss", $pi_name, $remarks, $room, $rack, $cage_id);
             $resultCages = $stmtCages->execute();
             $stmtCages->close();
 
@@ -294,7 +333,7 @@ if (isset($_GET['id'])) {
                     $stmtUpdateLog->close();
                 }
 
-                $_SESSION['message'] = 'Maintenance logs updated successfully.';
+                $_SESSION['message'] .= ' Maintenance logs updated successfully.';
             }
 
             // Process maintenance logs deletion
@@ -676,6 +715,16 @@ require 'header.php';
                 allowClear: true
             });
 
+            // Show/hide custom strain input based on strain selection
+            $('#strain').on('change', function() {
+                if ($(this).val() === 'custom') {
+                    $('#custom_strain_div').show();
+                } else {
+                    $('#custom_strain_div').hide();
+                    $('#custom_strain').val('');
+                }
+            });
+
             $('#iacuc').select2({
                 placeholder: "Select IACUC",
                 allowClear: true,
@@ -879,8 +928,13 @@ require 'header.php';
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
 
                             <div class="mb-3">
-                                <label for="cage_id" class="form-label">Cage ID <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control" id="cage_id" name="cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" readonly required>
+                                <label for="cage_id" class="form-label">Current Cage ID</label>
+                                <input type="text" class="form-control" id="cage_id" name="cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_cage_id" class="form-label">New Cage ID <span class="required-asterisk">*</span></label>
+                                <input type="text" class="form-control" id="new_cage_id" name="new_cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" required style="border: 2px solid #0d6efd;">
+                                <small class="form-text text-muted">Change the cage ID if needed.</small>
                             </div>
 
                             <div class="mb-3">
@@ -897,12 +951,23 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
+                                <label for="room" class="form-label">Room</label>
+                                <input type="text" class="form-control" id="room" name="room" value="<?= htmlspecialchars($holdingcage['room'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="rack" class="form-label">Rack</label>
+                                <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($holdingcage['rack'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
                                 <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
                                 <select class="form-control" id="strain" name="strain" data-field-type="important">
-                                    <option value="" disabled <?= empty($holdingcage['strain']) ? 'selected' : ''; ?>>Select Strain</option>
+                                    <option value="" <?= empty($holdingcage['strain']) ? 'selected' : ''; ?>>None / Not Applicable</option>
                                     <?php
                                     // Initialize a flag to check if the current strain exists in the options
                                     $strainExists = false;
+                                    $isCustomStrain = false;
 
                                     // Populate the dropdown with options
                                     foreach ($strainOptions as $option) {
@@ -916,13 +981,20 @@ require 'header.php';
                                         echo "<option value='$value' $selected>$option</option>";
                                     }
 
-                                    // If the current strain is not in the list, add it as a separate option
+                                    // If the current strain is not in the list and not empty, it's a custom strain
                                     if (!$strainExists && !empty($holdingcage['strain'])) {
+                                        $isCustomStrain = true;
                                         $currentStrainId = htmlspecialchars($holdingcage['strain']);
-                                        echo "<option value='$currentStrainId' disabled selected>$currentStrainId | Unknown Strain</option>";
+                                        echo "<option value='$currentStrainId' selected>$currentStrainId (Custom)</option>";
                                     }
                                     ?>
+                                    <option value="custom" <?= $isCustomStrain ? '' : ''; ?>>Custom</option>
                                 </select>
+                            </div>
+
+                            <div class="mb-3" id="custom_strain_div" style="display: <?= $isCustomStrain ? 'block' : 'none'; ?>;">
+                                <label for="custom_strain" class="form-label">Custom Strain Name</label>
+                                <input type="text" class="form-control" id="custom_strain" name="custom_strain" value="<?= $isCustomStrain ? htmlspecialchars($holdingcage['strain']) : ''; ?>">
                             </div>
 
                             <div class="mb-3">
@@ -979,6 +1051,11 @@ require 'header.php';
                             <div class="mb-3">
                                 <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
                                 <input type="text" class="form-control" id="parent_cg" name="parent_cg" value="<?= htmlspecialchars($holdingcage['parent_cg']); ?>" data-field-type="useful">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="cage_genotype" class="form-label">Genotype</label>
+                                <input type="text" class="form-control" id="cage_genotype" name="cage_genotype" value="<?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?>">
                             </div>
 
                             <div class="mb-3">
