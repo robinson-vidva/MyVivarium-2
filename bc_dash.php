@@ -40,36 +40,49 @@ require 'header.php';
     <!-- Bootstrap 5 CSS is already loaded via header.php -->
 
     <script>
+        // State variables for pagination, sorting, and archive filtering
+        var currentLimit = 10;
+        var currentSort = 'asc';
+        var showArchived = '0';
+
         // Initialize tooltips when the document is ready
         $(document).ready(function() {
             $('[data-toggle="tooltip"]').tooltip();
         });
 
-        // Confirm deletion function with a dialog
+        // Confirm archive function with a dialog
         function confirmDeletion(id) {
-            var confirmDelete = confirm("Are you sure you want to delete cage - '" + id + "' and related mouse data?");
-            if (confirmDelete) {
-                window.location.href = "bc_drop.php?id=" + id + "&confirm=true"; // Redirect to deletion script
+            var confirmArchive = confirm("Are you sure you want to archive cage - '" + id + "' and related mouse data?");
+            if (confirmArchive) {
+                window.location.href = "bc_drop.php?id=" + id + "&action=archive&confirm=true";
             }
         }
 
         // Fetch data function to load data dynamically
         function fetchData(page = 1, search = '') {
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', 'bc_fetch_data.php?page=' + page + '&search=' + encodeURIComponent(search), true);
+            var url = 'bc_fetch_data.php?page=' + page
+                + '&search=' + encodeURIComponent(search)
+                + '&limit=' + currentLimit
+                + '&sort=' + currentSort
+                + '&show_archived=' + showArchived;
+            xhr.open('GET', url, true);
             xhr.onload = function() {
                 if (xhr.status === 200) {
                     try {
                         var response = JSON.parse(xhr.responseText);
                         if (response.tableRows && response.paginationLinks) {
-                            document.getElementById('tableBody').innerHTML = response.tableRows; // Insert table rows
-                            document.getElementById('paginationLinks').innerHTML = response.paginationLinks; // Insert pagination links
-                            document.getElementById('searchInput').value = search; // Preserve search input
+                            document.getElementById('tableBody').innerHTML = response.tableRows;
+                            document.getElementById('paginationLinks').innerHTML = response.paginationLinks;
+                            document.getElementById('searchInput').value = search;
 
-                            // Update the URL with the current page and search query
+                            // Update the URL with all current parameters
                             const newUrl = new URL(window.location.href);
                             newUrl.searchParams.set('page', page);
                             newUrl.searchParams.set('search', search);
+                            newUrl.searchParams.set('limit', currentLimit);
+                            newUrl.searchParams.set('sort', currentSort);
+                            newUrl.searchParams.set('show_archived', showArchived);
                             window.history.replaceState({
                                 path: newUrl.href
                             }, '', newUrl.href);
@@ -89,6 +102,44 @@ require 'header.php';
             xhr.send();
         }
 
+        // Change page size and re-fetch from page 1
+        function changeLimit(newLimit) {
+            currentLimit = parseInt(newLimit);
+            var searchQuery = document.getElementById('searchInput').value;
+            fetchData(1, searchQuery);
+        }
+
+        // Toggle sort order and re-fetch
+        function toggleSort() {
+            currentSort = (currentSort === 'asc') ? 'desc' : 'asc';
+            // Update sort icon
+            var icon = document.getElementById('sortIcon');
+            if (currentSort === 'asc') {
+                icon.className = 'fas fa-sort-alpha-down';
+            } else {
+                icon.className = 'fas fa-sort-alpha-up';
+            }
+            var searchQuery = document.getElementById('searchInput').value;
+            fetchData(1, searchQuery);
+        }
+
+        // Toggle archive view and re-fetch
+        function toggleArchive() {
+            showArchived = (showArchived === '0') ? '1' : '0';
+            var btn = document.getElementById('archiveToggleBtn');
+            if (showArchived === '1') {
+                btn.innerHTML = '<i class="fas fa-box-open me-1"></i> Show Active';
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-outline-warning');
+            } else {
+                btn.innerHTML = '<i class="fas fa-archive me-1"></i> Show Archived';
+                btn.classList.remove('btn-outline-warning');
+                btn.classList.add('btn-outline-secondary');
+            }
+            var searchQuery = document.getElementById('searchInput').value;
+            fetchData(1, searchQuery);
+        }
+
         // Search function with debounce to avoid excessive requests
         var searchTimeout = null;
         function searchCages() {
@@ -104,6 +155,25 @@ require 'header.php';
             const urlParams = new URLSearchParams(window.location.search);
             const page = urlParams.get('page') || 1;
             const search = urlParams.get('search') || '';
+            currentLimit = parseInt(urlParams.get('limit')) || 10;
+            currentSort = urlParams.get('sort') || 'asc';
+            showArchived = urlParams.get('show_archived') || '0';
+
+            // Sync UI controls with URL params
+            document.getElementById('pageSizeSelect').value = currentLimit;
+
+            var icon = document.getElementById('sortIcon');
+            if (currentSort === 'desc') {
+                icon.className = 'fas fa-sort-alpha-up';
+            }
+
+            if (showArchived === '1') {
+                var btn = document.getElementById('archiveToggleBtn');
+                btn.innerHTML = '<i class="fas fa-box-open me-1"></i> Show Active';
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-outline-warning');
+            }
+
             fetchData(page, search);
         });
     </script>
@@ -213,6 +283,25 @@ require 'header.php';
                         <div class="input-group mb-3">
                             <input type="text" id="searchInput" class="form-control" placeholder="Enter Cage ID" onkeyup="searchCages()">
                             <button class="btn btn-primary" type="button" onclick="searchCages()">Search</button>
+                        </div>
+
+                        <!-- Controls row: page size, sort toggle, archive toggle -->
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                            <div class="d-flex align-items-center">
+                                <label for="pageSizeSelect" class="form-label mb-0 me-2 text-nowrap" style="font-size: 0.875rem;">Show</label>
+                                <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;" onchange="changeLimit(this.value)">
+                                    <option value="10">10</option>
+                                    <option value="20">20</option>
+                                    <option value="30">30</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleSort()" title="Toggle sort order">
+                                <i id="sortIcon" class="fas fa-sort-alpha-down"></i> Sort
+                            </button>
+                            <button id="archiveToggleBtn" class="btn btn-sm btn-outline-secondary" onclick="toggleArchive()">
+                                <i class="fas fa-archive me-1"></i> Show Archived
+                            </button>
                         </div>
 
                         <div class="table-wrapper" id="tableContainer">

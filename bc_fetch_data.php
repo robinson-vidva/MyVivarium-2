@@ -33,8 +33,20 @@ if (!isset($_SESSION['username'])) {
 $userRole = $_SESSION['role'];
 $currentUserId = $_SESSION['user_id'];
 
-// Pagination variables
-$limit = 10; // Number of entries to show in a page
+// Validate and set dynamic limit (page size)
+$allowedLimits = [10, 20, 30, 50];
+$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+if (!in_array($limit, $allowedLimits)) {
+    $limit = 10; // Default to 10 if invalid value
+}
+
+// Validate and set sort direction
+$sort = isset($_GET['sort']) && strtolower($_GET['sort']) === 'desc' ? 'DESC' : 'ASC';
+
+// Determine whether to show archived cages
+$showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
+$cageStatus = $showArchived ? 'archived' : 'active';
+
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1; // Current page number, default to 1
 $offset = ($page - 1) * $limit; // Offset for the SQL query
 
@@ -45,34 +57,39 @@ if (isset($_GET['search'])) {
 }
 
 // Fetch the distinct cage IDs with pagination using prepared statements
+// JOIN with cages table to filter by status
 if (!empty($searchQuery)) {
     $searchPattern = '%' . $searchQuery . '%';
     // Query with search filter
-    $totalQuery = "SELECT DISTINCT `cage_id` FROM breeding WHERE `cage_id` LIKE ?";
+    $totalQuery = "SELECT DISTINCT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ? AND b.`cage_id` LIKE ?";
     $stmtTotal = $con->prepare($totalQuery);
-    $stmtTotal->bind_param("s", $searchPattern);
+    $stmtTotal->bind_param("ss", $cageStatus, $searchPattern);
     $stmtTotal->execute();
     $totalResult = $stmtTotal->get_result();
     $totalRecords = $totalResult->num_rows;
     $totalPages = ceil($totalRecords / $limit);
     $stmtTotal->close();
 
-    // Query with pagination
-    $query = "SELECT DISTINCT `cage_id` FROM breeding WHERE `cage_id` LIKE ? LIMIT ? OFFSET ?";
+    // Query with pagination and sort
+    $query = "SELECT DISTINCT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ? AND b.`cage_id` LIKE ? ORDER BY b.`cage_id` $sort LIMIT ? OFFSET ?";
     $stmt = $con->prepare($query);
-    $stmt->bind_param("sii", $searchPattern, $limit, $offset);
+    $stmt->bind_param("ssii", $cageStatus, $searchPattern, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
 } else {
     // Query without search filter
-    $totalQuery = "SELECT DISTINCT `cage_id` FROM breeding";
-    $totalResult = mysqli_query($con, $totalQuery);
-    $totalRecords = mysqli_num_rows($totalResult);
+    $totalQuery = "SELECT DISTINCT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ?";
+    $stmtTotal = $con->prepare($totalQuery);
+    $stmtTotal->bind_param("s", $cageStatus);
+    $stmtTotal->execute();
+    $totalResult = $stmtTotal->get_result();
+    $totalRecords = $totalResult->num_rows;
     $totalPages = ceil($totalRecords / $limit);
+    $stmtTotal->close();
 
-    $query = "SELECT DISTINCT `cage_id` FROM breeding LIMIT ? OFFSET ?";
+    $query = "SELECT DISTINCT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ? ORDER BY b.`cage_id` $sort LIMIT ? OFFSET ?";
     $stmt = $con->prepare($query);
-    $stmt->bind_param("ii", $limit, $offset);
+    $stmt->bind_param("sii", $cageStatus, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
 }

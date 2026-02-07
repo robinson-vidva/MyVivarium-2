@@ -41,7 +41,7 @@ if (isset($_GET['id'])) {
     $id = mysqli_real_escape_string($con, $_GET['id']);
 
     // Fetch the breeding cage record with the specified ID
-    $query = "SELECT b.*, c.remarks AS remarks, pi.initials AS pi_initials, pi.name AS pi_name
+    $query = "SELECT b.*, c.remarks AS remarks, pi.initials AS pi_initials, pi.name AS pi_name, c.room, c.rack
           FROM breeding b
           LEFT JOIN cages c ON b.cage_id = c.cage_id
           LEFT JOIN users pi ON c.pi_name = pi.id
@@ -447,6 +447,14 @@ require 'header.php';
                         <td id="pi-data" data-value="<?= !empty($breedingcage['pi_name']) && $breedingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['pi_initials'] . ' [' . $breedingcage['pi_name'] . ']'); ?></td>
                     </tr>
                     <tr>
+                        <th>Room</th>
+                        <td><?= htmlspecialchars($breedingcage['room'] ?? ''); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Rack</th>
+                        <td><?= htmlspecialchars($breedingcage['rack'] ?? ''); ?></td>
+                    </tr>
+                    <tr>
                         <th>Cross</th>
                         <td id="cross-data" data-value="<?= !empty($breedingcage['cross']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['cross']); ?></td>
                     </tr>
@@ -463,12 +471,20 @@ require 'header.php';
                         <td id="male-id-data" data-value="<?= !empty($breedingcage['male_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_id']); ?></td>
                     </tr>
                     <tr>
+                        <th>Male Genotype</th>
+                        <td><?= htmlspecialchars($breedingcage['male_genotype'] ?? ''); ?></td>
+                    </tr>
+                    <tr>
                         <th>Male DOB</th>
                         <td id="male-dob-data" data-value="<?= !empty($breedingcage['male_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
                     </tr>
                     <tr>
                         <th>Female ID</th>
                         <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Female Genotype</th>
+                        <td><?= htmlspecialchars($breedingcage['female_genotype'] ?? ''); ?></td>
                     </tr>
                     <tr>
                         <th>Female DOB</th>
