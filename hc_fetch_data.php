@@ -40,7 +40,7 @@ $offset = ($page - 1) * $limit; // Calculate offset for the SQL query
 // Handle the search filter
 $searchQuery = '';
 if (isset($_GET['search'])) {
-    $searchQuery = mysqli_real_escape_string($con, urldecode($_GET['search'])); // Decode and escape the search parameter
+    $searchQuery = $_GET['search']; // PHP auto-decodes GET parameters; prepared statements handle escaping
 }
 
 // Fetch the distinct cage IDs with pagination using prepared statements
@@ -99,9 +99,13 @@ while ($row = mysqli_fetch_assoc($result)) {
                         <a href="hc_view.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="View Cage"><i class="fas fa-eye"></i></a>
                         <a href="manage_tasks.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Manage Tasks"><i class="fas fa-tasks"></i></a>';
                         
-        // Check if the user is an admin or assigned to this cage
-        $assignedUsers = explode(',', $holdingcage['user']);
-        if ($userRole === 'admin' || in_array($currentUserId, $assignedUsers)) {
+        // Check if the user is an admin or assigned to this cage via cage_users table
+        $assignedCheck = $con->prepare("SELECT 1 FROM cage_users WHERE cage_id = ? AND user_id = ?");
+        $assignedCheck->bind_param("si", $holdingcage['cage_id'], $currentUserId);
+        $assignedCheck->execute();
+        $isAssigned = $assignedCheck->get_result()->num_rows > 0;
+        $assignedCheck->close();
+        if ($userRole === 'admin' || $isAssigned) {
             $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
                            <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Delete Cage"><i class="fas fa-trash"></i></a>';
         }

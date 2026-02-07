@@ -161,10 +161,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Retrieve and sanitize user input
-        $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING);
-        $username = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+        $name = trim($_POST['name'] ?? '');
+        $username = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
         $password = $_POST['password'];
-        $position = filter_input(INPUT_POST, 'position', FILTER_SANITIZE_STRING);
+        $position = trim($_POST['position'] ?? '');
+
+        // Validate email format
+        if (!$username) {
+            $_SESSION['resultMessage'] = "Please enter a valid email address.";
+            $con->close();
+            header("Location: " . $_SERVER["PHP_SELF"]);
+            exit;
+        }
         $role = "user";
         $status = "pending";
         $email_verified = 0; // Explicitly set to integer 0

@@ -106,9 +106,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     }
 
     $newUsername = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_EMAIL);
-    $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING);
-    $initials = filter_input(INPUT_POST, 'initials', FILTER_SANITIZE_STRING);
-    $position = filter_input(INPUT_POST, 'position', FILTER_SANITIZE_STRING);
+    $name = trim($_POST['name'] ?? '');
+    $initials = trim($_POST['initials'] ?? '');
+    $position = trim($_POST['position'] ?? '');
 
     // Check if the email address (username) has changed
     $emailChanged = ($newUsername !== $username);

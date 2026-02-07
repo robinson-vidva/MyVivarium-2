@@ -23,10 +23,23 @@ if (!isset($_SESSION['username'])) {
     exit; // Exit to ensure no further code is executed
 }
 
+// Accept both POST (preferred) and GET (legacy) requests for deletion
+$requestId = $_POST['id'] ?? $_GET['id'] ?? null;
+$requestConfirm = $_POST['confirm'] ?? $_GET['confirm'] ?? null;
+
+// Validate CSRF token for POST requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
+        $_SESSION['message'] = 'CSRF token validation failed.';
+        header("Location: bc_dash.php");
+        exit();
+    }
+}
+
 // Check if both 'id' and 'confirm' parameters are set, and if 'confirm' is 'true'
-if (isset($_GET['id'], $_GET['confirm']) && $_GET['confirm'] == 'true') {
-    // Sanitize the ID parameter to prevent SQL injection
-    $id = mysqli_real_escape_string($con, $_GET['id']);
+if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
+    // Use the request ID (already extracted above)
+    $id = $requestId;
 
     // Start a transaction
     mysqli_begin_transaction($con);

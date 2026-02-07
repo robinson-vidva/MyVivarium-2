@@ -37,8 +37,7 @@ require 'header.php';
 
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <!-- Bootstrap for tooltips and responsive design -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <!-- Bootstrap 5 CSS is already loaded via header.php -->
 
     <script>
         // Initialize tooltips when the document is ready
@@ -90,10 +89,14 @@ require 'header.php';
             xhr.send();
         }
 
-        // Search function to initiate data fetch based on search query
+        // Search function with debounce to avoid excessive requests
+        var searchTimeout = null;
         function searchCages() {
-            var searchQuery = document.getElementById('searchInput').value;
-            fetchData(1, searchQuery);
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                var searchQuery = document.getElementById('searchInput').value;
+                fetchData(1, searchQuery);
+            }, 300);
         }
 
         // Fetch initial data when the DOM content is loaded
@@ -240,10 +243,7 @@ require 'header.php';
     <!-- Include footer -->
     <?php include 'footer.php'; ?>
 
-    <!-- Bootstrap and jQuery for tooltips -->
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <!-- Bootstrap 5 JS and jQuery already loaded via header.php -->
 </body>
 
 </html>

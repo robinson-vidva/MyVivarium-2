@@ -7,6 +7,13 @@
  * It also schedules emails by inserting records into the outbox table.
  */
 
+// Guard against web access - this script should only be run via CLI (cron)
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    echo 'This script can only be run from the command line.';
+    exit;
+}
+
 require 'dbcon.php';
 
 // Fetch the timezone from the settings table

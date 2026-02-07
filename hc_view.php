@@ -407,11 +407,11 @@ require 'header.php';
                         <td id="strain-data" data-value="<?= !empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA' ? '1' : ''; ?>">
                             <a href="javascript:void(0);" onclick="viewStrainDetails(
                                 '<?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?>', 
-                                '<?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>', 
-                                '<?= htmlspecialchars($holdingcage['str_aka'] ?? ''); ?>', 
-                                '<?= htmlspecialchars($holdingcage['str_url'] ?? '#'); ?>', 
-                                '<?= htmlspecialchars($holdingcage['str_rrid'] ?? ''); ?>', 
-                                `<?= htmlspecialchars($holdingcage['str_notes'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE) ?>`)">
+                                <?= json_encode($holdingcage['str_name'] ?? 'Unknown Name') ?>,
+                                <?= json_encode($holdingcage['str_aka'] ?? '') ?>,
+                                <?= json_encode($holdingcage['str_url'] ?? '#') ?>,
+                                <?= json_encode($holdingcage['str_rrid'] ?? '') ?>,
+                                <?= json_encode($holdingcage['str_notes'] ?? '') ?>)">
                                 <?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?> | <?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>
                             </a>
                         </td>
@@ -626,15 +626,21 @@ require 'header.php';
         }
 
         function viewStrainDetails(id, name, aka, url, rrid, notes) {
-            document.getElementById('view_strain_id').innerText = id;
-            document.getElementById('view_strain_name').innerText = name;
-            document.getElementById('view_strain_aka').innerText = aka;
-            document.getElementById('view_strain_url').innerText = url;
-            document.getElementById('view_strain_rrid').innerText = rrid;
-            document.getElementById('view_strain_notes').innerHTML = notes.replace(/\n/g, '<br>');
+            document.getElementById('view_strain_id').textContent = id;
+            document.getElementById('view_strain_name').textContent = name;
+            document.getElementById('view_strain_aka').textContent = aka;
+            document.getElementById('view_strain_url').textContent = url;
+            document.getElementById('view_strain_rrid').textContent = rrid;
+            // Safely render notes with line breaks
+            var notesEl = document.getElementById('view_strain_notes');
+            notesEl.textContent = '';
+            notes.split('\n').forEach(function(line, i) {
+                if (i > 0) notesEl.appendChild(document.createElement('br'));
+                notesEl.appendChild(document.createTextNode(line));
+            });
             document.getElementById('viewPopupOverlay').style.display = 'block';
             document.getElementById('viewPopupForm').style.display = 'block';
-            document.getElementById('view_strain_url').href = url; // Set the href for the URL link
+            document.getElementById('view_strain_url').href = url;
         }
 
         function closeViewForm() {
