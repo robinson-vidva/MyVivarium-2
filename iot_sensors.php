@@ -9,7 +9,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -71,7 +71,7 @@ require 'header.php';
     <title>IOT Sensors | <?php echo htmlspecialchars($labName); ?></title>
 
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- Bootstrap 5.3 loaded via header.php -->
 
     <!-- Inline CSS for styling -->
     <style>

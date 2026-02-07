@@ -7,7 +7,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -82,13 +82,13 @@ require 'header.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cage Maintenance</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- jQuery loaded via header.php -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Bootstrap 5.3 loaded via header.php -->
     <style>
         .container {
             max-width: 800px;
-            background-color: #f8f9fa;
+            background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
             margin-top: 20px;
@@ -139,11 +139,11 @@ require 'header.php';
                         <h4>Add Cage Maintenance Record</h4>
                         <div class="action-buttons">
                             <!-- Button to go back to the previous page -->
-                            <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Go Back">
+                            <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                                 <i class="fas fa-arrow-circle-left"></i>
                             </a>
                             <!-- Button to save the form -->
-                            <a href="javascript:void(0);" onclick="document.getElementById('editForm').submit();" class="btn btn-success btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Save">
+                            <a href="javascript:void(0);" onclick="document.getElementById('editForm').submit();" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Save">
                                 <i class="fas fa-save"></i>
                             </a>
                         </div>

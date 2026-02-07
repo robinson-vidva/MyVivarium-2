@@ -11,7 +11,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -42,7 +42,7 @@ if (isset($_GET['id'])) {
         $id = mysqli_real_escape_string($con, $id); // Sanitize the ID
 
         // Fetch the holding cage record with the specified ID
-        $query = "SELECT h.*, pi.name AS pi_name, c.quantity as qty, h.dob, h.sex, h.parent_cg, s.str_name
+        $query = "SELECT h.*, pi.name AS pi_name, c.quantity as qty, c.room, c.rack, h.dob, h.sex, h.parent_cg, s.str_name
                   FROM holding h
                   LEFT JOIN cages c ON h.cage_id = c.cage_id
                   LEFT JOIN users pi ON c.pi_name = pi.id
@@ -213,7 +213,7 @@ if (isset($_GET['id'])) {
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Strain:</span>
                                 <span><?= htmlspecialchars($holdingcage["strain"]); ?></span>
                             </td>
-                            <td rowspan="4" style="width:20%; text-align:center;">
+                            <td rowspan="5" style="width:20%; text-align:center;">
                                 <img src="<?php echo "https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=https://" . $url . "/hc_view.php?id=" . $holdingcage["cage_id"] . "&choe=UTF-8"; ?>" alt="QR Code">
                             </td>
                         </tr>
@@ -237,14 +237,24 @@ if (isset($_GET['id'])) {
                                 <span><?= htmlspecialchars($holdingcage["dob"]); ?></span>
                             </td>
                         </tr>
-                        <tr style="border-bottom: none;">
+                        <tr>
                             <td style="width:40%;">
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Sex:</span>
-                                <span><?= htmlspecialchars(ucfirst($holdingcage["sex"])); ?></span>
+                                <span><?= htmlspecialchars(ucfirst($holdingcage["sex"] ?? '')); ?></span>
                             </td>
                             <td style="width:40%;">
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Parent Cage:</span>
-                                <span><?= htmlspecialchars($holdingcage["parent_cg"]); ?></span>
+                                <span><?= htmlspecialchars($holdingcage["parent_cg"] ?? ''); ?></span>
+                            </td>
+                        </tr>
+                        <tr style="border-bottom: none;">
+                            <td style="width:40%;">
+                                <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Room:</span>
+                                <span><?= htmlspecialchars($holdingcage["room"] ?? ''); ?></span>
+                            </td>
+                            <td style="width:40%;">
+                                <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Rack:</span>
+                                <span><?= htmlspecialchars($holdingcage["rack"] ?? ''); ?></span>
                             </td>
                         </tr>
                     </table>

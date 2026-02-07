@@ -68,7 +68,7 @@ if (isset($settings['r2_pres'])) {
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 
 <head>
     <meta charset="UTF-8">
@@ -83,8 +83,8 @@ if (isset($settings['r2_pres'])) {
     <link rel="icon" sizes="512x512" href="./icons/android-chrome-512x512.png">
     <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- Bootstrap 5.3 CSS (supports dark mode via data-bs-theme) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YcnS/1p6gQKpMBo8TFMhCZhBR8gFUPHOaJ9J" crossorigin="anonymous">
 
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
@@ -189,6 +189,7 @@ if (isset($settings['r2_pres'])) {
                         echo '<li><a class="dropdown-item" href="iot_sensors.php">IOT Sensors</a></li>';
                     }
                     ?>
+                    <li><a class="dropdown-item" href="cage_lineage.php">Cage Lineage</a></li>
                 </ul>
             </div>
 
@@ -207,6 +208,7 @@ if (isset($settings['r2_pres'])) {
                         echo '<li><hr class="dropdown-divider"></li>';
                         echo '<li class="dropdown-header">Vivarium Management</li>';
                         echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php"><i class="fas fa-clipboard-list"></i> Maintenance Notes</a></li>';
+                        echo '<li><a class="dropdown-item" href="activity_log.php"><i class="fas fa-history"></i> Activity Log</a></li>';
                     }
 
                     // Display admin options if the user is an admin
@@ -224,10 +226,59 @@ if (isset($settings['r2_pres'])) {
                     <li><a class="dropdown-item" href="logout.php">Logout</a></li>
                 </ul>
             </div>
+
+            <!-- Dark Mode Toggle -->
+            <button id="darkModeToggle" class="btn btn-outline-light" style="margin-left: 5px;">
+                <i class="fas fa-moon"></i>
+            </button>
         </nav>
     </div>
 
     <!-- Bootstrap and jQuery JS -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <!-- Dark Mode Toggle Script -->
+    <script>
+    (function() {
+        // Apply saved theme immediately to prevent flash
+        const savedTheme = localStorage.getItem('mv-theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggle = document.getElementById('darkModeToggle');
+            if (!toggle) return;
+
+            // Set initial icon
+            updateToggleIcon(toggle, savedTheme);
+
+            toggle.addEventListener('click', function() {
+                const current = document.documentElement.getAttribute('data-bs-theme');
+                const next = current === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-bs-theme', next);
+                localStorage.setItem('mv-theme', next);
+                updateToggleIcon(toggle, next);
+            });
+        });
+
+        function updateToggleIcon(btn, theme) {
+            btn.innerHTML = theme === 'dark'
+                ? '<i class="fas fa-sun"></i>'
+                : '<i class="fas fa-moon"></i>';
+            btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+        }
+    })();
+    </script>
+
+    <!-- Dark Mode Overrides -->
+    <style>
+    [data-bs-theme="dark"] .header { background-color: #1a1d21; }
+    [data-bs-theme="dark"] .nav-container { background-color: #1a1d21; }
+    [data-bs-theme="dark"] .container { background-color: #212529; }
+    [data-bs-theme="dark"] .note-app-container { background-color: #2b3035; }
+    [data-bs-theme="dark"] .popup-form { background-color: #212529; border-color: #495057; color: #dee2e6; }
+    [data-bs-theme="dark"] .table-wrapper th,
+    [data-bs-theme="dark"] .table-wrapper td { border-color: #495057; }
+    [data-bs-theme="dark"] .modal-header { background-color: #1a1d21; }
+    </style>
 <!-- Note: Document structure (html/head/body) is managed by the including page -->

@@ -10,7 +10,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -23,7 +23,7 @@ if (!isset($_SESSION['username'])) {
 }
 
 // Fetch all distinct cage IDs from the database
-$query = "SELECT DISTINCT `cage_id` FROM breeding";
+$query = "SELECT DISTINCT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = 'active'";
 $result = mysqli_query($con, $query);
 
 // Initialize an array to store cage IDs
@@ -46,7 +46,7 @@ require 'header.php';
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
     <!-- jQuery (required for Select2) -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jQuery loaded via header.php -->
     <!-- Select2 JS for enhanced dropdowns -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
@@ -58,7 +58,7 @@ require 'header.php';
 
         .container {
             max-width: 800px;
-            background-color: #f8f9fa;
+            background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
             margin: 50px auto;

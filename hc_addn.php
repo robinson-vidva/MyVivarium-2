@@ -8,10 +8,13 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
+
+// Include the activity log helper
+require_once 'log_activity.php';
 
 // Check if the user is not logged in, redirect them to index.php with the current URL for redirection after login
 if (!isset($_SESSION['username'])) {
@@ -81,6 +84,61 @@ while ($strainRow = $strainResult->fetch_assoc()) {
 
 // Sort the options based on str_id
 sort($strainOptions, SORT_STRING);
+
+// Clone cage data if clone parameter is provided
+$cloneData = null;
+$cloneUsers = [];
+$cloneIacuc = [];
+$cloneMice = [];
+if (isset($_GET['clone'])) {
+    $cloneId = trim($_GET['clone']);
+
+    // Fetch cage + holding data
+    $cloneQuery = "SELECT h.*, c.pi_name, c.remarks, c.room, c.rack
+                   FROM holding h
+                   LEFT JOIN cages c ON h.cage_id = c.cage_id
+                   WHERE h.cage_id = ?";
+    $cloneStmt = $con->prepare($cloneQuery);
+    $cloneStmt->bind_param("s", $cloneId);
+    $cloneStmt->execute();
+    $cloneResult = $cloneStmt->get_result();
+    if ($cloneResult->num_rows === 1) {
+        $cloneData = $cloneResult->fetch_assoc();
+    }
+    $cloneStmt->close();
+
+    // Fetch associated users
+    if ($cloneData) {
+        $cuQuery = "SELECT user_id FROM cage_users WHERE cage_id = ?";
+        $cuStmt = $con->prepare($cuQuery);
+        $cuStmt->bind_param("s", $cloneId);
+        $cuStmt->execute();
+        $cuResult = $cuStmt->get_result();
+        while ($row = $cuResult->fetch_assoc()) {
+            $cloneUsers[] = $row['user_id'];
+        }
+        $cuStmt->close();
+
+        // Fetch associated IACUC
+        $ciQuery = "SELECT iacuc_id FROM cage_iacuc WHERE cage_id = ?";
+        $ciStmt = $con->prepare($ciQuery);
+        $ciStmt->bind_param("s", $cloneId);
+        $ciStmt->execute();
+        $ciResult = $ciStmt->get_result();
+        while ($row = $ciResult->fetch_assoc()) {
+            $cloneIacuc[] = $row['iacuc_id'];
+        }
+        $ciStmt->close();
+
+        // Fetch mice data
+        $miceQuery = "SELECT mouse_id, genotype, notes FROM mice WHERE cage_id = ?";
+        $miceStmt = $con->prepare($miceQuery);
+        $miceStmt->bind_param("s", $cloneId);
+        $miceStmt->execute();
+        $cloneMice = $miceStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $miceStmt->close();
+    }
+}
 
 // Check if the form is submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -189,6 +247,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Commit the transaction
             mysqli_commit($con);
 
+            log_activity($con, 'create', 'cage', $cage_id, 'Created holding cage');
+
             $_SESSION['message'] = "New holding cage added successfully.";
         } catch (Exception $e) {
             // Rollback the transaction in case of an error
@@ -219,7 +279,7 @@ require 'header.php';
     <title>Add New Holding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
     <!-- Include Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- Bootstrap 5.3 loaded via header.php -->
 
     <!-- Include Select2 CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet">
@@ -230,7 +290,7 @@ require 'header.php';
     <style>
         .container {
             max-width: 800px;
-            background-color: #f8f9fa;
+            background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
             margin: auto;
@@ -550,7 +610,7 @@ require 'header.php';
 <body>
     <div class="container mt-4 content">
 
-        <h4>Add New Holding Cage</h4>
+        <h4>Add New Holding Cage<?php if ($cloneData): ?> <small class="text-muted">(Cloning from <?= htmlspecialchars($_GET['clone']); ?>)</small><?php endif; ?></h4>
 
         <?php include('message.php'); ?>
 
@@ -580,14 +640,18 @@ require 'header.php';
                     <option value="">Select PI</option>
                     <?php
                     // Populate dropdown with options from the database
-                    // Auto-select if only one PI exists
+                    // Auto-select if only one PI exists, or use cloneData if cloning
                     $isFirst = true;
                     $shouldAutoSelect = (count($piOptions) === 1);
                     foreach ($piOptions as $row) {
                         $pi_id = htmlspecialchars($row['id']);
                         $pi_initials = htmlspecialchars($row['initials']);
                         $pi_name = htmlspecialchars($row['name']);
-                        $selected = ($shouldAutoSelect || ($isFirst && count($piOptions) > 0)) ? 'selected' : '';
+                        if ($cloneData) {
+                            $selected = ($cloneData['pi_name'] == $row['id']) ? 'selected' : '';
+                        } else {
+                            $selected = ($shouldAutoSelect || ($isFirst && count($piOptions) > 0)) ? 'selected' : '';
+                        }
                         echo "<option value='$pi_id' $selected>$pi_initials [$pi_name]</option>";
                         $isFirst = false;
                     }
@@ -597,12 +661,12 @@ require 'header.php';
 
             <div class="mb-3">
                 <label for="room" class="form-label">Room</label>
-                <input type="text" class="form-control" id="room" name="room">
+                <input type="text" class="form-control" id="room" name="room" value="<?= htmlspecialchars($cloneData['room'] ?? ''); ?>">
             </div>
 
             <div class="mb-3">
                 <label for="rack" class="form-label">Rack</label>
-                <input type="text" class="form-control" id="rack" name="rack">
+                <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($cloneData['rack'] ?? ''); ?>">
             </div>
 
             <div class="mb-3">
@@ -612,7 +676,9 @@ require 'header.php';
                     <?php
                     // Populate the dropdown with all the options generated
                     foreach ($strainOptions as $option) {
-                        echo "<option value='" . explode(" | ", $option)[0] . "'>$option</option>";
+                        $strOptId = explode(" | ", $option)[0];
+                        $strSelected = ($cloneData && $strOptId == $cloneData['strain']) ? 'selected' : '';
+                        echo "<option value='$strOptId' $strSelected>$option</option>";
                     }
                     ?>
                     <option value="custom">Custom</option>
@@ -634,7 +700,8 @@ require 'header.php';
                         $iacuc_id = htmlspecialchars($iacucRow['iacuc_id']);
                         $iacuc_title = htmlspecialchars($iacucRow['iacuc_title']);
                         $truncated_title = strlen($iacuc_title) > 40 ? substr($iacuc_title, 0, 40) . '...' : $iacuc_title;
-                        echo "<option value='$iacuc_id' title='$iacuc_title'>$iacuc_id | $truncated_title</option>";
+                        $iacucSelected = in_array($iacucRow['iacuc_id'], $cloneIacuc) ? 'selected' : '';
+                        echo "<option value='$iacuc_id' title='$iacuc_title' $iacucSelected>$iacuc_id | $truncated_title</option>";
                     }
                     ?>
                 </select>
@@ -645,12 +712,16 @@ require 'header.php';
                 <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
                     <?php
                     // Populate the dropdown with options from the database
-                    // Auto-select current user
+                    // Auto-select current user, or use cloneUsers if cloning
                     while ($userRow = $userResult->fetch_assoc()) {
                         $user_id = htmlspecialchars($userRow['id']);
                         $initials = htmlspecialchars($userRow['initials']);
                         $name = htmlspecialchars($userRow['name']);
-                        $selected = ($currentUserId && $user_id == $currentUserId) ? 'selected' : '';
+                        if ($cloneData) {
+                            $selected = in_array($userRow['id'], $cloneUsers) ? 'selected' : '';
+                        } else {
+                            $selected = ($currentUserId && $user_id == $currentUserId) ? 'selected' : '';
+                        }
                         echo "<option value='$user_id' $selected>$initials [$name]</option>";
                     }
                     ?>
@@ -659,31 +730,31 @@ require 'header.php';
 
             <div class="mb-3">
                 <label for="dob" class="form-label">DOB <span class="badge bg-warning">Critical</span></label>
-                <input type="date" class="form-control" id="dob" name="dob" min="1900-01-01" data-field-type="critical">
+                <input type="date" class="form-control" id="dob" name="dob" min="1900-01-01" data-field-type="critical" value="<?= htmlspecialchars($cloneData['dob'] ?? ''); ?>">
             </div>
 
             <div class="mb-3">
                 <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
                 <select class="form-control" id="sex" name="sex" data-field-type="critical">
                     <option value="">Select Sex</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="Male" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'Male') ? 'selected' : '' ?>>Male</option>
+                    <option value="Female" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'Female') ? 'selected' : '' ?>>Female</option>
                 </select>
             </div>
 
             <div class="mb-3">
                 <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
-                <input type="text" class="form-control" id="parent_cg" name="parent_cg" data-field-type="useful">
+                <input type="text" class="form-control" id="parent_cg" name="parent_cg" data-field-type="useful" value="<?= htmlspecialchars($cloneData['parent_cg'] ?? ''); ?>">
             </div>
 
             <div class="mb-3">
                 <label for="cage_genotype" class="form-label">Genotype</label>
-                <input type="text" class="form-control" id="cage_genotype" name="cage_genotype">
+                <input type="text" class="form-control" id="cage_genotype" name="cage_genotype" value="<?= htmlspecialchars($cloneData['genotype'] ?? ''); ?>">
             </div>
 
             <div class="mb-3">
                 <label for="remarks" class="form-label">Remarks</label>
-                <textarea class="form-control" id="remarks" name="remarks" oninput="adjustTextareaHeight(this)"></textarea>
+                <textarea class="form-control" id="remarks" name="remarks" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($cloneData['remarks'] ?? ''); ?></textarea>
             </div>
 
             <!-- HTML Form Section for Mouse Fields -->
@@ -709,6 +780,19 @@ require 'header.php';
 
     <br>
     <?php include 'footer.php'; ?>
+
+    <?php if (!empty($cloneMice)): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        <?php foreach ($cloneMice as $mouse): ?>
+        addMouseField();
+        document.getElementById('mouse_id_' + mouseFieldCounter).value = <?= json_encode($mouse['mouse_id']); ?>;
+        document.getElementById('genotype_' + mouseFieldCounter).value = <?= json_encode($mouse['genotype']); ?>;
+        document.getElementById('notes_' + mouseFieldCounter).value = <?= json_encode($mouse['notes'] ?? ''); ?>;
+        <?php endforeach; ?>
+    });
+    </script>
+    <?php endif; ?>
 </body>
 
 </html>

@@ -8,7 +8,7 @@
  * 
  */
 
-session_start();
+require 'session_config.php';
 require 'dbcon.php';
 
 // Check if the user is not logged in
@@ -16,6 +16,11 @@ if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
     exit;
+}
+
+// Generate CSRF token if not already present
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 // Disable error display in production (errors logged to server logs)
@@ -231,7 +236,7 @@ require 'header.php';
 
         .container {
             max-width: 800px;
-            background-color: #f8f9fa;
+            background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
             margin: auto;
@@ -355,7 +360,7 @@ require 'header.php';
             z-index: 999;
         }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Font Awesome loaded via header.php -->
 </head>
 
 <body>
@@ -364,19 +369,22 @@ require 'header.php';
             <div class="card-header">
                 <h4>View Holding Cage <?= htmlspecialchars($holdingcage['cage_id']); ?></h4>
                 <div class="action-buttons">
-                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Go Back">
+                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                         <i class="fas fa-arrow-circle-left"></i>
                     </a>
-                    <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Edit Cage">
+                    <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
-                    <a href="manage_tasks.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Manage Tasks">
+                    <a href="hc_addn.php?clone=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-info btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
+                        <i class="fas fa-clone"></i>
+                    </a>
+                    <a href="manage_tasks.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="showQrCodePopup('<?= rawurlencode($holdingcage['cage_id']); ?>')" class="btn btn-success btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="QR Code">
+                    <a href="javascript:void(0);" onclick="showQrCodePopup('<?= rawurlencode($holdingcage['cage_id']); ?>')" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
                         <i class="fas fa-qrcode"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Print Cage">
+                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
                         <i class="fas fa-print"></i>
                     </a>
                 </div>
@@ -470,11 +478,17 @@ require 'header.php';
                                 <th>Mouse ID</th>
                                 <th>Genotype</th>
                                 <th>Notes</th>
+                                <th>Actions</th>
                             </tr>
                             <tr>
                                 <td><?= htmlspecialchars($mouse['mouse_id']); ?></td>
                                 <td><?= htmlspecialchars($mouse['genotype']); ?></td>
                                 <td><?= htmlspecialchars($mouse['notes']); ?></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="openTransferModal(<?= $mouse['id']; ?>, '<?= htmlspecialchars($mouse['mouse_id']); ?>')" title="Transfer Mouse">
+                                        <i class="fas fa-exchange-alt"></i>
+                                    </button>
+                                </td>
                             </tr>
                         </table>
                     <?php endforeach; ?>
@@ -524,10 +538,10 @@ require 'header.php';
                     <h4>Maintenance Log for Cage ID: <?= htmlspecialchars($id ?? 'Unknown'); ?></h4>
                     <div class="action-icons mt-3 mt-md-0">
                         <!-- Maintenance button with tooltip -->
-                        <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-icon" data-toggle="tooltip" data-placement="top" title="Add Maintenance Record">
+                        <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
                             <i class="fas fa-wrench"></i>
                         </a>
-                        <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Edit Cage">
+                        <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                             <i class="fas fa-edit"></i>
                         </a>
                     </div>
@@ -604,6 +618,42 @@ require 'header.php';
         </div>
     </div>
 
+    <!-- Mouse Transfer Modal -->
+    <div class="popup-overlay" id="transferOverlay"></div>
+    <div class="popup-form" id="transferForm" style="max-width: 500px;">
+        <h4>Transfer Mouse</h4>
+        <form method="POST" action="mouse_transfer.php">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+            <input type="hidden" id="transfer_mouse_db_id" name="mouse_db_id">
+            <input type="hidden" name="source_cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>">
+            <div class="mb-3">
+                <label class="form-label"><strong>Mouse ID:</strong></label>
+                <p id="transfer_mouse_id_display"></p>
+            </div>
+            <div class="mb-3">
+                <label for="target_cage_id" class="form-label"><strong>Transfer to Cage:</strong></label>
+                <select class="form-control" id="target_cage_id" name="target_cage_id" required>
+                    <option value="">Select Target Cage</option>
+                    <?php
+                    $targetCageQuery = "SELECT h.cage_id FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = 'active' AND h.cage_id != ? ORDER BY h.cage_id";
+                    $targetStmt = $con->prepare($targetCageQuery);
+                    $targetStmt->bind_param("s", $id);
+                    $targetStmt->execute();
+                    $targetResult = $targetStmt->get_result();
+                    while ($targetRow = $targetResult->fetch_assoc()) {
+                        echo '<option value="' . htmlspecialchars($targetRow['cage_id']) . '">' . htmlspecialchars($targetRow['cage_id']) . '</option>';
+                    }
+                    $targetStmt->close();
+                    ?>
+                </select>
+            </div>
+            <div class="form-buttons">
+                <button type="submit" class="btn btn-primary">Transfer</button>
+                <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+
     <script>
         function showQrCodePopup(cageId) {
             var popup = window.open("", "QR Code for Cage " + cageId, "width=400,height=400");
@@ -658,6 +708,18 @@ require 'header.php';
         function closeViewForm() {
             document.getElementById('viewPopupOverlay').style.display = 'none';
             document.getElementById('viewPopupForm').style.display = 'none';
+        }
+
+        function openTransferModal(dbId, mouseId) {
+            document.getElementById('transfer_mouse_db_id').value = dbId;
+            document.getElementById('transfer_mouse_id_display').textContent = mouseId;
+            document.getElementById('transferOverlay').style.display = 'block';
+            document.getElementById('transferForm').style.display = 'block';
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferOverlay').style.display = 'none';
+            document.getElementById('transferForm').style.display = 'none';
         }
 
         // Information Completeness Calculation

@@ -10,9 +10,7 @@
 
 
 // Start or resume the session
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -224,7 +222,7 @@ $result = $stmt->get_result();
             text-align: right;
         }
     </style>
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <!-- jQuery loaded via header.php -->
 </head>
 
 <body>

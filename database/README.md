@@ -1,116 +1,103 @@
-# Database Migrations and Schema
+# Database Schema and Migrations
 
-This folder contains the database schema and migration scripts for MyVivarium.
+This folder contains the database schema, migration scripts, and tools for MyVivarium-2.
 
-## Files
+## Files Overview
 
-### `schema.sql`
-The main database schema file. Use this for **new installations** to create all required tables and initial data.
+| File | Purpose |
+|------|---------|
+| `schema.sql` | Complete v2 schema for **new installations** |
+| `migrate_v1_to_v2.sql` | **In-place upgrade** from MyVivarium v1 to v2 |
+| `migrate_v1_to_v2.sh` | **Full migration** script (old DB -> new DB, with verification) |
+| `add_vivarium_manager_role.sql` | Legacy: adds vivarium_manager role (included in v2 schema) |
+| `add_features_v2.sql` | Legacy: adds v2 columns (included in migrate_v1_to_v2.sql) |
+| `make_cage_fields_optional.sql` | Legacy: optional fields (included in migrate_v1_to_v2.sql) |
+| `erd.png` | Entity-Relationship Diagram |
 
-**Usage:**
+## New Installation
+
+Use `schema.sql` to create all tables with the latest v2 structure:
+
 ```bash
-mysql -u your_username -p your_database_name < database/schema.sql
+mysql -u root -p your_database_name < database/schema.sql
 ```
 
-### Migration Files
+## Upgrading from MyVivarium v1
 
-Migration files are used to update **existing databases** without losing data. Run these on databases that were created with an earlier version of the schema.
+### Option A: In-Place Upgrade (Recommended)
 
-#### `add_vivarium_manager_role.sql`
-- **Purpose:** Adds the "vivarium_manager" role to the system
-- **Date Added:** 2025-11-02
-- **What it does:**
-  - Automatically assigns vivarium_manager role to users with position "Vivarium Manager"
-  - Includes verification queries
-  - Provides optional manual assignment commands
+Run the SQL migration directly on your existing database:
 
-**Usage:**
 ```bash
-mysql -u your_username -p your_database_name < database/add_vivarium_manager_role.sql
+# 1. Backup first!
+mysqldump -u root -p myvivarium > backup_$(date +%Y%m%d).sql
+
+# 2. Run migration
+mysql -u root -p myvivarium < database/migrate_v1_to_v2.sql
 ```
 
-#### `make_cage_fields_optional.sql`
-- **Purpose:** Makes several cage creation fields optional for quick cage creation
-- **Date Added:** 2025-11-03
-- **What it does:**
-  - Makes DOB and Parent Cage optional for holding cages
-  - Makes Cross, Male ID, Female ID, Male DOB, and Female DOB optional for breeding cages
-  - Enables users to create cages quickly with minimal information
-  - Allows completing cage details later
+### Option B: Full Migration (New Database)
 
-**Fields Changed:**
+Use the interactive shell script to migrate data to a fresh database:
 
-**Holding Cages:**
-- `dob` - Changed from NOT NULL to DEFAULT NULL
-- `parent_cg` - Changed from NOT NULL to DEFAULT NULL
-
-**Breeding Cages:**
-- `cross` - Changed from NOT NULL to DEFAULT NULL
-- `male_id` - Changed from NOT NULL to DEFAULT NULL
-- `female_id` - Changed from NOT NULL to DEFAULT NULL
-- `male_dob` - Changed from NOT NULL to DEFAULT NULL
-- `female_dob` - Changed from NOT NULL to DEFAULT NULL
-
-**Usage:**
 ```bash
-mysql -u your_username -p your_database_name < database/make_cage_fields_optional.sql
+# 1. Create new database and import v2 schema
+mysql -u root -p -e "CREATE DATABASE myvivarium2;"
+mysql -u root -p myvivarium2 < database/schema.sql
+
+# 2. Run migration script
+chmod +x database/migrate_v1_to_v2.sh
+./database/migrate_v1_to_v2.sh
 ```
 
-**After Running This Migration:**
-- Users can create cages with just a Cage ID
-- The application will show information completeness indicators
-- Users are encouraged to fill in missing details over time
+The script will:
+- Back up the old database automatically
+- Migrate all data table by table
+- Map v1 columns to v2 schema (setting new columns to defaults)
+- Verify row counts match between old and new databases
 
-## How to Apply Migrations
+## What Changed in v2
 
-### For New Installations
-1. Use only `schema.sql`
-2. This creates all tables with the latest structure
+### New Columns
 
-### For Existing Databases
-1. First, check which migrations you need to apply
-2. Apply migrations in chronological order:
-   - `add_vivarium_manager_role.sql` (if not already applied)
-   - `make_cage_fields_optional.sql` (if not already applied)
+| Table | Column | Type | Default | Purpose |
+|-------|--------|------|---------|---------|
+| `cages` | `status` | ENUM('active','archived') | 'active' | Soft-delete / archive |
+| `cages` | `room` | VARCHAR(255) | NULL | Physical location |
+| `cages` | `rack` | VARCHAR(255) | NULL | Physical location |
+| `holding` | `genotype` | VARCHAR(255) | NULL | Cage-level genotype |
+| `breeding` | `male_genotype` | VARCHAR(255) | NULL | Male parent genotype |
+| `breeding` | `female_genotype` | VARCHAR(255) | NULL | Female parent genotype |
 
-### Checking Which Migrations Are Needed
+### Fields Made Optional (Allow NULL)
 
-**To check if vivarium_manager role migration is needed:**
+**Holding**: `dob`, `parent_cg`
+**Breeding**: `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`
+
+### New Role
+
+`vivarium_manager` role auto-assigned to users with position "Vivarium Manager" or "Animal Care Technician".
+
+## Verification
+
+After migration, run these queries to verify:
+
 ```sql
-SELECT DISTINCT role FROM users;
-```
-If you don't see 'vivarium_manager' in the results, you need to apply that migration.
+-- Check v2 schema
+DESCRIBE cages;
+DESCRIBE holding;
+DESCRIBE breeding;
 
-**To check if cage fields are optional:**
-```sql
-SHOW COLUMNS FROM holding WHERE Field IN ('dob', 'parent_cg');
-SHOW COLUMNS FROM breeding WHERE Field IN ('cross', 'male_id', 'female_id', 'male_dob', 'female_dob');
+-- Check cage counts
+SELECT status, COUNT(*) FROM cages GROUP BY status;
+
+-- Check roles
+SELECT role, COUNT(*) FROM users GROUP BY role;
 ```
-If you see 'NO' in the 'Null' column for these fields, you need to apply the migration.
 
 ## Best Practices
 
-1. **Always backup your database before running migrations:**
-   ```bash
-   mysqldump -u your_username -p your_database_name > backup_$(date +%Y%m%d_%H%M%S).sql
-   ```
-
-2. **Test migrations on a development database first** before applying to production
-
-3. **Run verification queries** (included in each migration file) after applying migrations
-
-4. **Keep track of which migrations have been applied** to your database
-
-## Rollback Instructions
-
-Each migration file includes rollback instructions in the comments. Review the specific migration file for detailed rollback steps.
-
-**WARNING:** Rollback may fail if the migration has been applied and data has been created that depends on the changes. Always backup before attempting a rollback.
-
-## Support
-
-For issues with database migrations, please:
-1. Check the verification queries in the migration file
-2. Review the error messages
-3. Ensure you have proper database permissions
-4. Create an issue at https://github.com/robinson-vidva/MyVivarium-2/issues
+1. **Always backup** before running any migration
+2. **Test on dev** before applying to production
+3. **Run verification queries** after migration
+4. Update `.env` if you created a new database

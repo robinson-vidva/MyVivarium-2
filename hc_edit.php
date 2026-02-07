@@ -8,10 +8,13 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
+
+// Include the activity log helper
+require_once 'log_activity.php';
 
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
@@ -402,6 +405,12 @@ if (isset($_GET['id'])) {
                 }
             }
 
+            // Log activity
+            log_activity($con, 'edit', 'cage', $cage_id, 'Cage details updated');
+            if ($cageIdChanged) {
+                log_activity($con, 'rename', 'cage', $cage_id, 'Cage renamed from ' . $oldCageId);
+            }
+
             // Redirect to the same page to prevent resubmission on refresh
             header("Location: hc_dash.php?" . getCurrentUrlParams());
             exit();
@@ -451,7 +460,7 @@ require 'header.php';
     <title>Edit Holding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
     <!-- Include Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- Bootstrap 5.3 loaded via header.php -->
 
     <!-- Include Select2 CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet">
@@ -462,7 +471,7 @@ require 'header.php';
     <style>
         .container {
             max-width: 800px;
-            background-color: #f8f9fa;
+            background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
             margin-top: 20px;
@@ -901,11 +910,11 @@ require 'header.php';
                         <h4>Edit Holding Cage</h4>
                         <div class="action-buttons">
                             <!-- Button to go back to the previous page -->
-                            <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Go Back">
+                            <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                                 <i class="fas fa-arrow-circle-left"></i>
                             </a>
                             <!-- Button to save the form -->
-                            <a href="javascript:void(0);" onclick="document.getElementById('editForm').submit();" class="btn btn-success btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Save">
+                            <a href="javascript:void(0);" onclick="document.getElementById('editForm').submit();" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Save">
                                 <i class="fas fa-save"></i>
                             </a>
                         </div>
@@ -1164,7 +1173,7 @@ require 'header.php';
                                     <h4>Maintenance Log for Cage ID: <?= htmlspecialchars($id ?? 'Unknown'); ?></h4>
                                     <div class="action-icons mt-3 mt-md-0">
                                         <!-- Maintenance button with tooltip -->
-                                        <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-icon" data-toggle="tooltip" data-placement="top" title="Add Maintenance Record">
+                                        <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
                                             <i class="fas fa-wrench"></i>
                                         </a>
                                     </div>

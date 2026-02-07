@@ -5,7 +5,7 @@
  * This script handles AJAX requests to fetch a single reminder's data based on its ID.
  */
 
-session_start();
+require 'session_config.php';
 require 'dbcon.php';
 
 // Check if the user is logged in

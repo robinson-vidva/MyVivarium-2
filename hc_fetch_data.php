@@ -10,7 +10,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
@@ -113,8 +113,8 @@ while ($row = mysqli_fetch_assoc($result)) {
             $firstRow = false;
         }
         $tableRows .= '<td class="action-icons" style="width: 50%; white-space: nowrap;">
-                        <a href="hc_view.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="View Cage"><i class="fas fa-eye"></i></a>
-                        <a href="manage_tasks.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Manage Tasks"><i class="fas fa-tasks"></i></a>';
+                        <a href="hc_view.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="View Cage"><i class="fas fa-eye"></i></a>
+                        <a href="manage_tasks.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks"><i class="fas fa-tasks"></i></a>';
                         
         // Check if the user is an admin or assigned to this cage via cage_users table
         $assignedCheck = $con->prepare("SELECT 1 FROM cage_users WHERE cage_id = ? AND user_id = ?");
@@ -123,8 +123,8 @@ while ($row = mysqli_fetch_assoc($result)) {
         $isAssigned = $assignedCheck->get_result()->num_rows > 0;
         $assignedCheck->close();
         if ($userRole === 'admin' || $isAssigned) {
-            $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-secondary btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
-                           <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm btn-icon" data-toggle="tooltip" data-placement="top" title="Delete Cage"><i class="fas fa-trash"></i></a>';
+            $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
+                           <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete Cage"><i class="fas fa-trash"></i></a>';
         }
         $tableRows .= '</td></tr>';
     }

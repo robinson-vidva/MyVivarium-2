@@ -10,7 +10,7 @@
  * 
  */
 
-session_start();
+require 'session_config.php';
 require 'dbcon.php'; // Database connection
 require 'config.php'; // Configuration file for email settings
 require 'header.php'; // Include the header file

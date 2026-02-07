@@ -8,9 +8,7 @@
  */
 
 // Check if a session is already started, and start a new session if not
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require 'session_config.php';
 
 // Unset all session variables
 $_SESSION = array();

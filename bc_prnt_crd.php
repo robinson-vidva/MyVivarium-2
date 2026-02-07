@@ -9,7 +9,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -38,7 +38,7 @@ if (isset($_GET['id'])) {
 
     foreach ($ids as $id) {
         // Fetch the breeding cage record with the specified ID, including PI name details
-        $query = "SELECT b.*, c.remarks AS remarks, pi.name AS pi_name
+        $query = "SELECT b.*, c.remarks AS remarks, c.room, c.rack, pi.name AS pi_name
         FROM breeding b
         LEFT JOIN cages c ON b.cage_id = c.cage_id
         LEFT JOIN users pi ON c.pi_name = pi.id
@@ -211,7 +211,7 @@ function getIacucIdsByCageId($con, $cageId)
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Cross:</span>
                                 <span><?= $breedingcage["cross"] ?></span>
                             </td>
-                            <td rowspan="4" style="width:20%; text-align:center;">
+                            <td rowspan="5" style="width:20%; text-align:center;">
                                 <img src="<?php echo "https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=https://" . $url . "/bc_view.php?id=" . $breedingcage["cage_id"] . "&choe=UTF-8"; ?>" alt="QR Code">
                             </td>
                         </tr>
@@ -227,22 +227,32 @@ function getIacucIdsByCageId($con, $cageId)
                         </tr>
                         <tr>
                             <td style="width:40%;">
+                                <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Room:</span>
+                                <span><?= htmlspecialchars($breedingcage["room"] ?? '') ?></span>
+                            </td>
+                            <td style="width:40%;">
+                                <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Rack:</span>
+                                <span><?= htmlspecialchars($breedingcage["rack"] ?? '') ?></span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="width:40%;">
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Male ID:</span>
-                                <span><?= $breedingcage["male_id"] ?></span>
+                                <span><?= htmlspecialchars($breedingcage["male_id"] ?? '') ?></span>
                             </td>
                             <td style="width:40%;">
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Male DOB:</span>
-                                <span><?= $breedingcage["male_dob"] ?></span>
+                                <span><?= htmlspecialchars($breedingcage["male_dob"] ?? '') ?></span>
                             </td>
                         </tr>
                         <tr style="border-bottom: none;">
                             <td style="width:40%;">
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Female ID:</span>
-                                <span><?= $breedingcage["female_id"] ?></span>
+                                <span><?= htmlspecialchars($breedingcage["female_id"] ?? '') ?></span>
                             </td>
                             <td style="width:40%;">
                                 <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Female DOB:</span>
-                                <span><?= $breedingcage["female_dob"] ?></span>
+                                <span><?= htmlspecialchars($breedingcage["female_dob"] ?? '') ?></span>
                             </td>
                         </tr>
                     </table>

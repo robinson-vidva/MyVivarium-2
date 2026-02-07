@@ -10,7 +10,7 @@
  */
 
 // Start a new session or resume the existing session
-session_start();
+require 'session_config.php';
 
 // Include the database connection file
 require 'dbcon.php';
@@ -21,14 +21,24 @@ if (!isset($_SESSION['name'])) {
     exit;
 }
 
-// Fetch the counts for holding and breeding cages
-$holdingCountResult = $con->query("SELECT COUNT(*) AS count FROM holding");
+// Fetch the counts for holding and breeding cages (active vs archived)
+$holdingCountResult = $con->query("SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END) AS active,
+    SUM(CASE WHEN c.status = 'archived' THEN 1 ELSE 0 END) AS archived
+    FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id");
 $holdingCountRow = $holdingCountResult->fetch_assoc();
-$holdingCount = $holdingCountRow['count'];
+$holdingCount = $holdingCountRow['active'] ?? 0;
+$holdingArchived = $holdingCountRow['archived'] ?? 0;
 
-$matingCountResult = $con->query("SELECT COUNT(*) AS count FROM breeding");
+$matingCountResult = $con->query("SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END) AS active,
+    SUM(CASE WHEN c.status = 'archived' THEN 1 ELSE 0 END) AS archived
+    FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id");
 $matingCountRow = $matingCountResult->fetch_assoc();
-$matingCount = $matingCountRow['count'];
+$matingCount = $matingCountRow['active'] ?? 0;
+$matingArchived = $matingCountRow['archived'] ?? 0;
 
 // Fetch the task stats for the logged-in user
 $userId = $_SESSION['user_id'];
@@ -131,7 +141,10 @@ require 'header.php';
                                 </div>
                                 <div class="card-body">
                                     <h5 class="card-title"><?php echo $holdingCount; ?></h5>
-                                    <p class="card-text">Total Entries</p>
+                                    <p class="card-text">Active Cages</p>
+                                    <?php if ($holdingArchived > 0): ?>
+                                    <small class="text-muted"><a href="hc_dash.php?show_archived=1"><?php echo $holdingArchived; ?> archived</a></small>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -143,7 +156,10 @@ require 'header.php';
                                 </div>
                                 <div class="card-body">
                                     <h5 class="card-title"><?php echo $matingCount; ?></h5>
-                                    <p class="card-text">Total Entries</p>
+                                    <p class="card-text">Active Cages</p>
+                                    <?php if ($matingArchived > 0): ?>
+                                    <small class="text-muted"><a href="bc_dash.php?show_archived=1"><?php echo $matingArchived; ?> archived</a></small>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
