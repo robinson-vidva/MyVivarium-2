@@ -167,28 +167,21 @@ require 'header.php';
     <title>View Breeding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
     <script>
-        // Function to display a QR code popup for the cage
+        // Function to display a QR code in an inline modal
         function showQrCodePopup(cageId) {
-            var popup = window.open("", "QR Code for Cage " + cageId, "width=400,height=400");
-            var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://' + $url + '/bc_view.php?id=' + cageId;
-            var htmlContent = `
-            <html>
-            <head>
-                <title>QR Code for Cage ${cageId}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; text-align: center; padding-top: 40px; }
-                    h1 { color: #333; }
-                    img { margin-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <h1>QR Code for Cage ${cageId}</h1>
-                <img src="${qrUrl}" alt="QR Code for Cage ${cageId}" />
-            </body>
-            </html>
-        `;
-            popup.document.write(htmlContent);
-            popup.document.close();
+            var baseUrl = <?php echo json_encode($url); ?>;
+            var pageUrl = 'https://' + baseUrl + '/bc_view.php?id=' + encodeURIComponent(cageId);
+            var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(pageUrl);
+
+            document.getElementById('qrTitle').textContent = 'QR Code for Cage ' + cageId;
+            document.getElementById('qrImage').src = qrUrl;
+            document.getElementById('qrOverlay').style.display = 'block';
+            document.getElementById('qrForm').style.display = 'block';
+        }
+
+        function closeQrCodePopup() {
+            document.getElementById('qrOverlay').style.display = 'none';
+            document.getElementById('qrForm').style.display = 'none';
         }
 
         // Function to navigate back to the previous page
@@ -380,6 +373,32 @@ require 'header.php';
                 text-align: center;
             }
         }
+
+        .popup-form {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--bs-body-bg);
+            padding: 20px;
+            border: 2px solid #000;
+            z-index: 1000;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            width: 80%;
+            max-width: 800px;
+        }
+
+        .popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
     </style>
     <!-- Font Awesome loaded via header.php -->
 </head>
@@ -404,7 +423,7 @@ require 'header.php';
                     <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="showQrCodePopup('<?= rawurlencode($breedingcage['cage_id']); ?>')" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
+                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= json_encode($breedingcage['cage_id']); ?>)" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
                         <i class="fas fa-qrcode"></i>
                     </a>
                     <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
@@ -612,6 +631,15 @@ require 'header.php';
         <div class="note-app-container">
             <?php include 'nt_app.php'; ?>
         </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div class="popup-overlay" id="qrOverlay" onclick="closeQrCodePopup()"></div>
+    <div class="popup-form" id="qrForm" style="max-width: 400px; text-align: center;">
+        <h4 id="qrTitle">QR Code</h4>
+        <img id="qrImage" src="" alt="QR Code" style="margin: 15px 0; max-width: 200px;">
+        <br>
+        <button type="button" class="btn btn-secondary" onclick="closeQrCodePopup()">Close</button>
     </div>
 
     <br>
