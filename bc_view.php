@@ -427,22 +427,22 @@ require 'header.php';
                 <i class="fas fa-venus-mars"></i>
                 <h5>Breeding Cage <?= htmlspecialchars($breedingcage['cage_id']); ?></h5>
                 <div class="action-buttons">
-                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
+                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                         <i class="fas fa-arrow-circle-left"></i>
                     </a>
-                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
-                    <a href="bc_addn.php?clone=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
+                    <a href="bc_addn.php?clone=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
                         <i class="fas fa-clone"></i>
                     </a>
-                    <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
+                    <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($breedingcage['cage_id'])); ?>)" class="btn btn-outline-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
+                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($breedingcage['cage_id'])); ?>)" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
                         <i class="fas fa-qrcode"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-outline-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
+                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
                         <i class="fas fa-print"></i>
                     </a>
                 </div>
@@ -598,10 +598,10 @@ require 'header.php';
                 <i class="fas fa-clipboard-list"></i>
                 <h5>Maintenance Log</h5>
                 <div class="action-buttons">
-                    <a href="maintenance.php?from=bc_dash" class="btn btn-outline-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
+                    <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
                         <i class="fas fa-wrench"></i>
                     </a>
-                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
                 </div>
