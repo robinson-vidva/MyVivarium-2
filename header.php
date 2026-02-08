@@ -293,8 +293,7 @@ if (isset($settings['r2_pres'])) {
     .table-wrapper td,
     .table th,
     .table td {
-        border: none;
-        border-bottom: 1px solid #e9ecef;
+        border: 1px solid #e9ecef;
         padding: 11px 14px;
         text-align: left;
         vertical-align: middle;
@@ -310,6 +309,7 @@ if (isset($settings['r2_pres'])) {
         font-weight: 600;
         text-align: center;
         color: #475569;
+        border: 1px solid #cbd5e1;
         border-bottom: 2px solid #cbd5e1;
         font-size: 0.82rem;
         text-transform: uppercase;
@@ -341,10 +341,11 @@ if (isset($settings['r2_pres'])) {
 
     /* Unified Action Button Styles */
     .table-actions,
-    .action-buttons {
+    .action-buttons,
+    .action-icons {
         display: flex;
-        gap: 8px;
-        flex-wrap: nowrap;
+        gap: 10px;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: center;
     }
@@ -353,6 +354,7 @@ if (isset($settings['r2_pres'])) {
     .action-icons .btn {
         width: 34px;
         height: 34px;
+        min-width: 34px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
