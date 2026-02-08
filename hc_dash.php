@@ -273,8 +273,8 @@ require 'header.php';
                             <table class="table" id="mouseTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 50%;">Cage ID</th>
-                                        <th style="width: 50%;">Action</th>
+                                        <th>Cage ID</th>
+                                        <th style="width: 220px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tableBody">

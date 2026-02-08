@@ -109,10 +109,10 @@ while ($row = mysqli_fetch_assoc($result)) {
     while ($holdingcage = mysqli_fetch_assoc($cageResult)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
-            $tableRows .= '<td style="width: 50%;">' . htmlspecialchars($holdingcage['cage_id']) . '</td>'; // Display cage ID only once per group
+            $tableRows .= '<td>' . htmlspecialchars($holdingcage['cage_id']) . '</td>'; // Display cage ID only once per group
             $firstRow = false;
         }
-        $tableRows .= '<td class="action-icons" style="width: 50%; white-space: nowrap;">
+        $tableRows .= '<td class="action-icons" style="white-space: nowrap;">
                         <a href="hc_view.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View Cage"><i class="fas fa-eye"></i></a>
                         <a href="manage_tasks.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks"><i class="fas fa-tasks"></i></a>';
 
