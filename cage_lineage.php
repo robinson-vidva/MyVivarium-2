@@ -62,18 +62,20 @@ function getCageInfo($con, $cageId) {
     }
     $stmt->close();
 
-    // Try breeding table
-    $stmt2 = $con->prepare("SELECT b.cage_id, b.strain, s.str_name, c.status
+    // Try breeding table (breeding has 'cross' instead of 'strain', and no parent_cg)
+    $stmt2 = $con->prepare("SELECT b.cage_id, b.`cross`, c.status
                             FROM breeding b
                             LEFT JOIN cages c ON b.cage_id = c.cage_id
-                            LEFT JOIN strains s ON b.strain = s.str_id
                             WHERE b.cage_id = ?");
     $stmt2->bind_param("s", $cageId);
     $stmt2->execute();
     $result2 = $stmt2->get_result();
     if ($row2 = $result2->fetch_assoc()) {
         $stmt2->close();
+        $row2['strain'] = null;
+        $row2['str_name'] = $row2['cross'] ?? null;  // Show cross info as the label
         $row2['parent_cg'] = null;
+        unset($row2['cross']);
         return $row2;
     }
     $stmt2->close();
@@ -244,7 +246,7 @@ require 'header.php';
         .lineage-section {
             margin-top: 20px;
             padding: 15px;
-            background: #ffffff;
+            background: var(--bs-body-bg);
             border-radius: 8px;
             border: 1px solid #dee2e6;
         }
