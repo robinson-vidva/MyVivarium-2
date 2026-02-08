@@ -238,7 +238,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             border-radius: 5px;
             background-color: var(--bs-tertiary-bg);
         }
@@ -247,48 +247,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             margin-bottom: 15px;
         }
 
-        .btn1 {
+        .btn-profile {
             display: block;
             width: 100%;
             padding: 10px;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
         }
 
-        .btn1:hover {
-            background-color: #0056b3;
-        }
-
-        .result-message {
-            text-align: center;
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #dff0d8;
-            border: 1px solid #3c763d;
-            color: #3c763d;
-            border-radius: 5px;
-        }
-
+        .result-message,
         .update-message {
             text-align: center;
             margin-top: 15px;
             padding: 10px;
-            background-color: #dff0d8;
-            border: 1px solid #3c763d;
-            color: #3c763d;
             border-radius: 5px;
         }
 
         .note {
             font-size: 0.9em;
-            color: #555;
+            color: var(--bs-secondary-color);
             text-align: center;
             margin-top: 10px;
         }
 
         .note1 {
-            color: #888;
+            color: var(--bs-secondary-color);
             font-size: 12px;
         }
     </style>
@@ -334,25 +318,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
                 </div>
             <?php endif; ?>
             <br>
-            <button type="submit" class="btn1 btn-primary" name="update_profile">Update Profile</button>
+            <button type="submit" class="btn btn-primary btn-profile" name="update_profile">Update Profile</button>
         </form>
-        <br>
+
         <?php if ($updateMessage) {
-            echo "<p class='update-message'>$updateMessage</p>";
+            echo "<div class='alert alert-success text-center'>" . htmlspecialchars($updateMessage) . "</div>";
         } ?>
-        <br>
-        <br>
-        <br>
-        <br>
+
+        <hr class="my-4">
+
         <h2>Request Password Change</h2>
-        <br>
         <br>
         <form method="POST" action="">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-            <button type="submit" class="btn1 btn-warning" name="reset">Request Password Change</button>
+            <button type="submit" class="btn btn-warning btn-profile" name="reset">Request Password Change</button>
         </form>
         <?php if ($resultMessage) {
-            echo "<p class='result-message'>$resultMessage</p>";
+            echo "<div class='alert alert-success text-center'>" . htmlspecialchars($resultMessage) . "</div>";
         } ?>
         <br>
         <p class="note">In order to reflect the changes everywhere, please log out and log back in.</p>
