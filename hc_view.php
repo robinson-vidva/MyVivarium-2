@@ -235,7 +235,7 @@ require 'header.php';
         }
 
         .container {
-            max-width: 800px;
+            max-width: 900px;
             background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
@@ -244,22 +244,6 @@ require 'header.php';
 
         .table-wrapper {
             padding: 10px;
-        }
-
-        .table-wrapper table {
-            width: 100%;
-            border: 1px solid #000;
-            border-collapse: separate;
-            border-spacing: 0;
-        }
-
-        .table-wrapper th,
-        .table-wrapper td {
-            border: 1px solid gray;
-            padding: 8px;
-            text-align: left;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
         }
 
         .table-wrapper th:nth-child(1),

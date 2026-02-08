@@ -122,7 +122,7 @@ require 'header.php';
     <!-- Inline CSS for styling -->
     <style>
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;

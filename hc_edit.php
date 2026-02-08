@@ -470,7 +470,7 @@ require 'header.php';
 
     <style>
         .container {
-            max-width: 800px;
+            max-width: 900px;
             background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
@@ -489,11 +489,6 @@ require 'header.php';
         .table-wrapper {
             margin-bottom: 50px;
             overflow-x: auto;
-        }
-
-        .table-wrapper table {
-            width: 100%;
-            border-collapse: collapse;
         }
 
         .card-header {

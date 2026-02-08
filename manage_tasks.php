@@ -391,36 +391,9 @@ ob_end_flush(); // Flush the output buffer
             cursor: not-allowed;
         }
 
-        /* Table Styles */
-        .table-responsive {
-            overflow-x: auto;
-        }
-
+        /* Table Styles (base styles from header.php) */
         .table {
-            width: 100%;
             table-layout: fixed;
-            border-collapse: collapse;
-            border: 1px solid var(--bs-border-color);
-        }
-
-        .table th,
-        .table td {
-            border: 1px solid var(--bs-border-color);
-            padding: 10px;
-            text-align: left;
-            vertical-align: middle;
-        }
-
-        .table thead {
-            background-color: #343a40;
-            color: #ffffff;
-        }
-
-        .table thead th {
-            padding: 10px;
-            font-weight: bold;
-            text-align: center;
-            border: 1px solid #495057;
         }
 
         /* Specific Column Widths */
@@ -548,7 +521,7 @@ ob_end_flush(); // Flush the output buffer
 </head>
 
 <body>
-    <div class="container-fluid mt-4 content" style="max-width: 1400px;">
+    <div class="container mt-4 content" style="max-width: 900px;">
 
         <!-- Include message for user notifications -->
         <?php include('message.php'); ?>
