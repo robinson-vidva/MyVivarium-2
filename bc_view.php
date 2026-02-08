@@ -297,81 +297,86 @@ require 'header.php';
 
         .container {
             max-width: 900px;
-            background-color: var(--bs-tertiary-bg);
-            padding: 20px;
-            border-radius: 8px;
+            padding: 20px 15px;
             margin: auto;
         }
 
-        .table-wrapper {
-            padding: 10px;
+        .section-card {
+            background-color: var(--bs-tertiary-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
         }
 
-        .table-wrapper th:nth-child(1),
-        .table-wrapper td:nth-child(1) {
-            width: 30%;
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--bs-border-color);
         }
 
-        .table-wrapper th:nth-child(2),
-        .table-wrapper td:nth-child(2) {
-            width: 70%;
+        .section-header i {
+            font-size: 1.1rem;
+            color: var(--bs-primary);
+            width: 22px;
+            text-align: center;
         }
 
-        .remarks-column {
-            max-width: 400px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
+        .section-header h5 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.05rem;
         }
 
-        span {
-            font-size: 12pt;
-            line-height: 1;
-            display: inline-block;
+        .section-header .action-buttons {
+            margin-left: auto;
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .details-table th,
+        .details-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--bs-border-color);
+            vertical-align: middle;
+            font-size: 0.92rem;
+        }
+
+        .details-table th {
+            width: 35%;
+            font-weight: 600;
+            color: var(--bs-body-color);
+            background-color: transparent;
+            text-transform: none;
+            letter-spacing: 0;
+            text-align: left;
+        }
+
+        .details-table td {
+            color: var(--bs-secondary-color);
+        }
+
+        .details-table td a {
+            color: var(--bs-primary);
+        }
+
+        .details-table tr:last-child th,
+        .details-table tr:last-child td {
+            border-bottom: none;
         }
 
         .note-app-container {
             margin-top: 20px;
             padding: 20px;
-            background-color: #e9ecef;
-            border-radius: 8px;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn-icon {
-            width: 30px;
-            height: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-        }
-
-        .btn-icon i {
-            font-size: 16px;
-            margin: 0;
-        }
-
-        @media (max-width: 768px) {
-
-            .table-wrapper th,
-            .table-wrapper td {
-                padding: 12px 8px;
-            }
-
-            .table-wrapper th,
-            .table-wrapper td {
-                text-align: center;
-            }
+            background-color: var(--bs-tertiary-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 10px;
         }
 
         .popup-form {
@@ -382,11 +387,14 @@ require 'header.php';
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 2px solid #000;
+            border: 1px solid var(--bs-border-color);
             z-index: 1000;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
             width: 80%;
             max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .popup-overlay {
@@ -406,32 +414,33 @@ require 'header.php';
 <body>
 
     <div class="container content mt-4">
-        <div class="card">
-            <div class="card-header">
-                <h4>View Breeding Cage <?= htmlspecialchars($breedingcage['cage_id']); ?></h4>
+
+        <!-- Cage Details Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-venus-mars"></i>
+                <h5>Breeding Cage <?= htmlspecialchars($breedingcage['cage_id']); ?></h5>
                 <div class="action-buttons">
-                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
+                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                         <i class="fas fa-arrow-circle-left"></i>
                     </a>
-                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
-                    <a href="bc_addn.php?clone=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-info btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
+                    <a href="bc_addn.php?clone=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
                         <i class="fas fa-clone"></i>
                     </a>
-                    <!-- Button to mange tasks for the cage -->
-                    <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
+                    <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($breedingcage['cage_id'])); ?>)" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
+                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($breedingcage['cage_id'])); ?>)" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
                         <i class="fas fa-qrcode"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
+                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
                         <i class="fas fa-print"></i>
                     </a>
                 </div>
             </div>
-            <br>
 
             <!-- Information Completeness Indicator -->
             <div id="completeness-alert" class="alert" style="display: none; margin-bottom: 20px;">
@@ -442,8 +451,7 @@ require 'header.php';
                 <div id="missing-fields" class="mt-2"></div>
             </div>
 
-            <div class="table-wrapper">
-                <table class="table" id="mouseTable">
+                <table class="details-table" id="mouseTable">
                     <tr>
                         <th>Cage #:</th>
                         <td><?= htmlspecialchars($breedingcage['cage_id']); ?></td>
@@ -501,133 +509,124 @@ require 'header.php';
                         <td class="remarks-column"><?= htmlspecialchars($breedingcage['remarks']); ?></td>
                     </tr>
                 </table>
+        </div>
 
-                <!-- Separator -->
-                <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+        <!-- Files Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-file-alt"></i>
+                <h5>Files</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>File Name</th>
+                            <th style="width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $hasFiles = false;
+                        while ($file = $files->fetch_assoc()) :
+                            $hasFiles = true;
+                        ?>
+                            <tr>
+                                <td><?= htmlspecialchars($file['file_name']); ?></td>
+                                <td><div class="action-buttons"><a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-primary" title="Download"><i class="fas fa-cloud-download-alt"></i></a></div></td>
+                            </tr>
+                        <?php endwhile; ?>
+                        <?php if (!$hasFiles) : ?>
+                            <tr><td colspan="2" class="text-muted text-center">No files uploaded</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-                <!-- Display Files Section -->
-                <div class="card mt-4">
+        <!-- Litter Details Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-paw"></i>
+                <h5>Litter Details</h5>
+            </div>
+            <?php while ($litter = mysqli_fetch_assoc($litters)) : ?>
+                <table class="details-table" style="margin-bottom: 16px;">
+                    <tbody>
+                        <tr>
+                            <th>DOM</th>
+                            <td><?= htmlspecialchars($litter['dom'] ?? ''); ?></td>
+                        </tr>
+                        <tr>
+                            <th>Litter DOB</th>
+                            <td><?= htmlspecialchars($litter['litter_dob'] ?? ''); ?></td>
+                        </tr>
+                        <tr>
+                            <th>Pups Alive</th>
+                            <td><?= htmlspecialchars($litter['pups_alive'] ?? ''); ?></td>
+                        </tr>
+                        <tr>
+                            <th>Pups Dead</th>
+                            <td><?= htmlspecialchars($litter['pups_dead'] ?? ''); ?></td>
+                        </tr>
+                        <tr>
+                            <th>Pups Male</th>
+                            <td><?= htmlspecialchars($litter['pups_male'] ?? ''); ?></td>
+                        </tr>
+                        <tr>
+                            <th>Pups Female</th>
+                            <td><?= htmlspecialchars($litter['pups_female'] ?? ''); ?></td>
+                        </tr>
+                        <tr>
+                            <th>Remarks</th>
+                            <td><?= htmlspecialchars($litter['remarks'] ?? ''); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            <?php endwhile; ?>
+        </div>
 
-                    <div class="card-header">
-                        <h4>Manage Files</h4>
-                    </div>
-
+        <!-- Maintenance Log Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-clipboard-list"></i>
+                <h5>Maintenance Log</h5>
+                <div class="action-buttons">
+                    <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
+                        <i class="fas fa-wrench"></i>
+                    </a>
+                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                </div>
+            </div>
+                <?php if ($maintenanceLogs->num_rows > 0) : ?>
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table">
                             <thead>
                                 <tr>
-                                    <th>File Name</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
+                                    <th>Date</th>
+                                    <th>User</th>
+                                    <th>Comment</th>
+                                        </tr>
+                                    </thead>
                             <tbody>
-                                <?php while ($file = $files->fetch_assoc()) : ?>
+                                <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                     <tr>
-                                        <td><?= htmlspecialchars($file['file_name']); ?></td>
-                                        <td><a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-cloud-download-alt"></i></a></td>
+                                        <td><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                        <td><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                        <td><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
                                     </tr>
                                 <?php endwhile; ?>
                             </tbody>
                         </table>
                     </div>
-
-
-                </div>
-
-                <!-- Litter Details Section -->
-                <div class="card mt-4">
-
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">Litter Details - <?= htmlspecialchars($id) ?>
-                        </h4>
-                    </div>
-
-                    <?php while ($litter = mysqli_fetch_assoc($litters)) : ?>
-                        <div class="table-wrapper">
-                            <table class="table">
-                                <tbody>
-                                    <tr>
-                                        <th>DOM</th>
-                                        <td><?= htmlspecialchars($litter['dom'] ?? ''); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Litter DOB</th>
-                                        <td><?= htmlspecialchars($litter['litter_dob'] ?? ''); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Pups Alive</th>
-                                        <td><?= htmlspecialchars($litter['pups_alive'] ?? ''); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Pups Dead</th>
-                                        <td><?= htmlspecialchars($litter['pups_dead'] ?? ''); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Pups Male</th>
-                                        <td><?= htmlspecialchars($litter['pups_male'] ?? ''); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Pups Female</th>
-                                        <td><?= htmlspecialchars($litter['pups_female'] ?? ''); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Remarks</th>
-                                        <td class="remarks-column"><?= htmlspecialchars($litter['remarks'] ?? ''); ?></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endwhile; ?>
-
-                </div>
-
-
-                <div class="card mt-4">
-                    <div class="card-header d-flex flex-column flex-md-row justify-content-between">
-                        <h4>Maintenance Log for Cage ID: <?= htmlspecialchars($id ?? 'Unknown'); ?></h4>
-                        <div class="action-icons mt-3 mt-md-0">
-                            <!-- Maintenance button with tooltip -->
-                            <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
-                                <i class="fas fa-wrench"></i>
-                            </a>
-                            <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <?php if ($maintenanceLogs->num_rows > 0) : ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 25%;">Date</th>
-                                            <th style="width: 25%;">User</th>
-                                            <th style="width: 50%;">Comment</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
-                                            <tr>
-                                                <td style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                                <td style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                                <td style="width: 50%;"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
-                                            </tr>
-                                        <?php endwhile; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else : ?>
-                            <p>No maintenance records found for this cage.</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-
-            </div>
+                <?php else : ?>
+                    <p class="text-muted mb-0">No maintenance records found for this cage.</p>
+                <?php endif; ?>
         </div>
 
-        <!-- Note App Highlight -->
+        <!-- Notes Section -->
         <div class="note-app-container">
             <?php include 'nt_app.php'; ?>
         </div>
@@ -636,7 +635,10 @@ require 'header.php';
     <!-- QR Code Modal -->
     <div class="popup-overlay" id="qrOverlay" onclick="closeQrCodePopup()"></div>
     <div class="popup-form" id="qrForm" style="max-width: 400px; text-align: center;">
-        <h4 id="qrTitle">QR Code</h4>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 id="qrTitle" class="mb-0">QR Code</h4>
+            <button type="button" class="btn-close" onclick="closeQrCodePopup()" aria-label="Close"></button>
+        </div>
         <img id="qrImage" src="" alt="QR Code" style="margin: 15px 0; max-width: 200px;">
         <br>
         <button type="button" class="btn btn-secondary" onclick="closeQrCodePopup()">Close</button>
