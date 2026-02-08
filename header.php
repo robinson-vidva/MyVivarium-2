@@ -286,15 +286,16 @@ if (isset($settings['r2_pres'])) {
     .table {
         width: 100%;
         border-collapse: collapse;
-        border: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
     }
     .table-wrapper th,
     .table-wrapper td,
     .table th,
     .table td {
         border: none;
-        border-bottom: 1px solid var(--bs-border-color);
-        padding: 10px 12px;
+        border-bottom: 1px solid #e9ecef;
+        padding: 11px 14px;
         text-align: left;
         vertical-align: middle;
         word-wrap: break-word;
@@ -302,21 +303,22 @@ if (isset($settings['r2_pres'])) {
     }
     .table-wrapper thead,
     .table thead {
-        background-color: #f8f9fa;
-        color: #495057;
+        background-color: #f1f5f9;
     }
     .table-wrapper thead th,
     .table thead th {
         font-weight: 600;
         text-align: center;
-        border-bottom: 2px solid #dee2e6;
-        font-size: 0.85rem;
+        color: #475569;
+        border-bottom: 2px solid #cbd5e1;
+        font-size: 0.82rem;
         text-transform: uppercase;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.04em;
+        padding: 12px 14px;
     }
     .table-wrapper tbody tr:hover,
     .table tbody tr:hover {
-        background-color: rgba(0, 0, 0, 0.02);
+        background-color: #f8fafc;
     }
     .table-wrapper tbody tr:last-child td,
     .table tbody tr:last-child td {
@@ -324,22 +326,24 @@ if (isset($settings['r2_pres'])) {
     }
 
     /* Dark mode table overrides */
+    [data-bs-theme="dark"] .table-wrapper table,
+    [data-bs-theme="dark"] .table { border-color: #374151; }
     [data-bs-theme="dark"] .table-wrapper th,
     [data-bs-theme="dark"] .table-wrapper td,
     [data-bs-theme="dark"] .table th,
-    [data-bs-theme="dark"] .table td { border-color: #495057; }
+    [data-bs-theme="dark"] .table td { border-color: #374151; }
     [data-bs-theme="dark"] .table-wrapper thead,
-    [data-bs-theme="dark"] .table thead { background-color: #1a1d21; color: #adb5bd; }
+    [data-bs-theme="dark"] .table thead { background-color: #1e293b; }
     [data-bs-theme="dark"] .table-wrapper thead th,
-    [data-bs-theme="dark"] .table thead th { border-bottom-color: #495057; }
+    [data-bs-theme="dark"] .table thead th { color: #94a3b8; border-bottom-color: #475569; }
     [data-bs-theme="dark"] .table-wrapper tbody tr:hover,
-    [data-bs-theme="dark"] .table tbody tr:hover { background-color: rgba(255, 255, 255, 0.03); }
+    [data-bs-theme="dark"] .table tbody tr:hover { background-color: rgba(255, 255, 255, 0.04); }
 
     /* Unified Action Button Styles */
     .table-actions,
     .action-buttons {
         display: flex;
-        gap: 6px;
+        gap: 8px;
         flex-wrap: nowrap;
         align-items: center;
         justify-content: center;
@@ -347,22 +351,23 @@ if (isset($settings['r2_pres'])) {
     .action-buttons .btn,
     .table-actions .btn,
     .action-icons .btn {
-        width: 32px;
-        height: 32px;
+        width: 34px;
+        height: 34px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         padding: 0;
-        border-radius: 6px;
-        font-size: 0.8rem;
+        border-radius: 8px;
+        font-size: 0.82rem;
         border: none;
-        transition: opacity 0.15s, transform 0.15s;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
     .action-buttons .btn:hover,
     .table-actions .btn:hover,
     .action-icons .btn:hover {
-        opacity: 0.85;
         transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
     }
     .action-buttons .btn i,
     .table-actions .btn i,
