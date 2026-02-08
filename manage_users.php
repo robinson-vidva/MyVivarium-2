@@ -118,15 +118,7 @@ mysqli_close($con);
             align-items: center;
         }
 
-        .action-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-
-        .action-buttons .btn {
-            flex: 1 1 auto;
-        }
+        /* Action button styles handled by unified styles in header.php */
 
         @media (max-width: 576px) {
 

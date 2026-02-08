@@ -286,14 +286,15 @@ if (isset($settings['r2_pres'])) {
     .table {
         width: 100%;
         border-collapse: collapse;
-        border: 1px solid var(--bs-border-color);
+        border: none;
     }
     .table-wrapper th,
     .table-wrapper td,
     .table th,
     .table td {
-        border: 1px solid var(--bs-border-color);
-        padding: 8px 10px;
+        border: none;
+        border-bottom: 1px solid var(--bs-border-color);
+        padding: 10px 12px;
         text-align: left;
         vertical-align: middle;
         word-wrap: break-word;
@@ -301,20 +302,73 @@ if (isset($settings['r2_pres'])) {
     }
     .table-wrapper thead,
     .table thead {
-        background-color: #343a40;
-        color: #ffffff;
+        background-color: #f8f9fa;
+        color: #495057;
     }
     .table-wrapper thead th,
     .table thead th {
-        font-weight: bold;
+        font-weight: 600;
         text-align: center;
-        border: 1px solid #495057;
+        border-bottom: 2px solid #dee2e6;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
+    .table-wrapper tbody tr:hover,
+    .table tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+    .table-wrapper tbody tr:last-child td,
+    .table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Dark mode table overrides */
     [data-bs-theme="dark"] .table-wrapper th,
     [data-bs-theme="dark"] .table-wrapper td,
     [data-bs-theme="dark"] .table th,
     [data-bs-theme="dark"] .table td { border-color: #495057; }
     [data-bs-theme="dark"] .table-wrapper thead,
-    [data-bs-theme="dark"] .table thead { background-color: #1a1d21; }
+    [data-bs-theme="dark"] .table thead { background-color: #1a1d21; color: #adb5bd; }
+    [data-bs-theme="dark"] .table-wrapper thead th,
+    [data-bs-theme="dark"] .table thead th { border-bottom-color: #495057; }
+    [data-bs-theme="dark"] .table-wrapper tbody tr:hover,
+    [data-bs-theme="dark"] .table tbody tr:hover { background-color: rgba(255, 255, 255, 0.03); }
+
+    /* Unified Action Button Styles */
+    .table-actions,
+    .action-buttons {
+        display: flex;
+        gap: 6px;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: center;
+    }
+    .action-buttons .btn,
+    .table-actions .btn,
+    .action-icons .btn {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        border: none;
+        transition: opacity 0.15s, transform 0.15s;
+    }
+    .action-buttons .btn:hover,
+    .table-actions .btn:hover,
+    .action-icons .btn:hover {
+        opacity: 0.85;
+        transform: translateY(-1px);
+    }
+    .action-buttons .btn i,
+    .table-actions .btn i,
+    .action-icons .btn i {
+        font-size: 14px;
+        margin: 0;
+    }
     </style>
 <!-- Note: Document structure (html/head/body) is managed by the including page -->

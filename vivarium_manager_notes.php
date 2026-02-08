@@ -282,10 +282,7 @@ require 'header.php';
             max-width: 400px;
         }
 
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-        }
+        /* Action button styles handled by unified styles in header.php */
 
         .timestamp {
             font-size: 0.9em;
@@ -345,9 +342,7 @@ require 'header.php';
                 max-width: 100%;
             }
 
-            .action-buttons {
-                flex-wrap: wrap;
-            }
+            /* Action button styles handled by unified styles in header.php */
         }
     </style>
 </head>

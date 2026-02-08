@@ -230,23 +230,7 @@ ob_end_flush(); // Flush the output buffer
             width: 20%;
         }
 
-        /* Action Buttons */
-        .table-actions,
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: nowrap;
-        }
-
-        .table-actions {
-            border: none !important;
-        }
-
-        .table-actions button,
-        .action-buttons .btn {
-            width: 100%;
-            margin-bottom: 10px;
-        }
+        /* Action button styles handled by unified styles in header.php */
 
         @media (max-width: 576px) {
             .table thead {
@@ -289,10 +273,7 @@ ob_end_flush(); // Flush the output buffer
                 text-align: left;
             }
 
-            .table-actions {
-                flex-direction: column;
-                flex-wrap: wrap;
-            }
+            /* Mobile action button styles handled by unified styles in header.php */
         }
 
         .pr-0 {

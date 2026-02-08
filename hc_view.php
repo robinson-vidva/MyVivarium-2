@@ -444,7 +444,7 @@ require 'header.php';
             </div>
 
             <div class="table-wrapper">
-                <table class="table table-bordered">
+                <table class="table">
                     <tr>
                         <th>Cage #:</th>
                         <td><?= htmlspecialchars($holdingcage['cage_id']); ?></td>
@@ -510,7 +510,7 @@ require 'header.php';
                 <?php if (!empty($mice)) : ?>
                     <?php foreach ($mice as $index => $mouse) : ?>
                         <h4>Mouse #<?= $index + 1; ?></h4>
-                        <table class="table table-bordered">
+                        <table class="table">
                             <tr>
                                 <th>Mouse ID</th>
                                 <th>Genotype</th>

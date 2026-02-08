@@ -210,21 +210,7 @@ $strainResult = $con->query($strainQuery);
                 display: block;
             }
 
-            .table-actions,
-            .action-buttons {
-                flex-direction: column;
-            }
-
-            .table-actions button,
-            .action-buttons .btn {
-                width: 100%;
-                margin-bottom: 10px;
-            }
-
-            .table-actions {
-                gap: 10px;
-                flex-wrap: wrap;
-            }
+            /* Action button styles handled by unified styles in header.php */
         }
     </style>
 </head>
@@ -317,7 +303,7 @@ $strainResult = $con->query($strainQuery);
 
         <!-- Display existing strains -->
         <h3>Existing Strains</h3>
-        <table class="table table-bordered">
+        <table class="table">
             <thead>
                 <tr>
                     <th>ID</th>
