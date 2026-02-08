@@ -361,7 +361,6 @@ if (isset($settings['r2_pres'])) {
         padding: 0;
         border-radius: 8px;
         font-size: 0.82rem;
-        border: none;
         transition: all 0.2s ease;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }

@@ -164,6 +164,8 @@ require 'header.php';
 <html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Breeding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
     <script>
@@ -301,6 +303,7 @@ require 'header.php';
             margin: auto;
         }
 
+        /* Section Cards */
         .section-card {
             background-color: var(--bs-tertiary-bg);
             border: 1px solid var(--bs-border-color);
@@ -335,6 +338,7 @@ require 'header.php';
             margin-left: auto;
         }
 
+        /* Details Table (key-value pairs) */
         .details-table {
             width: 100%;
             border-collapse: collapse;
@@ -371,6 +375,7 @@ require 'header.php';
             border-bottom: none;
         }
 
+        /* Note app */
         .note-app-container {
             margin-top: 20px;
             padding: 20px;
@@ -379,6 +384,7 @@ require 'header.php';
             border-radius: 10px;
         }
 
+        /* Popup */
         .popup-form {
             display: none;
             position: fixed;
@@ -421,22 +427,22 @@ require 'header.php';
                 <i class="fas fa-venus-mars"></i>
                 <h5>Breeding Cage <?= htmlspecialchars($breedingcage['cage_id']); ?></h5>
                 <div class="action-buttons">
-                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
+                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                         <i class="fas fa-arrow-circle-left"></i>
                     </a>
-                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
-                    <a href="bc_addn.php?clone=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
+                    <a href="bc_addn.php?clone=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
                         <i class="fas fa-clone"></i>
                     </a>
-                    <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
+                    <a href="manage_tasks.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($breedingcage['cage_id'])); ?>)" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
+                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($breedingcage['cage_id'])); ?>)" class="btn btn-outline-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
                         <i class="fas fa-qrcode"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
+                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-outline-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
                         <i class="fas fa-print"></i>
                     </a>
                 </div>
@@ -451,64 +457,64 @@ require 'header.php';
                 <div id="missing-fields" class="mt-2"></div>
             </div>
 
-                <table class="details-table" id="mouseTable">
-                    <tr>
-                        <th>Cage #:</th>
-                        <td><?= htmlspecialchars($breedingcage['cage_id']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>PI Name</th>
-                        <td id="pi-data" data-value="<?= !empty($breedingcage['pi_name']) && $breedingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['pi_initials'] . ' [' . $breedingcage['pi_name'] . ']'); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Room</th>
-                        <td><?= htmlspecialchars($breedingcage['room'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Rack</th>
-                        <td><?= htmlspecialchars($breedingcage['rack'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Cross</th>
-                        <td id="cross-data" data-value="<?= !empty($breedingcage['cross']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['cross']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>IACUC</th>
-                        <td id="iacuc-data" data-value="<?= !empty($iacucLinks) ? '1' : ''; ?>"><?= $iacucDisplayString; ?></td>
-                    </tr>
-                    <tr>
-                        <th>User</th>
-                        <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
-                    </tr>
-                    <tr>
-                        <th>Male ID</th>
-                        <td id="male-id-data" data-value="<?= !empty($breedingcage['male_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_id']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Male Genotype</th>
-                        <td><?= htmlspecialchars($breedingcage['male_genotype'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Male DOB</th>
-                        <td id="male-dob-data" data-value="<?= !empty($breedingcage['male_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Female ID</th>
-                        <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Female Genotype</th>
-                        <td><?= htmlspecialchars($breedingcage['female_genotype'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Female DOB</th>
-                        <td id="female-dob-data" data-value="<?= !empty($breedingcage['female_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_dob']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Remarks</th>
-                        <td class="remarks-column"><?= htmlspecialchars($breedingcage['remarks']); ?></td>
-                    </tr>
-                </table>
+            <table class="details-table" id="mouseTable">
+                <tr>
+                    <th>Cage #</th>
+                    <td><?= htmlspecialchars($breedingcage['cage_id']); ?></td>
+                </tr>
+                <tr>
+                    <th>PI Name</th>
+                    <td id="pi-data" data-value="<?= !empty($breedingcage['pi_name']) && $breedingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['pi_initials'] . ' [' . $breedingcage['pi_name'] . ']'); ?></td>
+                </tr>
+                <tr>
+                    <th>Room</th>
+                    <td><?= htmlspecialchars($breedingcage['room'] ?? ''); ?></td>
+                </tr>
+                <tr>
+                    <th>Rack</th>
+                    <td><?= htmlspecialchars($breedingcage['rack'] ?? ''); ?></td>
+                </tr>
+                <tr>
+                    <th>Cross</th>
+                    <td id="cross-data" data-value="<?= !empty($breedingcage['cross']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['cross']); ?></td>
+                </tr>
+                <tr>
+                    <th>IACUC</th>
+                    <td id="iacuc-data" data-value="<?= !empty($iacucLinks) ? '1' : ''; ?>"><?= $iacucDisplayString; ?></td>
+                </tr>
+                <tr>
+                    <th>User</th>
+                    <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
+                </tr>
+                <tr>
+                    <th>Male ID</th>
+                    <td id="male-id-data" data-value="<?= !empty($breedingcage['male_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_id']); ?></td>
+                </tr>
+                <tr>
+                    <th>Male Genotype</th>
+                    <td><?= htmlspecialchars($breedingcage['male_genotype'] ?? ''); ?></td>
+                </tr>
+                <tr>
+                    <th>Male DOB</th>
+                    <td id="male-dob-data" data-value="<?= !empty($breedingcage['male_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
+                </tr>
+                <tr>
+                    <th>Female ID</th>
+                    <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></td>
+                </tr>
+                <tr>
+                    <th>Female Genotype</th>
+                    <td><?= htmlspecialchars($breedingcage['female_genotype'] ?? ''); ?></td>
+                </tr>
+                <tr>
+                    <th>Female DOB</th>
+                    <td id="female-dob-data" data-value="<?= !empty($breedingcage['female_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_dob']); ?></td>
+                </tr>
+                <tr>
+                    <th>Remarks</th>
+                    <td><?= htmlspecialchars($breedingcage['remarks']); ?></td>
+                </tr>
+            </table>
         </div>
 
         <!-- Files Section -->
@@ -592,38 +598,38 @@ require 'header.php';
                 <i class="fas fa-clipboard-list"></i>
                 <h5>Maintenance Log</h5>
                 <div class="action-buttons">
-                    <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
+                    <a href="maintenance.php?from=bc_dash" class="btn btn-outline-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
                         <i class="fas fa-wrench"></i>
                     </a>
-                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                    <a href="bc_edit.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-outline-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
                 </div>
             </div>
-                <?php if ($maintenanceLogs->num_rows > 0) : ?>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
+            <?php if ($maintenanceLogs->num_rows > 0) : ?>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>User</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>User</th>
-                                    <th>Comment</th>
-                                        </tr>
-                                    </thead>
-                            <tbody>
-                                <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                        <td><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                        <td><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else : ?>
-                    <p class="text-muted mb-0">No maintenance records found for this cage.</p>
-                <?php endif; ?>
+                                    <td><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                    <td><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                    <td><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else : ?>
+                <p class="text-muted mb-0">No maintenance records found for this cage.</p>
+            <?php endif; ?>
         </div>
 
         <!-- Notes Section -->
@@ -631,6 +637,8 @@ require 'header.php';
             <?php include 'nt_app.php'; ?>
         </div>
     </div>
+
+    <?php include 'footer.php'; ?>
 
     <!-- QR Code Modal -->
     <div class="popup-overlay" id="qrOverlay" onclick="closeQrCodePopup()"></div>
@@ -643,9 +651,6 @@ require 'header.php';
         <br>
         <button type="button" class="btn btn-secondary" onclick="closeQrCodePopup()">Close</button>
     </div>
-
-    <br>
-    <?php include 'footer.php'; ?>
 
 </body>
 
