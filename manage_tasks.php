@@ -393,46 +393,35 @@ ob_end_flush(); // Flush the output buffer
 
         /* Table Styles (base styles from header.php) */
         .table {
-            table-layout: fixed;
+            table-layout: auto;
         }
 
         /* Specific Column Widths */
         .table th:nth-child(1),
         .table td:nth-child(1) {
-            width: 10%;
-        }
-
-        .table th:nth-child(2),
-        .table td:nth-child(2) {
-            width: 30%;
-        }
-
-        .table th:nth-child(3),
-        .table td:nth-child(3) {
-            width: 20%;
-        }
-
-        .table th:nth-child(4),
-        .table td:nth-child(4) {
-            width: 20%;
+            width: 60px;
+            text-align: center;
         }
 
         .table th:nth-child(5),
         .table td:nth-child(5) {
-            width: 20%;
+            width: 160px;
         }
 
-        /* Status Colors */
-        .status-pending {
-            background-color: #f8d7da;
+        /* Status Colors - applied to status cell only */
+        .status-pending td:nth-child(4) {
+            color: #842029;
+            font-weight: 500;
         }
 
-        .status-in-progress {
-            background-color: #fff3cd;
+        .status-in-progress td:nth-child(4) {
+            color: #664d03;
+            font-weight: 500;
         }
 
-        .status-completed {
-            background-color: #d4edda;
+        .status-completed td:nth-child(4) {
+            color: #0f5132;
+            font-weight: 500;
         }
 
         /* Action button styles handled by unified styles in header.php */

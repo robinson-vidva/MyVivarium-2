@@ -196,38 +196,19 @@ ob_end_flush(); // Flush the output buffer
 
         /* Table Styles (base styles from header.php) */
         .table {
-            table-layout: fixed;
+            table-layout: auto;
         }
 
         /* Specific Column Widths */
         .table th:nth-child(1),
         .table td:nth-child(1) {
-            width: 10%;
-        }
-
-        .table th:nth-child(2),
-        .table td:nth-child(2) {
-            width: 20%;
-        }
-
-        .table th:nth-child(3),
-        .table td:nth-child(3) {
-            width: 20%;
-        }
-
-        .table th:nth-child(4),
-        .table td:nth-child(4) {
-            width: 20%;
+            width: 60px;
+            text-align: center;
         }
 
         .table th:nth-child(5),
         .table td:nth-child(5) {
-            width: 10%;
-        }
-
-        .table th:nth-child(6),
-        .table td:nth-child(6) {
-            width: 20%;
+            width: 160px;
         }
 
         /* Action button styles handled by unified styles in header.php */
