@@ -218,42 +218,65 @@ $search = $_GET['search'] ?? '';
 $cageIdFilter = $_GET['id'] ?? '';
 $filter = $_GET['filter'] ?? '';
 
+// Pagination settings
+$records_per_page = 20;
+$current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset = ($current_page - 1) * $records_per_page;
+
 // Construct the task query with search and filter options using prepared statements
-$taskQuery = "SELECT * FROM tasks WHERE 1";
+$taskWhere = "WHERE 1";
 $params = [];
 $types = '';
 
 if ($search) {
-    $taskQuery .= " AND (title LIKE ? OR assigned_by LIKE ? OR assigned_to LIKE ? OR status LIKE ? OR cage_id LIKE ?)";
+    $taskWhere .= " AND (title LIKE ? OR assigned_by LIKE ? OR assigned_to LIKE ? OR status LIKE ? OR cage_id LIKE ?)";
     $searchParam = '%' . $search . '%';
     $params = array_merge($params, [$searchParam, $searchParam, $searchParam, $searchParam, $searchParam]);
     $types .= 'sssss';
 }
 
 if ($filter == 'assigned_by_me') {
-    $taskQuery .= " AND assigned_by = ?";
+    $taskWhere .= " AND assigned_by = ?";
     $params[] = $currentUserId;
     $types .= 'i';
 } elseif ($filter == 'assigned_to_me') {
-    $taskQuery .= " AND FIND_IN_SET(?, assigned_to)";
+    $taskWhere .= " AND FIND_IN_SET(?, assigned_to)";
     $params[] = $currentUserId;
     $types .= 'i';
 } elseif (!$isAdmin) {
-    $taskQuery .= " AND (assigned_by = ? OR FIND_IN_SET(?, assigned_to))";
+    $taskWhere .= " AND (assigned_by = ? OR FIND_IN_SET(?, assigned_to))";
     $params[] = $currentUserId;
     $params[] = $currentUserId;
     $types .= 'ii';
 }
 
 if ($cageIdFilter) {
-    $taskQuery .= " AND cage_id = ?";
+    $taskWhere .= " AND cage_id = ?";
     $params[] = $cageIdFilter;
     $types .= 's';
 }
 
-$taskStmt = $con->prepare($taskQuery);
+// Count total records for pagination
+$countQuery = "SELECT COUNT(*) as total FROM tasks $taskWhere";
 if (!empty($params)) {
-    $taskStmt->bind_param($types, ...$params);
+    $countStmt = $con->prepare($countQuery);
+    $countStmt->bind_param($types, ...$params);
+    $countStmt->execute();
+    $total_records = $countStmt->get_result()->fetch_assoc()['total'];
+    $countStmt->close();
+} else {
+    $total_records = $con->query($countQuery)->fetch_assoc()['total'];
+}
+$total_pages = ceil($total_records / $records_per_page);
+
+// Fetch tasks with LIMIT/OFFSET
+$taskQuery = "SELECT * FROM tasks $taskWhere ORDER BY creation_date DESC LIMIT ? OFFSET ?";
+$paginatedParams = array_merge($params, [$records_per_page, $offset]);
+$paginatedTypes = $types . 'ii';
+
+$taskStmt = $con->prepare($taskQuery);
+if (!empty($paginatedParams)) {
+    $taskStmt->bind_param($paginatedTypes, ...$paginatedParams);
 }
 $taskStmt->execute();
 $taskResult = $taskStmt->get_result();
@@ -262,6 +285,22 @@ $taskResult = $taskStmt->get_result();
 $cageQuery = "SELECT cage_id FROM cages";
 $cageResult = $con->query($cageQuery);
 $cages = $cageResult ? array_column($cageResult->fetch_all(MYSQLI_ASSOC), 'cage_id') : [];
+
+/**
+ * Build a query string preserving current GET parameters with optional overrides.
+ */
+function buildTaskQueryString($overrides = []) {
+    $params = [
+        'search' => $_GET['search'] ?? '',
+        'filter' => $_GET['filter'] ?? '',
+        'id' => $_GET['id'] ?? '',
+        'page' => $_GET['page'] ?? 1,
+    ];
+    $params = array_merge($params, $overrides);
+    // Remove empty params to keep URL clean
+    $params = array_filter($params, function($v) { return $v !== '' && $v !== null; });
+    return http_build_query($params);
+}
 
 ob_end_flush(); // Flush the output buffer
 ?>
@@ -361,13 +400,12 @@ ob_end_flush(); // Flush the output buffer
             width: 100%;
             table-layout: fixed;
             border-collapse: collapse;
-            box-shadow: none;
-            border: 2px solid #ffffff;
+            border: 1px solid var(--bs-border-color);
         }
 
         .table th,
         .table td {
-            border: 1px solid #ffffff;
+            border: 1px solid var(--bs-border-color);
             padding: 10px;
             text-align: left;
             vertical-align: middle;
@@ -376,17 +414,13 @@ ob_end_flush(); // Flush the output buffer
         .table thead {
             background-color: #343a40;
             color: #ffffff;
-            border-bottom: 2px solid #ffffff;
         }
 
         .table thead th {
             padding: 10px;
             font-weight: bold;
             text-align: center;
-            border-top: 2px solid #ffffff;
-            border-left: 2px solid #ffffff;
-            border-right: 2px solid #ffffff;
-            border-bottom: 2px solid #ffffff;
+            border: 1px solid #495057;
         }
 
         /* Specific Column Widths */
@@ -631,7 +665,17 @@ ob_end_flush(); // Flush the output buffer
         </div>
 
         <!-- Table for displaying tasks -->
-        <h3>Existing Tasks</h3>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3 class="mb-0">Existing Tasks</h3>
+            <small class="text-muted">
+                <?php if ($total_records > 0): ?>
+                    Showing <?= $offset + 1; ?> - <?= min($offset + $records_per_page, $total_records); ?>
+                    of <?= $total_records; ?> tasks
+                <?php else: ?>
+                    No tasks found
+                <?php endif; ?>
+            </small>
+        </div>
         <div class="table-responsive">
             <table class="table">
                 <thead>
@@ -644,6 +688,13 @@ ob_end_flush(); // Flush the output buffer
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($total_records == 0): ?>
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <p class="text-muted mb-0">No tasks found.</p>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php while ($row = $taskResult->fetch_assoc()) : ?>
                         <tr class="status-<?= strtolower(str_replace(' ', '-', $row['status'])); ?>">
                             <td data-label="ID"><?= htmlspecialchars($row['id']); ?></td>
@@ -669,6 +720,31 @@ ob_end_flush(); // Flush the output buffer
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+            <nav aria-label="Task pagination" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    <?php if ($current_page > 1): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?<?= buildTaskQueryString(['page' => $current_page - 1]); ?>">Previous</a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
+                        <li class="page-item <?= $i == $current_page ? 'active' : ''; ?>">
+                            <a class="page-link" href="?<?= buildTaskQueryString(['page' => $i]); ?>"><?= $i; ?></a>
+                        </li>
+                    <?php endfor; ?>
+
+                    <?php if ($current_page < $total_pages): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?<?= buildTaskQueryString(['page' => $current_page + 1]); ?>">Next</a>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+        <?php endif; ?>
 
     </div>
 
