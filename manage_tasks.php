@@ -285,7 +285,7 @@ ob_end_flush(); // Flush the output buffer
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background-color: white;
+            background-color: var(--bs-body-bg);
             padding: 20px;
             border: 1px solid #ccc;
             z-index: 1000;

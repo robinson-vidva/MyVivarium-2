@@ -118,7 +118,7 @@ $strainResult = $con->query($strainQuery);
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background-color: white;
+            background-color: var(--bs-body-bg);
             padding: 20px;
             border: 2px solid #000;
             z-index: 1000;

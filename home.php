@@ -111,9 +111,7 @@ require 'header.php';
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong><i class="fas fa-exclamation-triangle"></i> Security Warning:</strong> You are using the default admin account.
             For security reasons, please create a new admin user and delete this default account immediately.
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         <?php endif; ?>
 
