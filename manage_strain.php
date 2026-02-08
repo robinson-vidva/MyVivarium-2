@@ -230,7 +230,7 @@ $strainResult = $con->query($strainQuery);
 </head>
 
 <body>
-    <div class="container-fluid mt-4 content" style="max-width: 1400px;">
+    <div class="container mt-4 content" style="max-width: 900px;">
         <h1 class="text-center">Manage Strains</h1>
         <?php if (isset($_SESSION['message'])) : ?>
             <div class="alert alert-info">

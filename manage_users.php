@@ -167,7 +167,7 @@ mysqli_close($con);
 </head>
 
 <body>
-    <div class="container-fluid mt-4 content" style="max-width: 1400px;">
+    <div class="container mt-4 content" style="max-width: 900px;">
         <div class="main-content">
             <h1 class="text-center">User Management</h1>
             <div class="table-responsive">

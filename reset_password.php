@@ -102,9 +102,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
 
     <style>
         .container {
-            max-width: 600px;
-            margin-top: 300px;
-            margin-bottom: 300px;
+            max-width: 900px;
+            margin-top: 50px;
+            margin-bottom: 50px;
             padding: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;

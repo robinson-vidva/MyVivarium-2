@@ -57,7 +57,7 @@ require 'header.php';
         }
 
         .container {
-            max-width: 800px;
+            max-width: 900px;
             background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;

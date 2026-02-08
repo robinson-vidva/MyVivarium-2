@@ -374,7 +374,7 @@ mysqli_close($con);
 
     <div class="content">
         <!-- Main Content -->
-        <div class="container mt-4">
+        <div class="container mt-4" style="max-width: 900px;">
             <div class="row">
                 <!-- Slideshow Column -->
                 <div class="col-md-6">

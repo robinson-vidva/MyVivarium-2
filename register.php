@@ -247,9 +247,9 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
     <style>
         .container {
-            max-width: 600px;
-            margin-top: 200px;
-            margin-bottom: 200px;
+            max-width: 900px;
+            margin-top: 50px;
+            margin-bottom: 50px;
             padding: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;
@@ -323,7 +323,7 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
             }
 
             .container {
-                max-width: 350px;
+                max-width: 500px;
                 margin: 0 auto;
                 padding: 20px;
                 border: 1px solid #ccc;

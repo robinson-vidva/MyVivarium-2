@@ -277,8 +277,44 @@ if (isset($settings['r2_pres'])) {
     [data-bs-theme="dark"] .container { background-color: #212529; }
     [data-bs-theme="dark"] .note-app-container { background-color: #2b3035; }
     [data-bs-theme="dark"] .popup-form { background-color: #212529; border-color: #495057; color: #dee2e6; }
-    [data-bs-theme="dark"] .table-wrapper th,
-    [data-bs-theme="dark"] .table-wrapper td { border-color: #495057; }
     [data-bs-theme="dark"] .modal-header { background-color: #1a1d21; }
+    </style>
+
+    <!-- Unified Table Styles -->
+    <style>
+    .table-wrapper table,
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--bs-border-color);
+    }
+    .table-wrapper th,
+    .table-wrapper td,
+    .table th,
+    .table td {
+        border: 1px solid var(--bs-border-color);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: middle;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .table-wrapper thead,
+    .table thead {
+        background-color: #343a40;
+        color: #ffffff;
+    }
+    .table-wrapper thead th,
+    .table thead th {
+        font-weight: bold;
+        text-align: center;
+        border: 1px solid #495057;
+    }
+    [data-bs-theme="dark"] .table-wrapper th,
+    [data-bs-theme="dark"] .table-wrapper td,
+    [data-bs-theme="dark"] .table th,
+    [data-bs-theme="dark"] .table td { border-color: #495057; }
+    [data-bs-theme="dark"] .table-wrapper thead,
+    [data-bs-theme="dark"] .table thead { background-color: #1a1d21; }
     </style>
 <!-- Note: Document structure (html/head/body) is managed by the including page -->

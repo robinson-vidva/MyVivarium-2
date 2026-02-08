@@ -234,7 +234,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
     <title>User Profile</title>
     <style>
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;

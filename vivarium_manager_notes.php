@@ -352,7 +352,7 @@ require 'header.php';
     </style>
 </head>
 <body>
-    <div class="container-fluid mt-4 content" style="max-width: 1400px;">
+    <div class="container mt-4 content" style="max-width: 900px;">
         <!-- Print Header (hidden on screen) -->
         <div class="print-header">
             <h2><?php echo htmlspecialchars($labName); ?></h2>
