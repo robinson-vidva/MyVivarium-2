@@ -236,88 +236,100 @@ require 'header.php';
 
         .container {
             max-width: 900px;
-            background-color: var(--bs-tertiary-bg);
-            padding: 20px;
-            border-radius: 8px;
+            padding: 20px 15px;
             margin: auto;
         }
 
-        .table-wrapper {
-            padding: 10px;
+        /* Section Cards */
+        .section-card {
+            background-color: var(--bs-tertiary-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
         }
 
-        .table-wrapper th:nth-child(1),
-        .table-wrapper td:nth-child(1) {
-            width: 25%;
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--bs-border-color);
         }
 
-        .table-wrapper th:nth-child(2),
-        .table-wrapper td:nth-child(2) {
-            width: 25%;
+        .section-header i {
+            font-size: 1.1rem;
+            color: var(--bs-primary);
+            width: 22px;
+            text-align: center;
         }
 
-        .table-wrapper th:nth-child(3),
-        .table-wrapper td:nth-child(3) {
-            width: 50%;
+        .section-header h5 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.05rem;
         }
 
-        .remarks-column {
-            max-width: 400px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
+        .section-header .action-buttons {
+            margin-left: auto;
         }
 
-        span {
-            font-size: 12pt;
-            line-height: 1;
-            display: inline-block;
+        /* Details Table (key-value pairs) */
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
         }
 
+        .details-table th,
+        .details-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--bs-border-color);
+            vertical-align: middle;
+            font-size: 0.92rem;
+        }
+
+        .details-table th {
+            width: 35%;
+            font-weight: 600;
+            color: var(--bs-body-color);
+            background-color: transparent;
+            text-transform: none;
+            letter-spacing: 0;
+            text-align: left;
+        }
+
+        .details-table td {
+            color: var(--bs-secondary-color);
+        }
+
+        .details-table td a {
+            color: var(--bs-primary);
+        }
+
+        .details-table tr:last-child th,
+        .details-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Mouse section heading */
+        .mouse-heading {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 20px 0 10px;
+            color: var(--bs-body-color);
+        }
+
+        /* Note app */
         .note-app-container {
             margin-top: 20px;
             padding: 20px;
-            background-color: #e9ecef;
-            border-radius: 8px;
+            background-color: var(--bs-tertiary-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 10px;
         }
 
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn-icon {
-            width: 30px;
-            height: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-        }
-
-        .btn-icon i {
-            font-size: 16px;
-            margin: 0;
-        }
-
-        @media (max-width: 768px) {
-
-            .table-wrapper th,
-            .table-wrapper td {
-                padding: 12px 8px;
-            }
-
-            .table-wrapper th,
-            .table-wrapper td {
-                text-align: center;
-            }
-        }
-
+        /* Popup */
         .popup-form {
             display: none;
             position: fixed;
@@ -326,11 +338,14 @@ require 'header.php';
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 2px solid #000;
+            border: 1px solid var(--bs-border-color);
             z-index: 1000;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
             width: 80%;
             max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .popup-overlay {
@@ -408,31 +423,33 @@ require 'header.php';
 
 <body>
     <div class="container content mt-4">
-        <div class="card">
-            <div class="card-header">
-                <h4>View Holding Cage <?= htmlspecialchars($holdingcage['cage_id']); ?></h4>
+
+        <!-- Cage Details Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-home"></i>
+                <h5>Holding Cage <?= htmlspecialchars($holdingcage['cage_id']); ?></h5>
                 <div class="action-buttons">
-                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
+                    <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                         <i class="fas fa-arrow-circle-left"></i>
                     </a>
-                    <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                    <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
-                    <a href="hc_addn.php?clone=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-info btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
+                    <a href="hc_addn.php?clone=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
                         <i class="fas fa-clone"></i>
                     </a>
-                    <a href="manage_tasks.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
+                    <a href="manage_tasks.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($holdingcage['cage_id'])); ?>)" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
+                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($holdingcage['cage_id'])); ?>)" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
                         <i class="fas fa-qrcode"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
+                    <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
                         <i class="fas fa-print"></i>
                     </a>
                 </div>
             </div>
-            <br>
 
             <!-- Information Completeness Indicator -->
             <div id="completeness-alert" class="alert" style="display: none; margin-bottom: 20px;">
@@ -443,177 +460,185 @@ require 'header.php';
                 <div id="missing-fields" class="mt-2"></div>
             </div>
 
-            <div class="table-wrapper">
-                <table class="table">
-                    <tr>
-                        <th>Cage #:</th>
-                        <td><?= htmlspecialchars($holdingcage['cage_id']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>PI Name</th>
-                        <td id="pi-data" data-value="<?= !empty($holdingcage['pi_name']) && $holdingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['pi_initials'] . ' [' . $holdingcage['pi_name'] . ']'); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Room</th>
-                        <td><?= htmlspecialchars($holdingcage['room'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Rack</th>
-                        <td><?= htmlspecialchars($holdingcage['rack'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Strain</th>
-                        <td id="strain-data" data-value="<?= !empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA' ? '1' : ''; ?>">
-                            <a href="javascript:void(0);" onclick="viewStrainDetails(<?= htmlspecialchars(json_encode($holdingcage['str_id'] ?? 'NA')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_name'] ?? 'Unknown Name')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_aka'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_url'] ?? '#')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_rrid'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_notes'] ?? '')) ?>)">
-                                <?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?> | <?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>
-                            </a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>IACUC</th>
-                        <td id="iacuc-data" data-value="<?= !empty($iacucCodes) ? '1' : ''; ?>"><?= $iacucDisplayString; ?></td>
-                    </tr>
-                    <tr>
-                        <th>User</th>
-                        <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
-                    </tr>
-                    <tr>
-                        <th>Qty</th>
-                        <td><?= htmlspecialchars($holdingcage['quantity']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>DOB</th>
-                        <td id="dob-data" data-value="<?= !empty($holdingcage['dob']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['dob']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Age</th>
-                        <td><?= htmlspecialchars($ageString); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Sex</th>
-                        <td id="sex-data" data-value="<?= !empty($holdingcage['sex']) ? '1' : ''; ?>"><?= htmlspecialchars(ucfirst($holdingcage['sex'])); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Parent Cage</th>
-                        <td id="parent-data" data-value="<?= !empty($holdingcage['parent_cg']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['parent_cg']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Genotype</th>
-                        <td><?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Remarks</th>
-                        <td><?= htmlspecialchars($holdingcage['remarks']); ?></td>
-                    </tr>
-                </table>
+            <table class="details-table">
+                <tr>
+                    <th>Cage #</th>
+                    <td><?= htmlspecialchars($holdingcage['cage_id']); ?></td>
+                </tr>
+                <tr>
+                    <th>PI Name</th>
+                    <td id="pi-data" data-value="<?= !empty($holdingcage['pi_name']) && $holdingcage['pi_name'] !== 'NA' ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['pi_initials'] . ' [' . $holdingcage['pi_name'] . ']'); ?></td>
+                </tr>
+                <tr>
+                    <th>Room</th>
+                    <td><?= htmlspecialchars($holdingcage['room'] ?? ''); ?></td>
+                </tr>
+                <tr>
+                    <th>Rack</th>
+                    <td><?= htmlspecialchars($holdingcage['rack'] ?? ''); ?></td>
+                </tr>
+                <tr>
+                    <th>Strain</th>
+                    <td id="strain-data" data-value="<?= !empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA' ? '1' : ''; ?>">
+                        <a href="javascript:void(0);" onclick="viewStrainDetails(<?= htmlspecialchars(json_encode($holdingcage['str_id'] ?? 'NA')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_name'] ?? 'Unknown Name')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_aka'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_url'] ?? '#')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_rrid'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_notes'] ?? '')) ?>)">
+                            <?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?> | <?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <th>IACUC</th>
+                    <td id="iacuc-data" data-value="<?= !empty($iacucCodes) ? '1' : ''; ?>"><?= $iacucDisplayString; ?></td>
+                </tr>
+                <tr>
+                    <th>User</th>
+                    <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
+                </tr>
+                <tr>
+                    <th>Qty</th>
+                    <td><?= htmlspecialchars($holdingcage['quantity']); ?></td>
+                </tr>
+                <tr>
+                    <th>DOB</th>
+                    <td id="dob-data" data-value="<?= !empty($holdingcage['dob']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['dob']); ?></td>
+                </tr>
+                <tr>
+                    <th>Age</th>
+                    <td><?= htmlspecialchars($ageString); ?></td>
+                </tr>
+                <tr>
+                    <th>Sex</th>
+                    <td id="sex-data" data-value="<?= !empty($holdingcage['sex']) ? '1' : ''; ?>"><?= htmlspecialchars(ucfirst($holdingcage['sex'])); ?></td>
+                </tr>
+                <tr>
+                    <th>Parent Cage</th>
+                    <td id="parent-data" data-value="<?= !empty($holdingcage['parent_cg']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['parent_cg']); ?></td>
+                </tr>
+                <tr>
+                    <th>Genotype</th>
+                    <td><?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?></td>
+                </tr>
+                <tr>
+                    <th>Remarks</th>
+                    <td><?= htmlspecialchars($holdingcage['remarks']); ?></td>
+                </tr>
+            </table>
+        </div>
 
-                <?php if (!empty($mice)) : ?>
-                    <?php foreach ($mice as $index => $mouse) : ?>
-                        <h4>Mouse #<?= $index + 1; ?></h4>
-                        <table class="table">
-                            <tr>
-                                <th>Mouse ID</th>
-                                <th>Genotype</th>
-                                <th>Notes</th>
-                                <th>Actions</th>
-                            </tr>
-                            <tr>
-                                <td><?= htmlspecialchars($mouse['mouse_id']); ?></td>
-                                <td><?= htmlspecialchars($mouse['genotype']); ?></td>
-                                <td><?= htmlspecialchars($mouse['notes']); ?></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="openTransferModal(<?= (int)$mouse['id']; ?>, <?= htmlspecialchars(json_encode($mouse['mouse_id'])); ?>)" title="Transfer Mouse">
-                                        <i class="fas fa-exchange-alt"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </table>
-                    <?php endforeach; ?>
-                <?php else : ?>
-                    <p>No mice data available for this cage.</p>
-                <?php endif; ?>
-            </div>
-
-            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
-
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h4>Manage Files</h4>
+        <!-- Mice Section -->
+        <?php if (!empty($mice)) : ?>
+            <div class="section-card">
+                <div class="section-header">
+                    <i class="fas fa-paw"></i>
+                    <h5>Mice (<?= count($mice); ?>)</h5>
                 </div>
-                <div class="card-body">
+                <?php foreach ($mice as $index => $mouse) : ?>
+                    <h6 class="mouse-heading">Mouse #<?= $index + 1; ?></h6>
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table">
                             <thead>
                                 <tr>
-                                    <th>File Name</th>
-                                    <th>Actions</th>
+                                    <th>Mouse ID</th>
+                                    <th>Genotype</th>
+                                    <th>Notes</th>
+                                    <th style="width: 80px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php
-                                while ($file = $files->fetch_assoc()) {
-                                    $file_path = htmlspecialchars($file['file_path']);
-                                    $file_name = htmlspecialchars($file['file_name']);
-                                    $file_id = intval($file['id']);
-
-                                    echo "<tr>";
-                                    echo "<td>$file_name</td>";
-                                    echo "<td><a href='$file_path' download='$file_name' class='btn btn-sm btn-outline-primary'> <i class='fas fa-cloud-download-alt fa-sm'></i></a></td>";
-                                    echo "</tr>";
-                                }
-                                ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($mouse['mouse_id']); ?></td>
+                                    <td><?= htmlspecialchars($mouse['genotype']); ?></td>
+                                    <td><?= htmlspecialchars($mouse['notes']); ?></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-info" onclick="openTransferModal(<?= (int)$mouse['id']; ?>, <?= htmlspecialchars(json_encode($mouse['mouse_id'])); ?>)" title="Transfer Mouse">
+                                                <i class="fas fa-exchange-alt"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
-                </div>
+                <?php endforeach; ?>
             </div>
+        <?php endif; ?>
 
-            <br>
-
-            <div class="card mt-4">
-                <div class="card-header d-flex flex-column flex-md-row justify-content-between">
-                    <h4>Maintenance Log for Cage ID: <?= htmlspecialchars($id ?? 'Unknown'); ?></h4>
-                    <div class="action-icons mt-3 mt-md-0">
-                        <!-- Maintenance button with tooltip -->
-                        <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
-                            <i class="fas fa-wrench"></i>
-                        </a>
-                        <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <?php if ($maintenanceLogs->num_rows > 0) : ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 25%;">Date</th>
-                                        <th style="width: 25%;">User</th>
-                                        <th style="width: 50%;">Comment</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
-                                        <tr>
-                                            <td style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                            <td style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                            <td style="width: 50%;"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
-                                        </tr>
-                                    <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else : ?>
-                        <p>No maintenance records found for this cage.</p>
-                    <?php endif; ?>
-                </div>
+        <!-- Files Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-file-alt"></i>
+                <h5>Files</h5>
             </div>
-
-
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>File Name</th>
+                            <th style="width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $hasFiles = false;
+                        while ($file = $files->fetch_assoc()) {
+                            $hasFiles = true;
+                            $file_path = htmlspecialchars($file['file_path']);
+                            $file_name = htmlspecialchars($file['file_name']);
+                            echo "<tr>";
+                            echo "<td>$file_name</td>";
+                            echo "<td><div class='action-buttons'><a href='$file_path' download='$file_name' class='btn btn-sm btn-primary' title='Download'><i class='fas fa-cloud-download-alt'></i></a></div></td>";
+                            echo "</tr>";
+                        }
+                        if (!$hasFiles) {
+                            echo "<tr><td colspan='2' class='text-muted text-center'>No files uploaded</td></tr>";
+                        }
+                        ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
+        <!-- Maintenance Log Section -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-clipboard-list"></i>
+                <h5>Maintenance Log</h5>
+                <div class="action-buttons">
+                    <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
+                        <i class="fas fa-wrench"></i>
+                    </a>
+                    <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                </div>
+            </div>
+            <?php if ($maintenanceLogs->num_rows > 0) : ?>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>User</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                    <td><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                    <td><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else : ?>
+                <p class="text-muted mb-0">No maintenance records found for this cage.</p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Notes Section -->
         <div class="note-app-container">
             <?php include 'nt_app.php'; ?>
         </div>
@@ -623,9 +648,12 @@ require 'header.php';
     <?php include 'footer.php'; ?>
 
     <!-- Popup form for viewing strain details -->
-    <div class="popup-overlay" id="viewPopupOverlay"></div>
+    <div class="popup-overlay" id="viewPopupOverlay" onclick="closeViewForm()"></div>
     <div class="popup-form" id="viewPopupForm">
-        <h4 id="viewFormTitle">Strain Details</h4>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 id="viewFormTitle" class="mb-0">Strain Details</h4>
+            <button type="button" class="btn-close" onclick="closeViewForm()" aria-label="Close"></button>
+        </div>
         <div class="form-group">
             <strong for="view_strain_id">Strain ID:</strong>
             <p id="view_strain_id"></p>
@@ -658,16 +686,22 @@ require 'header.php';
     <!-- QR Code Modal -->
     <div class="popup-overlay" id="qrOverlay" onclick="closeQrCodePopup()"></div>
     <div class="popup-form" id="qrForm" style="max-width: 400px; text-align: center;">
-        <h4 id="qrTitle">QR Code</h4>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 id="qrTitle" class="mb-0">QR Code</h4>
+            <button type="button" class="btn-close" onclick="closeQrCodePopup()" aria-label="Close"></button>
+        </div>
         <img id="qrImage" src="" alt="QR Code" style="margin: 15px 0; max-width: 200px;">
         <br>
         <button type="button" class="btn btn-secondary" onclick="closeQrCodePopup()">Close</button>
     </div>
 
     <!-- Mouse Transfer Modal -->
-    <div class="popup-overlay" id="transferOverlay"></div>
+    <div class="popup-overlay" id="transferOverlay" onclick="closeTransferModal()"></div>
     <div class="popup-form" id="transferForm" style="max-width: 500px;">
-        <h4>Transfer Mouse</h4>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Transfer Mouse</h4>
+            <button type="button" class="btn-close" onclick="closeTransferModal()" aria-label="Close"></button>
+        </div>
         <form method="POST" action="mouse_transfer.php">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
             <input type="hidden" id="transfer_mouse_db_id" name="mouse_db_id">
@@ -678,23 +712,33 @@ require 'header.php';
             </div>
             <div class="mb-3">
                 <label for="target_cage_id" class="form-label"><strong>Transfer to Cage:</strong></label>
-                <select class="form-control" id="target_cage_id" name="target_cage_id" required>
-                    <option value="">Select Target Cage</option>
-                    <?php
-                    $targetCageQuery = "SELECT h.cage_id FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = 'active' AND h.cage_id != ? ORDER BY h.cage_id";
-                    $targetStmt = $con->prepare($targetCageQuery);
-                    $targetStmt->bind_param("s", $id);
-                    $targetStmt->execute();
-                    $targetResult = $targetStmt->get_result();
-                    while ($targetRow = $targetResult->fetch_assoc()) {
-                        echo '<option value="' . htmlspecialchars($targetRow['cage_id']) . '">' . htmlspecialchars($targetRow['cage_id']) . '</option>';
-                    }
-                    $targetStmt->close();
-                    ?>
-                </select>
+                <?php
+                $targetCageQuery = "SELECT cage_id FROM cages WHERE status = 'active' AND cage_id != ? ORDER BY cage_id";
+                $targetStmt = $con->prepare($targetCageQuery);
+                $targetStmt->bind_param("s", $id);
+                $targetStmt->execute();
+                $targetResult = $targetStmt->get_result();
+                $targetCages = [];
+                while ($targetRow = $targetResult->fetch_assoc()) {
+                    $targetCages[] = $targetRow['cage_id'];
+                }
+                $targetStmt->close();
+                ?>
+                <?php if (!empty($targetCages)) : ?>
+                    <select class="form-control" id="target_cage_id" name="target_cage_id" required>
+                        <option value="">Select Target Cage</option>
+                        <?php foreach ($targetCages as $cageId) : ?>
+                            <option value="<?= htmlspecialchars($cageId); ?>"><?= htmlspecialchars($cageId); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php else : ?>
+                    <div class="alert alert-warning mb-0">No other active cages available for transfer.</div>
+                <?php endif; ?>
             </div>
-            <div class="form-buttons">
-                <button type="submit" class="btn btn-primary">Transfer</button>
+            <div class="d-flex gap-2">
+                <?php if (!empty($targetCages)) : ?>
+                    <button type="submit" class="btn btn-primary">Transfer</button>
+                <?php endif; ?>
                 <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
             </div>
         </form>
