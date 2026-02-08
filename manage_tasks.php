@@ -219,7 +219,7 @@ $cageIdFilter = $_GET['id'] ?? '';
 $filter = $_GET['filter'] ?? '';
 
 // Pagination settings
-$records_per_page = 20;
+$records_per_page = 10;
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 

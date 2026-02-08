@@ -85,8 +85,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch all users from the database
-$userquery = "SELECT * FROM users";
+// Pagination settings
+$records_per_page = 10;
+$current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset = ($current_page - 1) * $records_per_page;
+
+// Count total users
+$count_result = mysqli_query($con, "SELECT COUNT(*) as total FROM users");
+$total_records = mysqli_fetch_assoc($count_result)['total'];
+$total_pages = ceil($total_records / $records_per_page);
+
+// Fetch users with pagination
+$userquery = "SELECT * FROM users ORDER BY name ASC LIMIT $records_per_page OFFSET $offset";
 $userresult = mysqli_query($con, $userquery);
 
 // Include the header file
@@ -162,6 +172,17 @@ mysqli_close($con);
     <div class="container mt-4 content" style="max-width: 900px;">
         <div class="main-content">
             <h1 class="text-center">User Management</h1>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div></div>
+                <small class="text-muted">
+                    <?php if ($total_records > 0): ?>
+                        Showing <?= $offset + 1; ?> - <?= min($offset + $records_per_page, $total_records); ?>
+                        of <?= $total_records; ?> users
+                    <?php else: ?>
+                        No users found
+                    <?php endif; ?>
+                </small>
+            </div>
             <div class="table-responsive">
                 <table class="table table-striped">
                     <thead>
@@ -212,6 +233,31 @@ mysqli_close($con);
 
                 </table>
             </div>
+
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+                <nav aria-label="User pagination" class="mt-3">
+                    <ul class="pagination justify-content-center">
+                        <?php if ($current_page > 1): ?>
+                            <li class="page-item">
+                                <a class="page-link" href="?page=<?= $current_page - 1; ?>">Previous</a>
+                            </li>
+                        <?php endif; ?>
+
+                        <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
+                            <li class="page-item <?= $i == $current_page ? 'active' : ''; ?>">
+                                <a class="page-link" href="?page=<?= $i; ?>"><?= $i; ?></a>
+                            </li>
+                        <?php endfor; ?>
+
+                        <?php if ($current_page < $total_pages): ?>
+                            <li class="page-item">
+                                <a class="page-link" href="?page=<?= $current_page + 1; ?>">Next</a>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
+                </nav>
+            <?php endif; ?>
         </div>
     </div>
 
