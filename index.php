@@ -257,8 +257,11 @@ mysqli_close($con);
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
     <!-- Google Font: Poppins -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Bootstrap and jQuery JS -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -272,62 +275,10 @@ mysqli_close($con);
             padding: 0;
             height: 100%;
             width: 100%;
+            font-family: 'Poppins', sans-serif;
         }
 
-        .carousel img {
-            height: 100%;
-            object-fit: cover;
-            width: 100%;
-        }
-
-        .carousel,
-        .carousel-inner,
-        .carousel-item {
-            height: 100%;
-        }
-
-        .login-form {
-            padding: 25px;
-            background-color: var(--bs-body-bg);
-            border-radius: 10px;
-            box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .feature-box {
-            transition: transform .2s, box-shadow .2s;
-            border-radius: 10px;
-            padding: 25px;
-            background-color: var(--bs-body-bg);
-            box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            height: 100%;
-        }
-
-        .feature-box:hover {
-            transform: translateY(-3px);
-            box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.15);
-        }
-
-        .feature-box h3 {
-            margin-top: 0;
-            color: #007bff;
-            font-size: 1.2rem;
-        }
-
-        .feature-box p {
-            margin-bottom: 0;
-            font-size: 0.95rem;
-        }
-
-        .forgot-password-link {
-            text-align: left;
-            margin-top: 10px;
-        }
-
+        /* Header */
         .header {
             display: flex;
             flex-wrap: wrap;
@@ -362,8 +313,116 @@ mysqli_close($con);
             font-weight: 500;
         }
 
-        /* Responsive styling for smaller screens */
-        @media (max-width: 576px) {
+        /* Hero Section */
+        .hero-section {
+            background: linear-gradient(135deg, #343a40 0%, #1a1d21 100%);
+            color: #ffffff;
+            padding: 50px 0;
+        }
+
+        .hero-section h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .hero-section .lead {
+            opacity: 0.85;
+            font-size: 1.05rem;
+            margin-bottom: 30px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .feature-item .feature-icon {
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            border-radius: 10px;
+            background: rgba(13, 110, 253, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #4da3ff;
+        }
+
+        .feature-item strong {
+            display: block;
+            font-size: 0.95rem;
+            margin-bottom: 2px;
+        }
+
+        .feature-item p {
+            margin: 0;
+            font-size: 0.85rem;
+            opacity: 0.75;
+            line-height: 1.4;
+        }
+
+        /* Login Card */
+        .login-card {
+            background: #ffffff;
+            color: #212529;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-card h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .login-card .form-label {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .login-card .form-control {
+            border-radius: 8px;
+            padding: 10px 14px;
+        }
+
+        .login-card .btn-primary {
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-weight: 500;
+        }
+
+        .login-card .btn-outline-secondary {
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-weight: 500;
+        }
+
+        /* Carousel Section */
+        .carousel-section {
+            padding: 40px 0;
+            background-color: #f8f9fa;
+        }
+
+        .carousel-section .carousel {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .carousel-section .carousel img {
+            height: 380px;
+            object-fit: cover;
+            width: 100%;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
             .header h2 {
                 font-size: 1.8rem;
                 margin-bottom: 5px;
@@ -371,6 +430,18 @@ mysqli_close($con);
 
             .header img.header-logo {
                 width: 150px;
+            }
+
+            .hero-section {
+                padding: 30px 0;
+            }
+
+            .hero-section h1 {
+                font-size: 1.5rem;
+            }
+
+            .carousel-section .carousel img {
+                height: 250px;
             }
         }
     </style>
@@ -389,34 +460,49 @@ mysqli_close($con);
         <h2><?php echo htmlspecialchars($labName); ?></h2>
     </div>
 
-    <div class="content">
-        <!-- Main Content -->
-        <div class="container mt-4" style="max-width: 900px;">
-            <div class="row align-items-stretch">
-                <!-- Slideshow Column -->
-                <div class="col-md-7 mb-3">
-                    <div id="labCarousel" class="carousel slide h-100" data-bs-ride="carousel">
-                        <div class="carousel-inner">
-                            <div class="carousel-item active"> <img class="d-block w-100" src="images/DSC_0536.webp" alt="Image 1"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0537.webp" alt="Image 2"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0539.webp" alt="Image 3"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0540.webp" alt="Image 4"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0560.webp" alt="Image 7"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0562.webp" alt="Image 8"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0586.webp" alt="Image 11"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0593.webp" alt="Image 12"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0607.webp" alt="Image 13"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0623.webp" alt="Image 14"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0658.webp" alt="Image 15"> </div>
-                            <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0665.webp" alt="Image 16"> </div>
+    <!-- Hero Section: Features + Login -->
+    <div class="hero-section">
+        <div class="container" style="max-width: 900px;">
+            <div class="row align-items-center">
+                <!-- Left Column: Welcome + Features -->
+                <div class="col-lg-7 mb-4 mb-lg-0">
+                    <h1>Welcome to the <?php echo htmlspecialchars($labName); ?></h1>
+                    <p class="lead">Elevate Your Research with IoT-Enhanced Colony Management</p>
+
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <i class="fas fa-thermometer-half"></i>
+                        </div>
+                        <div>
+                            <strong>Real-Time Environmental Monitoring</strong>
+                            <p>IoT sensors continuously track temperature and humidity, ensuring a stable environment for your research animals.</p>
                         </div>
                     </div>
-                    <?php if ($demo === "yes") include('demo/demo-disclaimer.php'); ?>
+
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <i class="fas fa-paw"></i>
+                        </div>
+                        <div>
+                            <strong>Effortless Cage and Mouse Tracking</strong>
+                            <p>Seamlessly monitor every cage and mouse in your facility. No more manual record-keeping.</p>
+                        </div>
+                    </div>
+
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div>
+                            <strong>Security and Compliance</strong>
+                            <p>Data integrity and confidentiality prioritized, compliant with industry regulations.</p>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Login Form Column -->
-                <div class="col-md-5 mb-3">
-                    <div class="login-form">
+                <!-- Right Column: Login Card -->
+                <div class="col-lg-5">
+                    <div class="login-card">
                         <h3>Login</h3>
                         <?php if (isset($_SESSION['error_message'])) { ?>
                             <div class="alert alert-danger">
@@ -447,80 +533,54 @@ mysqli_close($con);
                                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
                             <?php } ?>
 
-                            <div class="d-flex gap-2 mb-2">
+                            <div class="d-grid gap-2 mb-3">
                                 <button type="submit" class="btn btn-primary" name="login">Login</button>
-                                <a href="register.php" class="btn btn-secondary">Register</a>
                             </div>
-                            <a href="forgot_password.php" class="forgot-password-link">Forgot Password?</a>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a href="forgot_password.php" class="text-muted small">Forgot Password?</a>
+                                <a href="register.php" class="btn btn-outline-secondary btn-sm">Create Account</a>
+                            </div>
                         </form>
                     </div>
                     <?php if ($demo === "yes") include('demo/demo-credentials.php'); ?>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Welcome Section & Feature Boxes -->
-            <div class="text-center mt-4 mb-3">
-                <h2>Welcome to the <?php echo htmlspecialchars($labName); ?></h2>
-                <p>Elevate Your Research with IoT-Enhanced Colony Management</p>
+    <!-- Image Carousel Section -->
+    <div class="carousel-section">
+        <div class="container" style="max-width: 900px;">
+            <div id="labCarousel" class="carousel slide" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                    <div class="carousel-item active"> <img class="d-block w-100" src="images/DSC_0536.webp" alt="Image 1"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0537.webp" alt="Image 2"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0539.webp" alt="Image 3"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0540.webp" alt="Image 4"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0560.webp" alt="Image 7"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0562.webp" alt="Image 8"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0586.webp" alt="Image 11"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0593.webp" alt="Image 12"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0607.webp" alt="Image 13"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0623.webp" alt="Image 14"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0658.webp" alt="Image 15"> </div>
+                    <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0665.webp" alt="Image 16"> </div>
+                </div>
+                <button class="carousel-control-prev" type="button" data-bs-target="#labCarousel" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Previous</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#labCarousel" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Next</span>
+                </button>
             </div>
-
-            <div class="row g-4 mb-4">
-                <!-- Feature Box 1 -->
-                <div class="col-md-4">
-                    <div class="feature-box">
-                        <h3>Real-Time Environmental Monitoring</h3>
-                        <p>Gain unparalleled insights into the conditions of your vivarium. Our IoT sensors continuously track temperature and humidity levels, ensuring a stable and controlled environment for your research animals.</p>
-                    </div>
-                </div>
-
-                <!-- Feature Box 2 -->
-                <div class="col-md-4">
-                    <div class="feature-box">
-                        <h3>Effortless Cage and Mouse Tracking</h3>
-                        <p>Seamlessly monitor every cage and mouse in your facility. No more manual record-keeping or confusion.</p>
-                    </div>
-                </div>
-
-                <!-- Feature Box 3 -->
-                <div class="col-md-4">
-                    <div class="feature-box">
-                        <h3>Security and Compliance</h3>
-                        <p>Rest easy knowing your data is secure and compliant with industry regulations. We prioritize data integrity and confidentiality.</p>
-                    </div>
-                </div>
-            </div>
+            <?php if ($demo === "yes") include('demo/demo-disclaimer.php'); ?>
         </div>
     </div>
 
     <!-- Include the footer -->
     <?php include 'footer.php'; ?>
-    <script>
-        function adjustFooter() {
-            const footer = document.getElementById('footer');
-            const container = document.querySelector('.top-container');
-
-            if (footer && container) {
-                // Remove inline styles to calculate natural height
-                footer.style.position = 'relative';
-                footer.style.bottom = 'auto';
-
-                const containerHeight = container.offsetHeight;
-                const windowHeight = window.innerHeight;
-
-                // If content is shorter than viewport, fix the footer at the bottom
-                if (containerHeight < windowHeight) {
-                    footer.style.position = 'absolute';
-                    footer.style.bottom = '0';
-                } else {
-                    footer.style.position = 'relative';
-                    footer.style.bottom = 'auto';
-                }
-            }
-        }
-
-        window.addEventListener('load', adjustFooter);
-        window.addEventListener('resize', adjustFooter);
-    </script>
 </body>
 
 </html>
