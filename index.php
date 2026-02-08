@@ -255,7 +255,7 @@ mysqli_close($con);
     <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YcnS/1p6gQKpMBo8TFMhCZhBR8gFUPHOaJ9J" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 
     <!-- Google Font: Poppins -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
@@ -282,7 +282,7 @@ mysqli_close($con);
 
         .login-form {
             padding: 10px;
-            background-color: white;
+            background-color: var(--bs-body-bg);
             border-radius: 10px;
             box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
         }
@@ -291,7 +291,7 @@ mysqli_close($con);
             transition: transform .2s, box-shadow .2s;
             border-radius: 10px;
             padding: 30px;
-            background-color: white;
+            background-color: var(--bs-body-bg);
             box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
             text-align: center;
             margin: 50px 0;

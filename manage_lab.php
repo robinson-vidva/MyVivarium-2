@@ -128,7 +128,7 @@ require 'header.php';
             padding: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;
-            background-color: #f9f9f9;
+            background-color: var(--bs-tertiary-bg);
         }
 
         .form-group {

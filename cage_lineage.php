@@ -222,7 +222,7 @@ require 'header.php';
 
         .tree-node-content {
             padding: 8px 15px;
-            background: #f8f9fa;
+            background: var(--bs-tertiary-bg);
             border-radius: 6px;
             border: 1px solid #dee2e6;
             display: inline-block;
