@@ -377,5 +377,11 @@ if (isset($settings['r2_pres'])) {
         font-size: 14px;
         margin: 0;
     }
+    /* Make inline forms transparent to flex layout so buttons align in one row */
+    .action-buttons form,
+    .table-actions form,
+    .action-icons form {
+        display: contents;
+    }
     </style>
 <!-- Note: Document structure (html/head/body) is managed by the including page -->

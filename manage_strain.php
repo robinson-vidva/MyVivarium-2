@@ -169,7 +169,12 @@ $strainResult = $con->query($strainQuery);
         /* Actions column */
         .table th:nth-child(4),
         .table td:nth-child(4) {
-            width: 140px;
+            width: 160px;
+        }
+
+        /* Make delete form transparent to flex layout */
+        .action-buttons form {
+            display: contents;
         }
 
         .add-button {
