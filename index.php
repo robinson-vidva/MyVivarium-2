@@ -275,40 +275,57 @@ mysqli_close($con);
         }
 
         .carousel img {
-            height: 390px;
+            height: 100%;
             object-fit: cover;
             width: 100%;
         }
 
+        .carousel,
+        .carousel-inner,
+        .carousel-item {
+            height: 100%;
+        }
+
         .login-form {
-            padding: 10px;
+            padding: 25px;
             background-color: var(--bs-body-bg);
             border-radius: 10px;
             box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .feature-box {
             transition: transform .2s, box-shadow .2s;
             border-radius: 10px;
-            padding: 30px;
+            padding: 25px;
             background-color: var(--bs-body-bg);
             box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
             text-align: center;
-            margin: 50px 0;
+            height: 100%;
+        }
+
+        .feature-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.15);
         }
 
         .feature-box h3 {
             margin-top: 0;
             color: #007bff;
+            font-size: 1.2rem;
         }
 
         .feature-box p {
             margin-bottom: 0;
+            font-size: 0.95rem;
         }
 
         .forgot-password-link {
             text-align: left;
-            margin-top: 50px;
+            margin-top: 10px;
         }
 
         .header {
@@ -375,10 +392,10 @@ mysqli_close($con);
     <div class="content">
         <!-- Main Content -->
         <div class="container mt-4" style="max-width: 900px;">
-            <div class="row">
+            <div class="row align-items-stretch">
                 <!-- Slideshow Column -->
-                <div class="col-md-6">
-                    <div id="labCarousel" class="carousel slide" data-bs-ride="carousel">
+                <div class="col-md-7 mb-3">
+                    <div id="labCarousel" class="carousel slide h-100" data-bs-ride="carousel">
                         <div class="carousel-inner">
                             <div class="carousel-item active"> <img class="d-block w-100" src="images/DSC_0536.webp" alt="Image 1"> </div>
                             <div class="carousel-item"> <img class="d-block w-100" src="images/DSC_0537.webp" alt="Image 2"> </div>
@@ -398,7 +415,7 @@ mysqli_close($con);
                 </div>
 
                 <!-- Login Form Column -->
-                <div class="col-md-6">
+                <div class="col-md-5 mb-3">
                     <div class="login-form">
                         <h3>Login</h3>
                         <?php if (isset($_SESSION['error_message'])) { ?>
@@ -415,24 +432,25 @@ mysqli_close($con);
                             </div>
                         <?php } ?>
                         <form method="POST" action="">
-                            <div class="form-group">
-                                <label for="username">Email Address</label>
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Email Address</label>
                                 <input type="text" class="form-control" id="username" name="username" required>
                             </div>
-                            <div class="form-group">
-                                <label for="password">Password</label>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
                                 <input type="password" class="form-control" id="password" name="password" required>
                             </div>
 
                             <!-- Conditionally include Cloudflare Turnstile Widget -->
                             <?php if (!empty($turnstileSiteKey)) { ?>
-                                <div class="cf-turnstile" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>"></div>
+                                <div class="cf-turnstile mb-3" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>"></div>
                                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
                             <?php } ?>
 
-                            <button type="submit" class="btn btn-primary" name="login">Login</button>
-                            <a href="register.php" class="btn btn-secondary">Register</a>
-                            <br><br>
+                            <div class="d-flex gap-2 mb-2">
+                                <button type="submit" class="btn btn-primary" name="login">Login</button>
+                                <a href="register.php" class="btn btn-secondary">Register</a>
+                            </div>
                             <a href="forgot_password.php" class="forgot-password-link">Forgot Password?</a>
                         </form>
                     </div>
@@ -440,26 +458,32 @@ mysqli_close($con);
                 </div>
             </div>
 
-            <!-- New Row for Unique Features -->
-            <div class="row mt-4">
-                <div class="col-md-12">
-                    <h2 class="text-center">Welcome to the <?php echo htmlspecialchars($labName); ?></h2>
-                    <p class="text-center italic">Elevate Your Research with IoT-Enhanced Colony Management</p>
+            <!-- Welcome Section & Feature Boxes -->
+            <div class="text-center mt-4 mb-3">
+                <h2>Welcome to the <?php echo htmlspecialchars($labName); ?></h2>
+                <p>Elevate Your Research with IoT-Enhanced Colony Management</p>
+            </div>
 
-                    <!-- Feature Box 1 -->
-                    <div class="col-md-6 mb-6 mx-auto feature-box text-center">
+            <div class="row g-4 mb-4">
+                <!-- Feature Box 1 -->
+                <div class="col-md-4">
+                    <div class="feature-box">
                         <h3>Real-Time Environmental Monitoring</h3>
                         <p>Gain unparalleled insights into the conditions of your vivarium. Our IoT sensors continuously track temperature and humidity levels, ensuring a stable and controlled environment for your research animals.</p>
                     </div>
+                </div>
 
-                    <!-- Feature Box 2 -->
-                    <div class="col-md-6 mb-6 mx-auto feature-box text-center">
+                <!-- Feature Box 2 -->
+                <div class="col-md-4">
+                    <div class="feature-box">
                         <h3>Effortless Cage and Mouse Tracking</h3>
                         <p>Seamlessly monitor every cage and mouse in your facility. No more manual record-keeping or confusion.</p>
                     </div>
+                </div>
 
-                    <!-- Feature Box 3 -->
-                    <div class="col-md-6 mb-6 mx-auto feature-box text-center">
+                <!-- Feature Box 3 -->
+                <div class="col-md-4">
+                    <div class="feature-box">
                         <h3>Security and Compliance</h3>
                         <p>Rest easy knowing your data is secure and compliant with industry regulations. We prioritize data integrity and confidentiality.</p>
                     </div>
