@@ -245,6 +245,26 @@ $iacucResult = $con->query($iacucQuery);
 
         .table {
             width: 100%;
+            table-layout: auto;
+        }
+
+        /* Column widths */
+        .table th:nth-child(1),
+        .table td:nth-child(1) {
+            width: 80px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .table th:nth-child(3),
+        .table td:nth-child(3) {
+            width: 130px;
+            text-align: center;
+        }
+
+        .table th:nth-child(4),
+        .table td:nth-child(4) {
+            width: 120px;
         }
     </style>
 
