@@ -365,7 +365,7 @@ require 'header.php';
                     <a href="manage_tasks.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-secondary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
-                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= json_encode($holdingcage['cage_id']); ?>)" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
+                    <a href="javascript:void(0);" onclick="showQrCodePopup(<?= htmlspecialchars(json_encode($holdingcage['cage_id'])); ?>)" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="QR Code">
                         <i class="fas fa-qrcode"></i>
                     </a>
                     <a href="javascript:void(0);" onclick="window.print()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage">
