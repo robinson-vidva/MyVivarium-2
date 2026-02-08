@@ -174,16 +174,10 @@ $iacucResult = $con->query($iacucQuery);
             z-index: 999;
         }
 
-        /* Button and Form Layout */
-        .table-actions,
-        .action-buttons,
+        /* Action button styles handled by unified styles in header.php */
         .form-buttons {
             display: flex;
             gap: 10px;
-        }
-
-        .table-actions {
-            justify-content: flex-start;
         }
 
         .form-buttons {
@@ -246,21 +240,7 @@ $iacucResult = $con->query($iacucQuery);
                 display: block;
             }
 
-            .table-actions,
-            .action-buttons {
-                flex-direction: column;
-            }
-
-            .table-actions button,
-            .action-buttons .btn {
-                width: 100%;
-                margin-bottom: 10px;
-            }
-
-            .table-actions {
-                gap: 10px;
-                flex-wrap: wrap;
-            }
+            /* Mobile action button styles handled by unified styles in header.php */
         }
 
         .table {
@@ -315,7 +295,7 @@ $iacucResult = $con->query($iacucQuery);
 
         <!-- Display existing IACUC records -->
         <h3>Existing IACUC Records</h3>
-        <table class="table table-bordered">
+        <table class="table">
             <thead>
                 <tr>
                     <th>ID</th>

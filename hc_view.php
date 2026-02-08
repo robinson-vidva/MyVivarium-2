@@ -444,7 +444,7 @@ require 'header.php';
             </div>
 
             <div class="table-wrapper">
-                <table class="table table-bordered">
+                <table class="table">
                     <tr>
                         <th>Cage #:</th>
                         <td><?= htmlspecialchars($holdingcage['cage_id']); ?></td>
@@ -464,13 +464,7 @@ require 'header.php';
                     <tr>
                         <th>Strain</th>
                         <td id="strain-data" data-value="<?= !empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA' ? '1' : ''; ?>">
-                            <a href="javascript:void(0);" onclick="viewStrainDetails(
-                                '<?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?>', 
-                                <?= json_encode($holdingcage['str_name'] ?? 'Unknown Name') ?>,
-                                <?= json_encode($holdingcage['str_aka'] ?? '') ?>,
-                                <?= json_encode($holdingcage['str_url'] ?? '#') ?>,
-                                <?= json_encode($holdingcage['str_rrid'] ?? '') ?>,
-                                <?= json_encode($holdingcage['str_notes'] ?? '') ?>)">
+                            <a href="javascript:void(0);" onclick="viewStrainDetails(<?= htmlspecialchars(json_encode($holdingcage['str_id'] ?? 'NA')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_name'] ?? 'Unknown Name')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_aka'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_url'] ?? '#')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_rrid'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_notes'] ?? '')) ?>)">
                                 <?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?> | <?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>
                             </a>
                         </td>
@@ -516,7 +510,7 @@ require 'header.php';
                 <?php if (!empty($mice)) : ?>
                     <?php foreach ($mice as $index => $mouse) : ?>
                         <h4>Mouse #<?= $index + 1; ?></h4>
-                        <table class="table table-bordered">
+                        <table class="table">
                             <tr>
                                 <th>Mouse ID</th>
                                 <th>Genotype</th>
@@ -528,7 +522,7 @@ require 'header.php';
                                 <td><?= htmlspecialchars($mouse['genotype']); ?></td>
                                 <td><?= htmlspecialchars($mouse['notes']); ?></td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="openTransferModal(<?= $mouse['id']; ?>, '<?= htmlspecialchars($mouse['mouse_id']); ?>')" title="Transfer Mouse">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="openTransferModal(<?= (int)$mouse['id']; ?>, <?= htmlspecialchars(json_encode($mouse['mouse_id'])); ?>)" title="Transfer Mouse">
                                         <i class="fas fa-exchange-alt"></i>
                                     </button>
                                 </td>

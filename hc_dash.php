@@ -203,32 +203,7 @@ require 'header.php';
             overflow-x: auto;
         }
 
-        .btn-sm {
-            margin-right: 5px;
-        }
-
-        .btn-icon {
-            width: 30px;
-            height: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-        }
-
-        .btn-icon i {
-            font-size: 16px;
-            margin: 0;
-        }
-
-        .action-icons a {
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
-
-        .action-icons a:last-child {
-            margin-right: 0;
-        }
+        /* Action icon/button styles handled by unified styles in header.php */
 
         @media (max-width: 768px) {
 
@@ -295,7 +270,7 @@ require 'header.php';
                         </div>
 
                         <div class="table-wrapper" id="tableContainer">
-                            <table class="table table-bordered" id="mouseTable">
+                            <table class="table" id="mouseTable">
                                 <thead>
                                     <tr>
                                         <th style="width: 50%;">Cage ID</th>

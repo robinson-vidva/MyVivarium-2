@@ -317,27 +317,31 @@ mysqli_close($con);
         .hero-section {
             background: linear-gradient(135deg, #343a40 0%, #1a1d21 100%);
             color: #ffffff;
-            padding: 50px 0;
+            padding: 60px 0;
         }
 
         .hero-section h1 {
             font-family: 'Poppins', sans-serif;
             font-weight: 600;
             font-size: 2rem;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .hero-section .lead {
-            opacity: 0.85;
-            font-size: 1.05rem;
-            margin-bottom: 30px;
+            opacity: 0.75;
+            font-size: 1rem;
+            margin-bottom: 35px;
         }
 
         .feature-item {
             display: flex;
             align-items: flex-start;
             gap: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 22px;
+        }
+
+        .feature-item:last-child {
+            margin-bottom: 0;
         }
 
         .feature-item .feature-icon {
@@ -371,7 +375,7 @@ mysqli_close($con);
             background: #ffffff;
             color: #212529;
             border-radius: 12px;
-            padding: 30px;
+            padding: 32px;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         }
 
@@ -379,6 +383,7 @@ mysqli_close($con);
             font-family: 'Poppins', sans-serif;
             font-weight: 600;
             margin-bottom: 20px;
+            text-align: center;
         }
 
         .login-card .form-label {
@@ -393,19 +398,33 @@ mysqli_close($con);
 
         .login-card .btn-primary {
             border-radius: 8px;
-            padding: 10px 24px;
+            padding: 12px 24px;
             font-weight: 500;
+            font-size: 1rem;
         }
 
-        .login-card .btn-outline-secondary {
-            border-radius: 8px;
-            padding: 10px 24px;
+        .login-card .login-divider {
+            border-top: 1px solid #dee2e6;
+            margin-top: 16px;
+            padding-top: 14px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .login-card .login-divider a {
+            color: #0d6efd;
             font-weight: 500;
+            text-decoration: none;
+        }
+
+        .login-card .login-divider a:hover {
+            text-decoration: underline;
         }
 
         /* Carousel Section */
         .carousel-section {
-            padding: 40px 0;
+            padding: 30px 0 40px;
             background-color: #f8f9fa;
         }
 
@@ -463,9 +482,9 @@ mysqli_close($con);
     <!-- Hero Section: Features + Login -->
     <div class="hero-section">
         <div class="container" style="max-width: 900px;">
-            <div class="row align-items-center">
+            <div class="row align-items-center justify-content-between">
                 <!-- Left Column: Welcome + Features -->
-                <div class="col-lg-7 mb-4 mb-lg-0">
+                <div class="col-lg-6 mb-4 mb-lg-0">
                     <h1>Welcome to the <?php echo htmlspecialchars($labName); ?></h1>
                     <p class="lead">Elevate Your Research with IoT-Enhanced Colony Management</p>
 
@@ -501,7 +520,7 @@ mysqli_close($con);
                 </div>
 
                 <!-- Right Column: Login Card -->
-                <div class="col-lg-5">
+                <div class="col-lg-5 col-md-8 col-sm-10 mx-lg-0 mx-auto">
                     <div class="login-card">
                         <h3>Login</h3>
                         <?php if (isset($_SESSION['error_message'])) { ?>
@@ -533,14 +552,16 @@ mysqli_close($con);
                                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
                             <?php } ?>
 
-                            <div class="d-grid gap-2 mb-3">
+                            <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary" name="login">Login</button>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-center mt-2">
                                 <a href="forgot_password.php" class="text-muted small">Forgot Password?</a>
-                                <a href="register.php" class="btn btn-outline-secondary btn-sm">Create Account</a>
                             </div>
                         </form>
+                        <div class="login-divider">
+                            Don't have an account? <a href="register.php">Register</a>
+                        </div>
                     </div>
                     <?php if ($demo === "yes") include('demo/demo-credentials.php'); ?>
                 </div>

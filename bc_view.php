@@ -443,7 +443,7 @@ require 'header.php';
             </div>
 
             <div class="table-wrapper">
-                <table class="table table-bordered" id="mouseTable">
+                <table class="table" id="mouseTable">
                     <tr>
                         <th>Cage #:</th>
                         <td><?= htmlspecialchars($breedingcage['cage_id']); ?></td>
@@ -544,7 +544,7 @@ require 'header.php';
 
                     <?php while ($litter = mysqli_fetch_assoc($litters)) : ?>
                         <div class="table-wrapper">
-                            <table class="table table-bordered">
+                            <table class="table">
                                 <tbody>
                                     <tr>
                                         <th>DOM</th>
