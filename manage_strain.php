@@ -150,6 +150,7 @@ $strainResult = $con->query($strainQuery);
             table-layout: auto;
         }
 
+        /* ID column */
         .table th:nth-child(1),
         .table td:nth-child(1) {
             width: 80px;
@@ -157,23 +158,17 @@ $strainResult = $con->query($strainQuery);
             white-space: nowrap;
         }
 
+        /* RRID column */
         .table th:nth-child(3),
         .table td:nth-child(3) {
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            width: 160px;
             white-space: nowrap;
+            font-size: 0.85rem;
         }
 
+        /* Actions column */
         .table th:nth-child(4),
         .table td:nth-child(4) {
-            width: 140px;
-            white-space: nowrap;
-            font-size: 0.82rem;
-        }
-
-        .table th:nth-child(5),
-        .table td:nth-child(5) {
             width: 140px;
         }
 
@@ -331,7 +326,6 @@ $strainResult = $con->query($strainQuery);
                 <tr>
                     <th>ID</th>
                     <th>Name</th>
-                    <th>URL</th>
                     <th>RRID</th>
                     <th>Actions</th>
                 </tr>
@@ -341,7 +335,6 @@ $strainResult = $con->query($strainQuery);
                     <tr>
                         <td data-label="ID"><?= htmlspecialchars($row['str_id']); ?></td>
                         <td data-label="Name"><?= htmlspecialchars($row['str_name']); ?></td>
-                        <td data-label="URL"><a href="<?= htmlspecialchars($row['str_url']); ?>" target="_blank"><?= htmlspecialchars($row['str_url']); ?></a></td>
                         <td data-label="RRID"><?= htmlspecialchars($row['str_rrid']); ?></td>
                         <td data-label="Actions" class="table-actions">
                             <div class="action-buttons">
