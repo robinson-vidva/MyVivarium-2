@@ -17,15 +17,13 @@
  * DEPLOYMENT NOTES:
  *
  * FOR PRODUCTION (HTTPS REQUIRED):
- * - Ensure your site runs on HTTPS before enabling session.cookie_secure
+ * - Ensure your site runs on HTTPS before enabling 'secure' => true
  * - All security features will be active
  * - To use: Replace session_start() with: require 'session_config.php';
  *
  * FOR DEVELOPMENT (HTTP):
- * - Comment out the session.cookie_secure line (line 26) if using HTTP
+ * - Change 'secure' => true to 'secure' => false if using HTTP
  * - Otherwise sessions will not work without HTTPS
- * - Change: ini_set('session.cookie_secure', 1);
- * - To:     // ini_set('session.cookie_secure', 1);  // DISABLED FOR HTTP DEVELOPMENT
  *
  * USAGE:
  * Replace all instances of session_start() with:
@@ -35,19 +33,22 @@
  *
  */
 
-// Configure session cookie parameters for security
-ini_set('session.cookie_httponly', 1);  // Prevent JavaScript access to session cookie (XSS protection)
-ini_set('session.cookie_secure', 1);    // Only send cookie over HTTPS connections (COMMENT OUT FOR HTTP DEV)
-ini_set('session.cookie_samesite', 'Strict'); // Prevent CSRF attacks
-ini_set('session.use_only_cookies', 1); // Only use cookies for session ID
-ini_set('session.use_strict_mode', 1);  // Reject uninitialized session IDs
-
-// Set session timeout to 30 minutes of inactivity
-ini_set('session.gc_maxlifetime', 1800); // 30 minutes in seconds
-ini_set('session.cookie_lifetime', 1800); // Cookie expires after 30 minutes
-
-// Start session if not already started
+// Only configure and start session if one is not already active
 if (session_status() === PHP_SESSION_NONE) {
+    // Configure session cookie parameters (must be set BEFORE session_start)
+    session_set_cookie_params([
+        'lifetime' => 1800,           // Cookie expires after 30 minutes
+        'path'     => '/',
+        'secure'   => true,           // Only send cookie over HTTPS (set to false for HTTP dev)
+        'httponly'  => true,           // Prevent JavaScript access to session cookie (XSS protection)
+        'samesite'  => 'Strict'       // Prevent CSRF attacks
+    ]);
+
+    // Configure session behavior
+    ini_set('session.use_only_cookies', 1);  // Only use cookies for session ID
+    ini_set('session.use_strict_mode', 1);   // Reject uninitialized session IDs
+    ini_set('session.gc_maxlifetime', 1800); // 30 minutes garbage collection lifetime
+
     session_start();
 }
 
@@ -68,5 +69,3 @@ if (!isset($_SESSION['CREATED'])) {
     session_regenerate_id(true);    // Change session ID and delete old session
     $_SESSION['CREATED'] = time();  // Update creation time
 }
-
-?>
