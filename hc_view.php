@@ -344,6 +344,65 @@ require 'header.php';
             z-index: 999;
         }
     </style>
+
+    <script>
+        function showQrCodePopup(cageId) {
+            var baseUrl = <?php echo json_encode($url); ?>;
+            var pageUrl = 'https://' + baseUrl + '/hc_view.php?id=' + encodeURIComponent(cageId);
+            var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(pageUrl);
+
+            document.getElementById('qrTitle').textContent = 'QR Code for Cage ' + cageId;
+            document.getElementById('qrImage').src = qrUrl;
+            document.getElementById('qrOverlay').style.display = 'block';
+            document.getElementById('qrForm').style.display = 'block';
+        }
+
+        function closeQrCodePopup() {
+            document.getElementById('qrOverlay').style.display = 'none';
+            document.getElementById('qrForm').style.display = 'none';
+        }
+
+        function goBack() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const page = urlParams.get('page') || 1;
+            const search = urlParams.get('search') || '';
+            window.location.href = 'hc_dash.php?page=' + page + '&search=' + encodeURIComponent(search);
+        }
+
+        function viewStrainDetails(id, name, aka, url, rrid, notes) {
+            document.getElementById('view_strain_id').textContent = id;
+            document.getElementById('view_strain_name').textContent = name;
+            document.getElementById('view_strain_aka').textContent = aka;
+            document.getElementById('view_strain_url').textContent = url;
+            document.getElementById('view_strain_rrid').textContent = rrid;
+            var notesEl = document.getElementById('view_strain_notes');
+            notesEl.textContent = '';
+            notes.split('\n').forEach(function(line, i) {
+                if (i > 0) notesEl.appendChild(document.createElement('br'));
+                notesEl.appendChild(document.createTextNode(line));
+            });
+            document.getElementById('viewPopupOverlay').style.display = 'block';
+            document.getElementById('viewPopupForm').style.display = 'block';
+            document.getElementById('view_strain_url').href = url;
+        }
+
+        function closeViewForm() {
+            document.getElementById('viewPopupOverlay').style.display = 'none';
+            document.getElementById('viewPopupForm').style.display = 'none';
+        }
+
+        function openTransferModal(dbId, mouseId) {
+            document.getElementById('transfer_mouse_db_id').value = dbId;
+            document.getElementById('transfer_mouse_id_display').textContent = mouseId;
+            document.getElementById('transferOverlay').style.display = 'block';
+            document.getElementById('transferForm').style.display = 'block';
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferOverlay').style.display = 'none';
+            document.getElementById('transferForm').style.display = 'none';
+        }
+    </script>
     <!-- Font Awesome loaded via header.php -->
 </head>
 
@@ -648,64 +707,6 @@ require 'header.php';
     </div>
 
     <script>
-        function showQrCodePopup(cageId) {
-            var baseUrl = <?php echo json_encode($url); ?>;
-            var pageUrl = 'https://' + baseUrl + '/hc_view.php?id=' + encodeURIComponent(cageId);
-            var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(pageUrl);
-
-            document.getElementById('qrTitle').textContent = 'QR Code for Cage ' + cageId;
-            document.getElementById('qrImage').src = qrUrl;
-            document.getElementById('qrOverlay').style.display = 'block';
-            document.getElementById('qrForm').style.display = 'block';
-        }
-
-        function closeQrCodePopup() {
-            document.getElementById('qrOverlay').style.display = 'none';
-            document.getElementById('qrForm').style.display = 'none';
-        }
-
-        function goBack() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const page = urlParams.get('page') || 1;
-            const search = urlParams.get('search') || '';
-            window.location.href = 'hc_dash.php?page=' + page + '&search=' + encodeURIComponent(search);
-        }
-
-        function viewStrainDetails(id, name, aka, url, rrid, notes) {
-            document.getElementById('view_strain_id').textContent = id;
-            document.getElementById('view_strain_name').textContent = name;
-            document.getElementById('view_strain_aka').textContent = aka;
-            document.getElementById('view_strain_url').textContent = url;
-            document.getElementById('view_strain_rrid').textContent = rrid;
-            // Safely render notes with line breaks
-            var notesEl = document.getElementById('view_strain_notes');
-            notesEl.textContent = '';
-            notes.split('\n').forEach(function(line, i) {
-                if (i > 0) notesEl.appendChild(document.createElement('br'));
-                notesEl.appendChild(document.createTextNode(line));
-            });
-            document.getElementById('viewPopupOverlay').style.display = 'block';
-            document.getElementById('viewPopupForm').style.display = 'block';
-            document.getElementById('view_strain_url').href = url;
-        }
-
-        function closeViewForm() {
-            document.getElementById('viewPopupOverlay').style.display = 'none';
-            document.getElementById('viewPopupForm').style.display = 'none';
-        }
-
-        function openTransferModal(dbId, mouseId) {
-            document.getElementById('transfer_mouse_db_id').value = dbId;
-            document.getElementById('transfer_mouse_id_display').textContent = mouseId;
-            document.getElementById('transferOverlay').style.display = 'block';
-            document.getElementById('transferForm').style.display = 'block';
-        }
-
-        function closeTransferModal() {
-            document.getElementById('transferOverlay').style.display = 'none';
-            document.getElementById('transferForm').style.display = 'none';
-        }
-
         // Information Completeness Calculation
         document.addEventListener('DOMContentLoaded', function() {
             const fields = {
