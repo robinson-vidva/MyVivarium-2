@@ -126,7 +126,7 @@ require 'header.php';
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             border-radius: 5px;
             background-color: var(--bs-tertiary-bg);
         }
@@ -135,27 +135,13 @@ require 'header.php';
             margin-bottom: 15px;
         }
 
-        .btn1 {
+        .btn-profile {
             display: block;
             width: 100%;
             padding: 10px;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-
-        .btn1:hover {
-            background-color: #0056b3;
-        }
-
-        .update-message {
-            text-align: center;
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #dff0d8;
-            border: 1px solid #3c763d;
-            color: #3c763d;
-            border-radius: 5px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
         }
     </style>
 </head>
@@ -219,10 +205,10 @@ require 'header.php';
                 <label for="cf-turnstile-secretKey">Cloudflare Turnstile Secret Key</label>
                 <input type="password" class="form-control" id="cf-turnstile-secretKey" name="cf-turnstile-secretKey" value="<?php echo htmlspecialchars($labData['cf-turnstile-secretKey']); ?>">
             </div>
-            <button type="submit" class="btn1 btn-primary" name="update_lab">Update Lab Information</button>
+            <button type="submit" class="btn btn-primary btn-profile" name="update_lab">Update Lab Information</button>
         </form>
         <?php if ($updateMessage) {
-            echo "<p class='update-message'>$updateMessage</p>";
+            echo "<div class='alert alert-success text-center'>" . htmlspecialchars($updateMessage) . "</div>";
         } ?>
     </div>
 
