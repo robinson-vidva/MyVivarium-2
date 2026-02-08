@@ -138,20 +138,43 @@ $strainResult = $con->query($strainQuery);
             z-index: 999;
         }
 
-        /* Button and Form Layout */
-        .table-actions,
-        .action-buttons,
+        /* Form Layout */
         .form-buttons {
             display: flex;
             gap: 10px;
-        }
-
-        .table-actions {
-            justify-content: flex-start;
-        }
-
-        .form-buttons {
             justify-content: space-between;
+        }
+
+        /* Table column widths */
+        .table {
+            table-layout: auto;
+        }
+
+        .table th:nth-child(1),
+        .table td:nth-child(1) {
+            width: 80px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .table th:nth-child(3),
+        .table td:nth-child(3) {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .table th:nth-child(4),
+        .table td:nth-child(4) {
+            width: 140px;
+            white-space: nowrap;
+            font-size: 0.82rem;
+        }
+
+        .table th:nth-child(5),
+        .table td:nth-child(5) {
+            width: 140px;
         }
 
         .add-button {
