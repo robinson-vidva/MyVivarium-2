@@ -273,7 +273,7 @@ require 'header.php';
             border-bottom: 1px solid var(--bs-border-color);
         }
 
-        .section-header i {
+        .section-header > i {
             font-size: 1.1rem;
             color: var(--bs-primary);
             width: 22px;
