@@ -344,6 +344,8 @@ require 'header.php';
             border-radius: 10px;
             width: 80%;
             max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .popup-overlay {
@@ -646,9 +648,12 @@ require 'header.php';
     <?php include 'footer.php'; ?>
 
     <!-- Popup form for viewing strain details -->
-    <div class="popup-overlay" id="viewPopupOverlay"></div>
+    <div class="popup-overlay" id="viewPopupOverlay" onclick="closeViewForm()"></div>
     <div class="popup-form" id="viewPopupForm">
-        <h4 id="viewFormTitle">Strain Details</h4>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 id="viewFormTitle" class="mb-0">Strain Details</h4>
+            <button type="button" class="btn-close" onclick="closeViewForm()" aria-label="Close"></button>
+        </div>
         <div class="form-group">
             <strong for="view_strain_id">Strain ID:</strong>
             <p id="view_strain_id"></p>
@@ -681,16 +686,22 @@ require 'header.php';
     <!-- QR Code Modal -->
     <div class="popup-overlay" id="qrOverlay" onclick="closeQrCodePopup()"></div>
     <div class="popup-form" id="qrForm" style="max-width: 400px; text-align: center;">
-        <h4 id="qrTitle">QR Code</h4>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 id="qrTitle" class="mb-0">QR Code</h4>
+            <button type="button" class="btn-close" onclick="closeQrCodePopup()" aria-label="Close"></button>
+        </div>
         <img id="qrImage" src="" alt="QR Code" style="margin: 15px 0; max-width: 200px;">
         <br>
         <button type="button" class="btn btn-secondary" onclick="closeQrCodePopup()">Close</button>
     </div>
 
     <!-- Mouse Transfer Modal -->
-    <div class="popup-overlay" id="transferOverlay"></div>
+    <div class="popup-overlay" id="transferOverlay" onclick="closeTransferModal()"></div>
     <div class="popup-form" id="transferForm" style="max-width: 500px;">
-        <h4>Transfer Mouse</h4>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Transfer Mouse</h4>
+            <button type="button" class="btn-close" onclick="closeTransferModal()" aria-label="Close"></button>
+        </div>
         <form method="POST" action="mouse_transfer.php">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
             <input type="hidden" id="transfer_mouse_db_id" name="mouse_db_id">
@@ -701,23 +712,33 @@ require 'header.php';
             </div>
             <div class="mb-3">
                 <label for="target_cage_id" class="form-label"><strong>Transfer to Cage:</strong></label>
-                <select class="form-control" id="target_cage_id" name="target_cage_id" required>
-                    <option value="">Select Target Cage</option>
-                    <?php
-                    $targetCageQuery = "SELECT h.cage_id FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = 'active' AND h.cage_id != ? ORDER BY h.cage_id";
-                    $targetStmt = $con->prepare($targetCageQuery);
-                    $targetStmt->bind_param("s", $id);
-                    $targetStmt->execute();
-                    $targetResult = $targetStmt->get_result();
-                    while ($targetRow = $targetResult->fetch_assoc()) {
-                        echo '<option value="' . htmlspecialchars($targetRow['cage_id']) . '">' . htmlspecialchars($targetRow['cage_id']) . '</option>';
-                    }
-                    $targetStmt->close();
-                    ?>
-                </select>
+                <?php
+                $targetCageQuery = "SELECT cage_id FROM cages WHERE status = 'active' AND cage_id != ? ORDER BY cage_id";
+                $targetStmt = $con->prepare($targetCageQuery);
+                $targetStmt->bind_param("s", $id);
+                $targetStmt->execute();
+                $targetResult = $targetStmt->get_result();
+                $targetCages = [];
+                while ($targetRow = $targetResult->fetch_assoc()) {
+                    $targetCages[] = $targetRow['cage_id'];
+                }
+                $targetStmt->close();
+                ?>
+                <?php if (!empty($targetCages)) : ?>
+                    <select class="form-control" id="target_cage_id" name="target_cage_id" required>
+                        <option value="">Select Target Cage</option>
+                        <?php foreach ($targetCages as $cageId) : ?>
+                            <option value="<?= htmlspecialchars($cageId); ?>"><?= htmlspecialchars($cageId); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php else : ?>
+                    <div class="alert alert-warning mb-0">No other active cages available for transfer.</div>
+                <?php endif; ?>
             </div>
-            <div class="form-buttons">
-                <button type="submit" class="btn btn-primary">Transfer</button>
+            <div class="d-flex gap-2">
+                <?php if (!empty($targetCages)) : ?>
+                    <button type="submit" class="btn btn-primary">Transfer</button>
+                <?php endif; ?>
                 <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
             </div>
         </form>
