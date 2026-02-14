@@ -244,11 +244,6 @@ require 'header.php';
     <title>View Holding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
     <style>
-        body {
-            background: none !important;
-            background-color: transparent !important;
-        }
-
         .container {
             max-width: 900px;
             padding: 20px 15px;
@@ -325,14 +320,6 @@ require 'header.php';
         .details-table tr:last-child th,
         .details-table tr:last-child td {
             border-bottom: none;
-        }
-
-        /* Mouse section heading */
-        .mouse-heading {
-            font-size: 1rem;
-            font-weight: 600;
-            margin: 20px 0 10px;
-            color: var(--bs-body-color);
         }
 
         /* Note app */
@@ -540,25 +527,24 @@ require 'header.php';
         </div>
 
         <!-- Mice Section -->
-        <?php if (!empty($mice)) : ?>
-            <div class="section-card">
-                <div class="section-header">
-                    <i class="fas fa-paw"></i>
-                    <h5>Mice (<?= count($mice); ?>)</h5>
-                </div>
-                <?php foreach ($mice as $index => $mouse) : ?>
-                    <h6 class="mouse-heading">Mouse #<?= $index + 1; ?></h6>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Mouse ID</th>
-                                    <th>Genotype</th>
-                                    <th>Notes</th>
-                                    <th style="width: 80px;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-paw"></i>
+                <h5>Mice (<?= count($mice); ?>)</h5>
+            </div>
+            <?php if (!empty($mice)) : ?>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Mouse ID</th>
+                                <th>Genotype</th>
+                                <th>Notes</th>
+                                <th style="width: 80px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($mice as $mouse) : ?>
                                 <tr>
                                     <td><?= htmlspecialchars($mouse['mouse_id']); ?></td>
                                     <td><?= htmlspecialchars($mouse['genotype']); ?></td>
@@ -571,12 +557,14 @@ require 'header.php';
                                         </div>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else : ?>
+                <p class="text-muted mb-0">No mice records found for this cage.</p>
+            <?php endif; ?>
+        </div>
 
         <!-- Files Section -->
         <div class="section-card">
@@ -669,29 +657,29 @@ require 'header.php';
             <h4 id="viewFormTitle" class="mb-0">Strain Details</h4>
             <button type="button" class="btn-close" onclick="closeViewForm()" aria-label="Close"></button>
         </div>
-        <div class="form-group">
-            <strong for="view_strain_id">Strain ID:</strong>
-            <p id="view_strain_id"></p>
+        <div class="mb-3">
+            <strong>Strain ID:</strong>
+            <p id="view_strain_id" class="mb-0"></p>
         </div>
-        <div class="form-group">
-            <strong for="view_strain_name">Strain Name:</strong>
-            <p id="view_strain_name"></p>
+        <div class="mb-3">
+            <strong>Strain Name:</strong>
+            <p id="view_strain_name" class="mb-0"></p>
         </div>
-        <div class="form-group">
-            <strong for="view_strain_aka">Common Names:</strong>
-            <p id="view_strain_aka"></p>
+        <div class="mb-3">
+            <strong>Common Names:</strong>
+            <p id="view_strain_aka" class="mb-0"></p>
         </div>
-        <div class="form-group">
-            <strong for="view_strain_url">Strain URL:</strong>
-            <p><a href="#" id="view_strain_url" target="_blank"></a></p>
+        <div class="mb-3">
+            <strong>Strain URL:</strong>
+            <p class="mb-0"><a href="#" id="view_strain_url" target="_blank"></a></p>
         </div>
-        <div class="form-group">
-            <strong for="view_strain_rrid">Strain RRID:</strong>
-            <p id="view_strain_rrid"></p>
+        <div class="mb-3">
+            <strong>Strain RRID:</strong>
+            <p id="view_strain_rrid" class="mb-0"></p>
         </div>
-        <div class="form-group">
-            <strong for="view_strain_notes">Notes:</strong>
-            <p id="view_strain_notes"></p>
+        <div class="mb-3">
+            <strong>Notes:</strong>
+            <p id="view_strain_notes" class="mb-0"></p>
         </div>
         <div class="form-buttons">
             <button type="button" class="btn btn-secondary" onclick="closeViewForm()">Close</button>
