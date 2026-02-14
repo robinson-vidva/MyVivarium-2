@@ -326,9 +326,10 @@ ob_end_flush(); // Flush the output buffer
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
             width: 80%;
             max-width: 800px;
             overflow-y: auto;
@@ -387,7 +388,7 @@ ob_end_flush(); // Flush the output buffer
         }
 
         .form-control[readonly] {
-            background-color: #e9ecef;
+            background-color: var(--bs-tertiary-bg);
             cursor: not-allowed;
         }
 
@@ -439,7 +440,7 @@ ob_end_flush(); // Flush the output buffer
             .table tbody tr {
                 display: block;
                 margin-bottom: 15px;
-                border-bottom: 1px solid #dee2e6;
+                border-bottom: 1px solid var(--bs-border-color);
                 padding-bottom: 15px;
             }
 

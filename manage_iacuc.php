@@ -156,9 +156,12 @@ $iacucResult = $con->query($iacucQuery);
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 2px solid #000;
+            border: 1px solid var(--bs-border-color);
             z-index: 1000;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            max-height: 90vh;
+            overflow-y: auto;
             width: 80%;
             max-width: 800px;
         }
@@ -229,7 +232,7 @@ $iacucResult = $con->query($iacucQuery);
                 display: flex;
                 justify-content: space-between;
                 padding: 10px;
-                border: 1px solid #dee2e6;
+                border: 1px solid var(--bs-border-color);
             }
 
             .table td::before {
