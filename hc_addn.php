@@ -305,7 +305,7 @@ require 'header.php';
         }
 
         .warning-text {
-            color: #dc3545;
+            color: var(--bs-danger);
             font-size: 14px;
         }
 

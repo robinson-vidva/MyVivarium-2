@@ -294,15 +294,15 @@ $iacucResult = $con->query($iacucQuery);
             <h4 id="formTitle">Add New IACUC</h4>
             <form action="manage_iacuc.php" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="iacuc_id">IACUC ID <span class="required-asterisk">*</span></label>
                     <input type="text" name="iacuc_id" id="iacuc_id" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="iacuc_title">Title <span class="required-asterisk">*</span></label>
                     <input type="text" name="iacuc_title" id="iacuc_title" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="iacuc_file">Upload File</label>
                     <input type="file" name="iacuc_file" id="iacuc_file" class="form-control">
                     <div id="existingFile" style="margin-top: 10px;"></div>

@@ -35,14 +35,16 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - **Column Sorting** -- Sort cage lists by cage ID in ascending or descending order
 - **Location Tracking** -- Room and rack fields on all cage types
 - **Genotype Fields** -- Track genotype on holding cages and male/female genotype on breeding cages
+- **Parent Cage Tracking** -- Track male and female source/parent cage on breeding cages
 - **Flexible Cage Creation** -- Only cage ID is required; all other fields are optional
 - **Custom Strains** -- "None / Not Applicable" and "Custom" strain options with free-text input
 - **Vivarium Manager Role** -- Dedicated role with maintenance notes oversight across all cages
 - **Activity/Audit Log** -- Track who changed what and when (create, edit, archive, restore, delete, rename, transfer, role changes)
-- **Cage Lineage View** -- Visual tree showing parent-child cage relationships across breeding and holding cages
+- **Cage Lineage View** -- Visual tree with searchable Select2 dropdown for cage selection
 - **Date Range Filters** -- Filter maintenance notes by date range with From/To date inputs
-- **Dark Mode** -- Toggle between light and dark themes (Bootstrap 5.3 native, preference saved in localStorage)
+- **Dark Mode** -- Full dark mode support across all pages using Bootstrap 5.3 CSS variables (preference saved in localStorage)
 - **Dashboard Stats** -- Home page shows active vs. archived cage counts
+- **Archive Workflow** -- Intuitive Restore and Delete Forever buttons on archived cages with double confirmation for permanent deletion
 
 ### Security Improvements
 - SQL injection fixes (prepared statements throughout)
@@ -55,6 +57,16 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - CLI-only guard on `process_reminders.php`
 - Standardized on Bootstrap 5.3.3 (removed all Bootstrap 4 conflicts)
 
+### UI/UX Improvements
+- Replaced all hardcoded CSS colors with Bootstrap CSS variables for consistent dark mode
+- Migrated from Bootstrap 4 `.form-group` class to Bootstrap 5 `mb-3` utility
+- Button tooltips on dashboard action buttons (View, Tasks, Edit, Archive, Restore, Delete Forever)
+- Tooltips properly initialize on dynamically loaded AJAX content
+- Section cards with consistent styling across all view pages
+- Consistent action button sizing (34x34px) across all tables
+- Footer positioning fix (no longer overlaps content on long pages)
+- Dark mode support for Select2 dropdowns, form controls, alerts, and modals
+
 ### Bug Fixes
 - Fixed broken cage permission checks (now uses `cage_users` junction table)
 - Fixed login error messages not displaying
@@ -62,6 +74,7 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - Prevented username enumeration on login
 - Fixed premature `</body></html>` in header.php
 - Added search debounce (300ms) to prevent excessive AJAX requests
+- Fixed footer rendering in middle of page content (changed `height: 100%` to `min-height: 100vh`)
 
 ## Features
 - User registration and login with email verification
@@ -221,7 +234,10 @@ This will prompt for source/destination database credentials, create automatic b
 | Location fields | Adds `room` and `rack` to cages |
 | Genotype (holding) | Adds `genotype` to holding table |
 | Genotype (breeding) | Adds `male_genotype` and `female_genotype` to breeding table |
+| Parent cage (breeding) | Adds `male_parent_cage` and `female_parent_cage` to breeding table |
 | Optional fields | Makes DOB, parent cage, cross, male/female IDs nullable |
+
+> **Note**: If upgrading from an earlier v2 install, also run `database/migrate_add_parent_cage.sql` to add the parent cage columns.
 
 See `database/README.md` for full migration details.
 
@@ -343,6 +359,7 @@ See `database/README.md` for full migration details.
 | `database/schema.sql` | Full v2 database schema (use for fresh installs) |
 | `database/migrate_v1_to_v2.sql` | In-place SQL migration from v1 to v2 |
 | `database/migrate_v1_to_v2.sh` | Interactive shell migration script |
+| `database/migrate_add_parent_cage.sql` | Adds male/female parent cage columns to breeding table |
 | `database/README.md` | Detailed migration documentation |
 
 ## Demo Website

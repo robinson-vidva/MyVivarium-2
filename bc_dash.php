@@ -96,6 +96,11 @@ require 'header.php';
                             document.getElementById('paginationLinks').innerHTML = response.paginationLinks;
                             document.getElementById('searchInput').value = search;
 
+                            // Re-initialize tooltips on dynamically loaded content
+                            document.querySelectorAll('#tableBody [data-bs-toggle="tooltip"]').forEach(function(el) {
+                                new bootstrap.Tooltip(el);
+                            });
+
                             // Update the URL with all current parameters
                             const newUrl = new URL(window.location.href);
                             newUrl.searchParams.set('page', page);

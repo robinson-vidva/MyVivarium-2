@@ -251,7 +251,7 @@ ob_end_flush(); // Flush the output buffer
                 padding-right: 10px;
                 white-space: nowrap;
                 font-weight: bold;
-                color: #343a40;
+                color: var(--bs-body-color);
                 text-align: left;
             }
 
@@ -306,7 +306,7 @@ ob_end_flush(); // Flush the output buffer
             max-height: 90vh;
         }
 
-        #viewPopupForm .form-group {
+        #viewPopupForm .mb-3 {
             margin-bottom: 15px;
         }
 
@@ -345,17 +345,17 @@ ob_end_flush(); // Flush the output buffer
             <form id="reminderForm" action="manage_reminder.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <input type="hidden" name="id" id="id">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="title">Title <span class="required-asterisk">*</span></label>
                     <input type="text" name="title" id="title" class="form-control" maxlength="100" required>
                     <small id="titleCounter" class="form-text text-muted">0/100 characters used</small>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="description">Description <span class="required-asterisk">*</span></label>
                     <textarea name="description" id="description" class="form-control" rows="3" maxlength="500" required></textarea>
                     <small id="descriptionCounter" class="form-text text-muted">0/500 characters used</small>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="assigned_to">Assigned To <span class="required-asterisk">*</span></label>
                     <select name="assigned_to[]" id="assigned_to" class="form-control" multiple required>
                         <?php foreach ($users as $userId => $name) : ?>
@@ -363,7 +363,7 @@ ob_end_flush(); // Flush the output buffer
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label>Recurrence Type <span class="required-asterisk">*</span></label>
                     <select name="recurrence_type" id="recurrence_type" class="form-control" required>
                         <option value="daily">Daily</option>
@@ -371,7 +371,7 @@ ob_end_flush(); // Flush the output buffer
                         <option value="monthly">Monthly</option>
                     </select>
                 </div>
-                <div class="form-group" id="weeklyOptions" style="display: none;">
+                <div class="mb-3" id="weeklyOptions" style="display: none;">
                     <label for="day_of_week">Day of the Week <span class="required-asterisk">*</span></label>
                     <select name="day_of_week" id="day_of_week" class="form-control">
                         <option value="">Select Day</option>
@@ -384,22 +384,22 @@ ob_end_flush(); // Flush the output buffer
                         <option value="Sunday">Sunday</option>
                     </select>
                 </div>
-                <div class="form-group" id="monthlyOptions" style="display: none;">
+                <div class="mb-3" id="monthlyOptions" style="display: none;">
                     <label for="day_of_month">Day of the Month (1-28) <span class="required-asterisk">*</span></label>
                     <input type="number" name="day_of_month" id="day_of_month" class="form-control" min="1" max="28">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="time_of_day">Time of Day <span class="required-asterisk">*</span></label>
                     <input type="time" name="time_of_day" id="time_of_day" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label>Status <span class="required-asterisk">*</span></label>
                     <select name="status" id="status" class="form-control" required>
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="cage_id">Cage ID</label>
                     <select name="cage_id" id="cage_id" class="form-control">
                         <option value="">Select Cage</option>
@@ -420,31 +420,31 @@ ob_end_flush(); // Flush the output buffer
         <div class="popup-overlay" id="viewPopupOverlay"></div>
         <div class="popup-form" id="viewPopupForm">
             <h4>View Reminder Details</h4>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Title:</label>
                 <p id="viewTitle"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Description:</label>
                 <p id="viewDescription"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Assigned To:</label>
                 <p id="viewAssignedTo"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Recurrence Type:</label>
                 <p id="viewRecurrenceType"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Time of Day:</label>
                 <p id="viewTimeOfDay"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Status:</label>
                 <p id="viewStatus"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Cage ID:</label>
                 <p id="viewCageId"></p>
             </div>
