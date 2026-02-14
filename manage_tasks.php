@@ -479,15 +479,7 @@ ob_end_flush(); // Flush the output buffer
             padding-left: 0 !important;
         }
 
-        .form-control {
-            border-top-right-radius: 0;
-            border-bottom-right-radius: 0;
-        }
-
-        .btn-primary {
-            border-top-left-radius: 0;
-            border-bottom-left-radius: 0;
-        }
+        /* Search row uses g-2 grid - no border radius overrides needed */
     </style>
 </head>
 
@@ -522,21 +514,31 @@ ob_end_flush(); // Flush the output buffer
 
         <!-- Search form -->
         <form method="GET" class="mb-4">
-            <div class="row">
-                <div class="col-10 pr-0">
+            <?php if ($cageIdFilter): ?>
+                <input type="hidden" name="id" value="<?= htmlspecialchars($cageIdFilter); ?>">
+            <?php endif; ?>
+            <div class="row g-2">
+                <div class="col">
                     <input type="text" name="search" class="form-control" placeholder="Search tasks..." value="<?= htmlspecialchars($search); ?>">
                 </div>
-                <div class="col-2 pl-0">
-                    <button type="submit" class="btn btn-primary w-100">Search</button>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Search</button>
                 </div>
+                <?php if ($search || $filter): ?>
+                    <div class="col-auto">
+                        <a href="manage_tasks.php<?= $cageIdFilter ? '?id=' . urlencode($cageIdFilter) : ''; ?>" class="btn btn-outline-secondary"><i class="fas fa-times"></i> Clear</a>
+                    </div>
+                <?php endif; ?>
             </div>
-            <div class="form-check form-check-inline mt-2">
-                <input class="form-check-input" type="radio" name="filter" id="assignedByMe" value="assigned_by_me" <?= $filter == 'assigned_by_me' ? 'checked' : ''; ?>>
-                <label class="form-check-label" for="assignedByMe">Assigned by Me</label>
-            </div>
-            <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="filter" id="assignedToMe" value="assigned_to_me" <?= $filter == 'assigned_to_me' ? 'checked' : ''; ?>>
-                <label class="form-check-label" for="assignedToMe">Assigned to Me</label>
+            <div class="mt-2">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="filter" id="assignedByMe" value="assigned_by_me" <?= $filter == 'assigned_by_me' ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="assignedByMe">Assigned by Me</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="filter" id="assignedToMe" value="assigned_to_me" <?= $filter == 'assigned_to_me' ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="assignedToMe">Assigned to Me</label>
+                </div>
             </div>
         </form>
 
@@ -702,7 +704,8 @@ ob_end_flush(); // Flush the output buffer
         $(document).ready(function() {
             $('#assigned_to').select2({
                 placeholder: "Select users",
-                allowClear: true
+                allowClear: true,
+                dropdownParent: $('#popupForm')
             });
 
             // Ensure the form closes when clicking outside
