@@ -113,8 +113,8 @@ while ($row = mysqli_fetch_assoc($result)) {
             $firstRow = false;
         }
         $tableRows .= '<td class="action-icons" style="white-space: nowrap;">
-                        <a href="hc_view.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View Cage"><i class="fas fa-eye"></i></a>
-                        <a href="manage_tasks.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks"><i class="fas fa-tasks"></i></a>';
+                        <a href="hc_view.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View"><i class="fas fa-eye"></i></a>
+                        <a href="manage_tasks.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Tasks"><i class="fas fa-tasks"></i></a>';
 
         // Check if the user is an admin or assigned to this cage via cage_users table
         $assignedCheck = $con->prepare("SELECT 1 FROM cage_users WHERE cage_id = ? AND user_id = ?");
@@ -125,12 +125,12 @@ while ($row = mysqli_fetch_assoc($result)) {
         if ($userRole === 'admin' || $isAssigned) {
             if ($showArchived) {
                 // Archived view: show Restore and Permanently Delete buttons
-                $tableRows .= '<a href="#" onclick="confirmRestore(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Restore Cage"><i class="fas fa-undo"></i></a>
-                               <a href="#" onclick="confirmPermanentDelete(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Permanently Delete"><i class="fas fa-trash"></i></a>';
+                $tableRows .= '<a href="#" onclick="confirmRestore(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Restore"><i class="fas fa-undo"></i></a>
+                               <a href="#" onclick="confirmPermanentDelete(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete Forever"><i class="fas fa-trash"></i></a>';
             } else {
                 // Active view: show Edit and Archive buttons
-                $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
-                               <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Archive Cage"><i class="fas fa-archive"></i></a>';
+                $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit"><i class="fas fa-edit"></i></a>
+                               <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Archive"><i class="fas fa-archive"></i></a>';
             }
         }
         $tableRows .= '</td></tr>';
