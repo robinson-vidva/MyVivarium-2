@@ -121,7 +121,7 @@ if (isset($settings['r2_pres'])) {
             margin-left: 15px;
             margin-bottom: 0;
             margin-top: 12px;
-            font-size: 3.5rem;
+            font-size: clamp(1.4rem, 5vw, 3.5rem);
             white-space: nowrap;
             font-family: 'Poppins', sans-serif;
             font-weight: 500;
@@ -129,13 +129,17 @@ if (isset($settings['r2_pres'])) {
 
         /* Responsive styling for smaller screens */
         @media (max-width: 576px) {
+            .header {
+                padding: 0.5rem;
+            }
+
             .header h2 {
-                font-size: 1.8rem;
-                margin-bottom: 5px;
+                margin-left: 8px;
+                margin-top: 5px;
             }
 
             .header img.header-logo {
-                width: 150px;
+                width: 120px;
             }
         }
 
@@ -154,6 +158,67 @@ if (isset($settings['r2_pres'])) {
         .dropdown-menu {
             min-width: auto;
         }
+
+        /* Mobile hamburger menu */
+        .navbar-toggler-custom {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .navbar-toggler-custom:hover {
+            border-color: rgba(255,255,255,0.6);
+        }
+
+        @media (max-width: 576px) {
+            .navbar-toggler-custom {
+                display: inline-block;
+            }
+
+            .nav-collapsible {
+                display: none;
+                flex-direction: column;
+                gap: 5px;
+                width: 100%;
+                padding: 0 10px;
+            }
+
+            .nav-collapsible.show {
+                display: flex;
+            }
+
+            .nav-collapsible .btn,
+            .nav-collapsible .dropdown {
+                width: 100%;
+            }
+
+            .nav-collapsible .btn {
+                margin: 2px 0;
+            }
+
+            .nav-collapsible .dropdown .btn {
+                width: 100%;
+            }
+
+            .nav-container {
+                padding: 10px 0;
+            }
+        }
+
+        @media (min-width: 577px) {
+            .nav-collapsible {
+                display: flex !important;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+            }
+        }
     </style>
 </head>
 
@@ -171,66 +236,73 @@ if (isset($settings['r2_pres'])) {
 
     <!-- Navigation Menu Section -->
     <div class="nav-container">
-        <nav class="nav justify-content-center">
-            <a href="home.php" class="btn btn-primary">
-                <i class="fas fa-home"></i> Home
-            </a>
-
-            <!-- Dropdown for Dashboard -->
-            <div class="dropdown">
-                <button class="btn btn-primary dropdown-toggle" type="button" id="dashboardMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-tachometer-alt"></i> Dashboards
-                </button>
-                <ul class="dropdown-menu" aria-labelledby="dashboardMenuButton">
-                    <li><a class="dropdown-item" href="hc_dash.php">Holding Cage</a></li>
-                    <li><a class="dropdown-item" href="bc_dash.php">Breeding Cage</a></li>
-                    <?php
-                    if (!empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres) || !empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres)) {
-                        echo '<li><a class="dropdown-item" href="iot_sensors.php">IOT Sensors</a></li>';
-                    }
-                    ?>
-                    <li><a class="dropdown-item" href="cage_lineage.php">Cage Lineage</a></li>
-                </ul>
-            </div>
-
-            <!-- Dropdown for Settings -->
-            <div class="dropdown">
-                <button class="btn btn-primary dropdown-toggle" type="button" id="settingsMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-cog"></i> Settings
-                </button>
-                <ul class="dropdown-menu" aria-labelledby="settingsMenuButton">
-                    <li><a class="dropdown-item" href="user_profile.php">User Profile</a></li>
-                    <li><a class="dropdown-item" href="manage_tasks.php">Tasks &amp; Reminders</a></li>
-                    <?php
-                    // Display Vivarium Manager menu for vivarium_manager and admin roles
-                    if (isset($_SESSION['role']) &&
-                        ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'vivarium_manager')) {
-                        echo '<li><hr class="dropdown-divider"></li>';
-                        echo '<li class="dropdown-header">Vivarium Management</li>';
-                        echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php"><i class="fas fa-clipboard-list"></i> Maintenance Notes</a></li>';
-                        echo '<li><a class="dropdown-item" href="activity_log.php"><i class="fas fa-history"></i> Activity Log</a></li>';
-                    }
-
-                    // Display admin options if the user is an admin
-                    if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-                        echo '<li><hr class="dropdown-divider"></li>';
-                        echo '<li class="dropdown-header">Administration</li>';
-                        echo '<li><a class="dropdown-item" href="manage_users.php">Manage Users</a></li>';
-                        echo '<li><a class="dropdown-item" href="manage_iacuc.php">Manage IACUC</a></li>';
-                        echo '<li><a class="dropdown-item" href="manage_strain.php">Manage Strain</a></li>';
-                        echo '<li><a class="dropdown-item" href="manage_lab.php">Manage Lab</a></li>';
-                        echo '<li><a class="dropdown-item" href="export_data.php">Export CSV</a></li>';
-                        echo '<li><hr class="dropdown-divider"></li>';
-                    }
-                    ?>
-                    <li><a class="dropdown-item" href="logout.php">Logout</a></li>
-                </ul>
-            </div>
-
-            <!-- Dark Mode Toggle -->
-            <button id="darkModeToggle" class="btn btn-outline-light" style="margin-left: 5px;">
-                <i class="fas fa-moon"></i>
+        <nav class="nav justify-content-center flex-column align-items-center">
+            <!-- Hamburger toggle for mobile -->
+            <button class="navbar-toggler-custom" id="navToggler" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
             </button>
+
+            <div class="nav-collapsible" id="navCollapsible">
+                <a href="home.php" class="btn btn-primary">
+                    <i class="fas fa-home"></i> Home
+                </a>
+
+                <!-- Dropdown for Dashboard -->
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="dashboardMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-tachometer-alt"></i> Dashboards
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dashboardMenuButton">
+                        <li><a class="dropdown-item" href="hc_dash.php">Holding Cage</a></li>
+                        <li><a class="dropdown-item" href="bc_dash.php">Breeding Cage</a></li>
+                        <?php
+                        if (!empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres) || !empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres)) {
+                            echo '<li><a class="dropdown-item" href="iot_sensors.php">IOT Sensors</a></li>';
+                        }
+                        ?>
+                        <li><a class="dropdown-item" href="cage_lineage.php">Cage Lineage</a></li>
+                    </ul>
+                </div>
+
+                <!-- Dropdown for Settings -->
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="settingsMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-cog"></i> Settings
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="settingsMenuButton">
+                        <li><a class="dropdown-item" href="user_profile.php">User Profile</a></li>
+                        <li><a class="dropdown-item" href="manage_tasks.php">Tasks &amp; Reminders</a></li>
+                        <?php
+                        // Display Vivarium Manager menu for vivarium_manager and admin roles
+                        if (isset($_SESSION['role']) &&
+                            ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'vivarium_manager')) {
+                            echo '<li><hr class="dropdown-divider"></li>';
+                            echo '<li class="dropdown-header">Vivarium Management</li>';
+                            echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php"><i class="fas fa-clipboard-list"></i> Maintenance Notes</a></li>';
+                            echo '<li><a class="dropdown-item" href="activity_log.php"><i class="fas fa-history"></i> Activity Log</a></li>';
+                        }
+
+                        // Display admin options if the user is an admin
+                        if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+                            echo '<li><hr class="dropdown-divider"></li>';
+                            echo '<li class="dropdown-header">Administration</li>';
+                            echo '<li><a class="dropdown-item" href="manage_users.php">Manage Users</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_iacuc.php">Manage IACUC</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_strain.php">Manage Strain</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_lab.php">Manage Lab</a></li>';
+                            echo '<li><a class="dropdown-item" href="export_data.php">Export CSV</a></li>';
+                            echo '<li><hr class="dropdown-divider"></li>';
+                        }
+                        ?>
+                        <li><a class="dropdown-item" href="logout.php">Logout</a></li>
+                    </ul>
+                </div>
+
+                <!-- Dark Mode Toggle -->
+                <button id="darkModeToggle" class="btn btn-outline-light" style="margin-left: 5px;">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
         </nav>
     </div>
 
@@ -268,6 +340,19 @@ if (isset($settings['r2_pres'])) {
             btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
         }
     })();
+    </script>
+
+    <!-- Mobile Nav Toggle -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var toggler = document.getElementById('navToggler');
+        var nav = document.getElementById('navCollapsible');
+        if (toggler && nav) {
+            toggler.addEventListener('click', function() {
+                nav.classList.toggle('show');
+            });
+        }
+    });
     </script>
 
     <!-- Dark Mode Overrides -->
@@ -375,6 +460,65 @@ if (isset($settings['r2_pres'])) {
         border-color: #087990 !important;
         color: #cff4fc !important;
     }
+
+    /* Modal form inputs dark mode */
+    [data-bs-theme="dark"] .modal-content {
+        background-color: #3d444d;
+        border-color: #565e66;
+        color: #dee2e6;
+    }
+    [data-bs-theme="dark"] .modal-body .form-control,
+    [data-bs-theme="dark"] .modal-body .form-select,
+    [data-bs-theme="dark"] .popup-form .form-control,
+    [data-bs-theme="dark"] .popup-form .form-select,
+    [data-bs-theme="dark"] .popup-form input[type="text"],
+    [data-bs-theme="dark"] .popup-form input[type="date"],
+    [data-bs-theme="dark"] .popup-form textarea,
+    [data-bs-theme="dark"] .popup-form select {
+        background-color: #454d55 !important;
+        border-color: #565e66 !important;
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .popup-form label,
+    [data-bs-theme="dark"] .view-popup-form label {
+        color: #dee2e6;
+    }
+
+    /* Nav tab / btn-group outline dark mode */
+    [data-bs-theme="dark"] .btn-outline-primary {
+        color: #6ea8fe;
+        border-color: #6ea8fe;
+    }
+    [data-bs-theme="dark"] .btn-outline-primary:hover {
+        background-color: #0d6efd;
+        color: #fff;
+    }
+
+    /* Home page card borders in dark mode */
+    [data-bs-theme="dark"] .card {
+        border-color: #565e66;
+    }
+
+    /* Session timeout warning modal */
+    #sessionTimeoutModal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+    #sessionTimeoutModal.show { display: flex; }
+    #sessionTimeoutModal .timeout-box {
+        background: var(--bs-body-bg, #fff);
+        color: var(--bs-body-color, #212529);
+        border-radius: 8px;
+        padding: 30px;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
     </style>
 
     <!-- Unified Table Styles -->
@@ -480,4 +624,69 @@ if (isset($settings['r2_pres'])) {
         display: contents;
     }
     </style>
+    <!-- Session Timeout Warning -->
+    <div id="sessionTimeoutModal">
+        <div class="timeout-box">
+            <h5><i class="fas fa-clock"></i> Session Expiring</h5>
+            <p>Your session will expire in <strong id="timeoutCountdown">2:00</strong> minutes due to inactivity.</p>
+            <button class="btn btn-primary" id="stayLoggedIn">Stay Logged In</button>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var SESSION_TIMEOUT = 30 * 60 * 1000;  // 30 min
+        var WARNING_BEFORE = 2 * 60 * 1000;    // Warn 2 min before
+        var warnTimer, logoutTimer, countdownInterval;
+
+        function resetTimers() {
+            clearTimeout(warnTimer);
+            clearTimeout(logoutTimer);
+            clearInterval(countdownInterval);
+            var modal = document.getElementById('sessionTimeoutModal');
+            if (modal) modal.classList.remove('show');
+
+            warnTimer = setTimeout(showWarning, SESSION_TIMEOUT - WARNING_BEFORE);
+            logoutTimer = setTimeout(function() {
+                window.location.href = 'logout.php';
+            }, SESSION_TIMEOUT);
+        }
+
+        function showWarning() {
+            var modal = document.getElementById('sessionTimeoutModal');
+            if (!modal) return;
+            modal.classList.add('show');
+            var remaining = WARNING_BEFORE / 1000;
+            var cd = document.getElementById('timeoutCountdown');
+            countdownInterval = setInterval(function() {
+                remaining--;
+                if (remaining <= 0) { clearInterval(countdownInterval); return; }
+                var m = Math.floor(remaining / 60);
+                var s = remaining % 60;
+                if (cd) cd.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+            }, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var stayBtn = document.getElementById('stayLoggedIn');
+            if (stayBtn) {
+                stayBtn.addEventListener('click', function() {
+                    // Ping server to reset session
+                    fetch(window.location.href, { method: 'HEAD', credentials: 'same-origin' });
+                    resetTimers();
+                });
+            }
+            // Reset on user activity
+            ['click', 'keypress', 'scroll', 'mousemove'].forEach(function(evt) {
+                document.addEventListener(evt, function() {
+                    var modal = document.getElementById('sessionTimeoutModal');
+                    if (modal && !modal.classList.contains('show')) {
+                        resetTimers();
+                    }
+                }, { passive: true });
+            });
+            resetTimers();
+        });
+    })();
+    </script>
+
 <!-- Note: Document structure (html/head/body) is managed by the including page -->

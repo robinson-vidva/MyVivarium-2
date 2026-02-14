@@ -164,7 +164,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $name = trim($_POST['name'] ?? '');
         $username = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
         $password = $_POST['password'];
+        $confirm_password = $_POST['confirm_password'] ?? '';
         $position = trim($_POST['position'] ?? '');
+
+        // Check passwords match
+        if ($password !== $confirm_password) {
+            $_SESSION['resultMessage'] = "Passwords do not match. Please try again.";
+            $con->close();
+            header("Location: " . $_SERVER["PHP_SELF"]);
+            exit;
+        }
 
         // Validate email format
         if (!$username) {
@@ -381,6 +390,11 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
                 <label for="password">Password</label>
                 <input type="password" class="form-control" id="password" name="password" required>
             </div>
+            <div class="mb-3">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                <div id="passwordMismatch" class="text-danger small mt-1" style="display: none;">Passwords do not match.</div>
+            </div>
 
             <!-- Conditionally include Cloudflare Turnstile widget -->
             <?php if (!empty($turnstileSiteKey)) { ?>
@@ -389,10 +403,29 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
             <?php } ?>
 
             <br>
-            <button type="submit" class="btn btn-primary" name="signup">Register</button>
+            <button type="submit" class="btn btn-primary" name="signup" id="registerBtn">Register</button>
             <br>
             <a href="index.php" class="btn btn-secondary">Go Back</a>
         </form>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var pw = document.getElementById('password');
+            var cpw = document.getElementById('confirm_password');
+            var msg = document.getElementById('passwordMismatch');
+            var btn = document.getElementById('registerBtn');
+            function check() {
+                if (cpw.value && pw.value !== cpw.value) {
+                    msg.style.display = 'block';
+                    btn.disabled = true;
+                } else {
+                    msg.style.display = 'none';
+                    btn.disabled = false;
+                }
+            }
+            pw.addEventListener('input', check);
+            cpw.addEventListener('input', check);
+        });
+        </script>
         <br>
 
         <!-- Display the result message if any -->

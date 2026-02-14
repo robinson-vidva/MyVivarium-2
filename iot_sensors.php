@@ -147,6 +147,37 @@ require 'header.php';
 
     <!-- Include the footer file -->
     <?php include 'footer.php'; ?>
+
+    <!-- Toggle Grafana iframe theme with dark mode -->
+    <script>
+    (function() {
+        function updateIframeThemes() {
+            var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+            document.querySelectorAll('iframe.iframe').forEach(function(iframe) {
+                var src = iframe.getAttribute('src');
+                if (src) {
+                    var newSrc = isDark
+                        ? src.replace('theme=light', 'theme=dark')
+                        : src.replace('theme=dark', 'theme=light');
+                    if (newSrc !== src) {
+                        iframe.setAttribute('src', newSrc);
+                    }
+                }
+            });
+        }
+
+        // Watch for dark mode toggle
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                if (m.attributeName === 'data-bs-theme') updateIframeThemes();
+            });
+        });
+        observer.observe(document.documentElement, { attributes: true });
+
+        // Initial check
+        document.addEventListener('DOMContentLoaded', updateIframeThemes);
+    })();
+    </script>
 </body>
 
 </html>

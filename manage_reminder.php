@@ -467,6 +467,14 @@ ob_end_flush(); // Flush the output buffer
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($reminderResult->num_rows === 0): ?>
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <i class="fas fa-bell-slash fa-3x text-muted d-block mb-2"></i>
+                                <p class="text-muted mb-0">No reminders found. Click "Add New Reminder" to create one.</p>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php while ($row = $reminderResult->fetch_assoc()) : ?>
                         <tr>
                             <td data-label="ID"><?= htmlspecialchars($row['id']); ?></td>

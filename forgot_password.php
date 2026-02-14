@@ -165,8 +165,8 @@ function handlePasswordReset($con, $email, $url) {
     <style>
         .container {
             max-width: 900px;
-            margin-top: 50px;
-            margin-bottom: 50px;
+            margin-top: 20px;
+            margin-bottom: 20px;
             padding: 20px;
             border: 1px solid var(--bs-border-color);
             border-radius: 5px;
