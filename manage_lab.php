@@ -123,8 +123,8 @@ require 'header.php';
     <style>
         .lab-container {
             max-width: 900px;
-            margin: 30px auto 50px;
-            padding: 0 15px;
+            margin: 0 auto;
+            padding: 0 var(--bs-gutter-x, 0.75rem);
         }
 
         .section-card {
@@ -221,7 +221,7 @@ require 'header.php';
 </head>
 
 <body>
-    <div class="lab-container content">
+    <div class="container mt-4 lab-container content" style="max-width: 900px;">
         <h1 class="text-center mb-4">Manage Lab</h1>
 
         <?php if ($updateMessage) {
