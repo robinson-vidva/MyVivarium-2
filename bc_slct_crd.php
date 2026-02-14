@@ -61,7 +61,7 @@ require 'header.php';
             background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
-            margin: 50px auto;
+            margin: 20px auto;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
 
@@ -117,11 +117,7 @@ require 'header.php';
 </head>
 
 <body>
-    <br>
-    <br>
     <div class="content">
-        <br>
-        <br>
         <div class="container">
             <h4>Select Breeding Cages for Printing</h4>
             <br>

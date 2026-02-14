@@ -218,6 +218,13 @@ require 'header.php';
             font-size: 0.85em;
         }
 
+        .ip-cell {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         @media print {
             .no-print {
                 display: none !important;
@@ -296,13 +303,10 @@ require 'header.php';
                             <button class="btn btn-primary" type="submit">
                                 <i class="fas fa-search"></i> Search
                             </button>
+                            <button type="button" class="btn btn-info" onclick="window.print()">
+                                <i class="fas fa-print"></i>
+                            </button>
                         </div>
-                    </div>
-
-                    <div class="action-buttons">
-                        <button type="button" class="btn btn-info" onclick="window.print()">
-                            <i class="fas fa-print"></i> Print
-                        </button>
                     </div>
                 </div>
 
@@ -415,7 +419,7 @@ require 'header.php';
                                 <td><?php echo htmlspecialchars(ucfirst($entry['entity_type'])); ?></td>
                                 <td><strong><?php echo htmlspecialchars($entry['entity_id']); ?></strong></td>
                                 <td class="details-cell"><?php echo htmlspecialchars($entry['details'] ?? ''); ?></td>
-                                <td><small><?php echo htmlspecialchars($entry['ip_address'] ?? ''); ?></small></td>
+                                <td class="ip-cell" title="<?php echo htmlspecialchars($entry['ip_address'] ?? ''); ?>"><small><?php echo htmlspecialchars($entry['ip_address'] ?? ''); ?></small></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
