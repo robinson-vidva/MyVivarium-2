@@ -292,11 +292,6 @@ require 'header.php';
     </script>
 
     <style>
-        body {
-            background: none !important;
-            background-color: transparent !important;
-        }
-
         .container {
             max-width: 900px;
             padding: 20px 15px;
@@ -556,7 +551,11 @@ require 'header.php';
                 <i class="fas fa-paw"></i>
                 <h5>Litter Details</h5>
             </div>
-            <?php while ($litter = mysqli_fetch_assoc($litters)) : ?>
+            <?php
+            $hasLitters = false;
+            while ($litter = mysqli_fetch_assoc($litters)) :
+                $hasLitters = true;
+            ?>
                 <table class="details-table" style="margin-bottom: 16px;">
                     <tbody>
                         <tr>
@@ -590,6 +589,9 @@ require 'header.php';
                     </tbody>
                 </table>
             <?php endwhile; ?>
+            <?php if (!$hasLitters) : ?>
+                <p class="text-muted mb-0">No litter records found for this cage.</p>
+            <?php endif; ?>
         </div>
 
         <!-- Maintenance Log Section -->
