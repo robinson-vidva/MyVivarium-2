@@ -158,6 +158,12 @@ if (isset($settings['r2_pres'])) {
             margin: 0 5px;
         }
 
+        #darkModeToggle {
+            padding: .3rem .65rem;
+            font-size: .95rem;
+            line-height: inherit;
+        }
+
         .dropdown-menu {
             min-width: auto;
         }
