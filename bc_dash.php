@@ -53,9 +53,28 @@ require 'header.php';
 
         // Confirm archive function with a dialog
         function confirmDeletion(id) {
-            var confirmArchive = confirm("Are you sure you want to archive cage - '" + id + "' and related mouse data?");
-            if (confirmArchive) {
+            var confirmAction = confirm("Are you sure you want to archive cage '" + id + "'?");
+            if (confirmAction) {
                 window.location.href = "bc_drop.php?id=" + id + "&action=archive&confirm=true";
+            }
+        }
+
+        // Confirm restore function
+        function confirmRestore(id) {
+            var confirmAction = confirm("Restore cage '" + id + "' back to active?");
+            if (confirmAction) {
+                window.location.href = "bc_drop.php?id=" + id + "&action=restore&confirm=true";
+            }
+        }
+
+        // Confirm permanent delete function
+        function confirmPermanentDelete(id) {
+            var confirmAction = confirm("PERMANENTLY delete cage '" + id + "' and ALL related data?\n\nThis action CANNOT be undone.");
+            if (confirmAction) {
+                var doubleConfirm = confirm("Are you absolutely sure? This will permanently remove all data for cage '" + id + "'.");
+                if (doubleConfirm) {
+                    window.location.href = "bc_drop.php?id=" + id + "&action=permanent_delete&confirm=true";
+                }
             }
         }
 

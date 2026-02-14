@@ -123,8 +123,15 @@ while ($row = mysqli_fetch_assoc($result)) {
         $isAssigned = $assignedCheck->get_result()->num_rows > 0;
         $assignedCheck->close();
         if ($userRole === 'admin' || $isAssigned) {
-            $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
-                           <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Archive Cage"><i class="fas fa-archive"></i></a>';
+            if ($showArchived) {
+                // Archived view: show Restore and Permanently Delete buttons
+                $tableRows .= '<a href="#" onclick="confirmRestore(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Restore Cage"><i class="fas fa-undo"></i></a>
+                               <a href="#" onclick="confirmPermanentDelete(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Permanently Delete"><i class="fas fa-trash"></i></a>';
+            } else {
+                // Active view: show Edit and Archive buttons
+                $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
+                               <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($holdingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Archive Cage"><i class="fas fa-archive"></i></a>';
+            }
         }
         $tableRows .= '</td></tr>';
     }
