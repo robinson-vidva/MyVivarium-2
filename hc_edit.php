@@ -537,7 +537,7 @@ require 'header.php';
         }
 
         .warning-text {
-            color: #dc3545;
+            color: var(--bs-danger);
             font-size: 14px;
         }
 
@@ -1068,7 +1068,7 @@ require 'header.php';
                             </div>
 
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
                             <!-- HTML Form Section for Mouse Fields -->
                             <div id="mouse_fields_container">
@@ -1108,7 +1108,7 @@ require 'header.php';
                             </div>
 
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
                             <!-- Display Files Section -->
                             <div class="card mt-4">
@@ -1160,7 +1160,7 @@ require 'header.php';
 
                             <br>
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
 
                             <div class="card-body">

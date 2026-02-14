@@ -95,11 +95,11 @@ $result = $stmt->get_result();
         }
 
         .timestamp {
-            color: #666;
+            color: var(--bs-secondary-color);
         }
 
         .userid {
-            color: blue;
+            color: var(--bs-primary);
         }
 
         .close-btn,

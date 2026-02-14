@@ -168,14 +168,11 @@ function handlePasswordReset($con, $email, $url) {
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             border-radius: 5px;
             background-color: var(--bs-tertiary-bg);
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
 
         .btn {
             display: block;
@@ -194,9 +191,9 @@ function handlePasswordReset($con, $email, $url) {
             text-align: center;
             margin-top: 15px;
             padding: 10px;
-            background-color: #dff0d8;
-            border: 1px solid #3c763d;
-            color: #3c763d;
+            background-color: var(--bs-success-bg-subtle);
+            border: 1px solid var(--bs-success-border-subtle);
+            color: var(--bs-success-text-emphasis);
             border-radius: 5px;
         }
 
@@ -205,8 +202,8 @@ function handlePasswordReset($con, $email, $url) {
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            background-color: #343a40;
-            color: white;
+            background-color: var(--bs-dark);
+            color: var(--bs-white);
             padding: 1rem;
             text-align: center;
             margin: 0;
@@ -243,7 +240,7 @@ function handlePasswordReset($con, $email, $url) {
         }
 
         .warning-text {
-            color: #dc3545;
+            color: var(--bs-danger);
             font-size: 14px;
         }
 
@@ -261,7 +258,7 @@ function handlePasswordReset($con, $email, $url) {
                 max-width: 500px;
                 margin: 0 auto;
                 padding: 20px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--bs-border-color);
                 border-radius: 5px;
                 background-color: var(--bs-tertiary-bg);
             }
@@ -289,7 +286,7 @@ function handlePasswordReset($con, $email, $url) {
         <p class="warning-text">Fields marked with <span class="required-asterisk">*</span> are required.</p>
         <br>
         <form method="POST" action="">
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="email">Email Address <span class="required-asterisk">*</span></label>
                 <input type="email" class="form-control" id="email" name="email" required>
             </div>

@@ -303,7 +303,7 @@ require 'header.php';
             width: 35%;
             font-weight: 600;
             color: var(--bs-body-color);
-            background-color: transparent;
+            background-color: var(--bs-tertiary-bg);
             text-transform: none;
             letter-spacing: 0;
             text-align: left;

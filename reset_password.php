@@ -106,14 +106,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             border-radius: 5px;
             background-color: var(--bs-tertiary-bg);
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
 
         .btn {
             display: block;
@@ -132,9 +129,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             text-align: center;
             margin-top: 15px;
             padding: 10px;
-            background-color: #dff0d8;
-            border: 1px solid #3c763d;
-            color: #3c763d;
+            background-color: var(--bs-success-bg-subtle);
+            border: 1px solid var(--bs-success-border-subtle);
+            color: var(--bs-success-text-emphasis);
             border-radius: 5px;
         }
 
@@ -143,8 +140,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            background-color: #343a40;
-            color: white;
+            background-color: var(--bs-dark);
+            color: var(--bs-white);
             padding: 1rem;
             text-align: center;
             margin: 0;
@@ -206,13 +203,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             <input type="hidden" id="token" name="token" value="<?= htmlspecialchars($_GET['token']); ?>">
 
             <!-- New Password Field -->
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="new_password">New Password</label>
                 <input type="password" class="form-control" id="new_password" name="new_password" required>
             </div>
 
             <!-- Confirm Password Field -->
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="confirm_password">Confirm Password</label>
                 <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
             </div>

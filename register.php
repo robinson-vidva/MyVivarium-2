@@ -251,14 +251,11 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             border-radius: 5px;
             background-color: var(--bs-tertiary-bg);
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
 
         .btn {
             display: block;
@@ -274,7 +271,7 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
         }
 
         .note {
-            color: #888;
+            color: var(--bs-secondary-color);
             font-size: 12px;
         }
 
@@ -283,8 +280,8 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            background-color: #343a40;
-            color: white;
+            background-color: var(--bs-dark);
+            color: var(--bs-white);
             padding: 1rem;
             text-align: center;
             margin: 0;
@@ -326,7 +323,7 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
                 max-width: 500px;
                 margin: 0 auto;
                 padding: 20px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--bs-border-color);
                 border-radius: 5px;
                 background-color: var(--bs-tertiary-bg);
             }
@@ -355,11 +352,11 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
                 <label for="honeypot">Keep this field blank</label>
                 <input type="text" id="honeypot" name="honeypot">
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="name">Name</label>
                 <input type="text" class="form-control" id="name" name="name" required>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="position">Position</label>
                 <select class="form-control" id="position" name="position" required>
                     <option value="" disabled selected>Select Position</option>
@@ -376,11 +373,11 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
                     <option value="Interns and Volunteers">Interns and Volunteers</option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="email">Email Address <span class="note">(Your email address will be your username for login)</span></label>
                 <input type="email" class="form-control" id="email" name="email" required>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="password">Password</label>
                 <input type="password" class="form-control" id="password" name="password" required>
             </div>

@@ -411,17 +411,17 @@ ob_end_flush(); // Flush the output buffer
 
         /* Status Colors - applied to status cell only */
         .status-pending td:nth-child(4) {
-            color: #842029;
+            color: var(--bs-danger);
             font-weight: 500;
         }
 
         .status-in-progress td:nth-child(4) {
-            color: #664d03;
+            color: var(--bs-warning);
             font-weight: 500;
         }
 
         .status-completed td:nth-child(4) {
-            color: #0f5132;
+            color: var(--bs-success);
             font-weight: 500;
         }
 
@@ -464,7 +464,7 @@ ob_end_flush(); // Flush the output buffer
                 padding-right: 10px;
                 white-space: nowrap;
                 font-weight: bold;
-                color: #343a40;
+                color: var(--bs-body-color);
                 text-align: left;
             }
 
@@ -547,23 +547,23 @@ ob_end_flush(); // Flush the output buffer
             <form id="taskForm" action="manage_tasks.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <input type="hidden" name="id" id="id">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="title">Title <span class="required-asterisk">*</span></label>
                     <input type="text" name="title" id="title" class="form-control" maxlength="100" required>
                     <small id="titleCounter" class="form-text text-muted">0/100 characters used</small>
                 </div>
 
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="description">Description/Update <span class="required-asterisk">*</span></label>
                     <textarea name="description" id="description" class="form-control" rows="3" maxlength="500" required></textarea>
                     <small id="descriptionCounter" class="form-text text-muted">0/500 characters used</small>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="assigned_by">Assigned By <span class="required-asterisk">*</span></label>
                     <input type="text" name="assigned_by" id="assigned_by" class="form-control" readonly>
                     <input type="hidden" name="assigned_by_id" id="assigned_by_id">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="assigned_to">Assigned To <span class="required-asterisk">*</span></label>
                     <select name="assigned_to[]" id="assigned_to" class="form-control" multiple required>
                         <?php foreach ($users as $userId => $name) : ?>
@@ -571,7 +571,7 @@ ob_end_flush(); // Flush the output buffer
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label>Status <span class="required-asterisk">*</span></label>
                     <div class="radio-group">
                         <label><input type="radio" name="status" value="Pending" required> Pending</label>
@@ -579,11 +579,11 @@ ob_end_flush(); // Flush the output buffer
                         <label><input type="radio" name="status" value="Completed"> Completed</label>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="completion_date">Completion Date</label>
                     <input type="date" name="completion_date" id="completion_date" class="form-control">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="cage_id">Cage ID</label>
                     <select name="cage_id" id="cage_id" class="form-control">
                         <option value="">Select Cage</option>

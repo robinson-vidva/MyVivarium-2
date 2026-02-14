@@ -286,7 +286,7 @@ require 'header.php';
 
         .timestamp {
             font-size: 0.9em;
-            color: #666;
+            color: var(--bs-secondary-color);
         }
 
         .comments-cell {
@@ -296,12 +296,12 @@ require 'header.php';
 
         .pagination-info {
             margin: 15px 0;
-            color: #666;
+            color: var(--bs-secondary-color);
         }
 
         .modal-header {
-            background-color: #343a40;
-            color: white;
+            background-color: var(--bs-dark);
+            color: var(--bs-white);
         }
 
         .table td {

@@ -262,27 +262,27 @@ $strainResult = $con->query($strainQuery);
             <h4 id="formTitle">Add New Strain</h4>
             <form action="manage_strain.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_id">Strain ID <span class="required-asterisk">*</span></label>
                     <input type="text" name="strain_id" id="strain_id" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_name">Strain Name <span class="required-asterisk">*</span></label>
                     <input type="text" name="strain_name" id="strain_name" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_aka">Common Names (comma separated)</label>
                     <input type="text" name="strain_aka" id="strain_aka" class="form-control">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_url">Strain URL</label>
                     <input type="url" name="strain_url" id="strain_url" class="form-control">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_rrid">Strain RRID</label>
                     <input type="text" name="strain_rrid" id="strain_rrid" class="form-control">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_notes">Notes</label>
                     <textarea name="strain_notes" id="strain_notes" class="form-control" rows="3"></textarea>
                 </div>
@@ -298,27 +298,27 @@ $strainResult = $con->query($strainQuery);
         <div class="popup-overlay" id="viewPopupOverlay"></div>
         <div class="view-popup-form" id="viewPopupForm">
             <h4 id="viewFormTitle">View Strain</h4>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_id">Strain ID:</strong>
                 <p id="view_strain_id"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_name">Strain Name:</strong>
                 <p id="view_strain_name"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_aka">Common Names:</strong>
                 <p id="view_strain_aka"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_url">Strain URL:</strong>
                 <p><a href="#" id="view_strain_url" target="_blank"></a></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_rrid">Strain RRID:</strong>
                 <p id="view_strain_rrid"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_notes">Notes:</strong>
                 <p id="view_strain_notes"></p>
             </div>

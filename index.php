@@ -404,16 +404,16 @@ mysqli_close($con);
         }
 
         .login-card .login-divider {
-            border-top: 1px solid #dee2e6;
+            border-top: 1px solid var(--bs-border-color);
             margin-top: 16px;
             padding-top: 14px;
             text-align: center;
             font-size: 0.85rem;
-            color: #6c757d;
+            color: var(--bs-secondary-color);
         }
 
         .login-card .login-divider a {
-            color: #0d6efd;
+            color: var(--bs-primary);
             font-weight: 500;
             text-decoration: none;
         }

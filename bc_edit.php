@@ -842,7 +842,7 @@ require 'header.php';
         }
 
         .warning-text {
-            color: #dc3545;
+            color: var(--bs-danger);
             font-size: 14px;
         }
 
@@ -1038,7 +1038,7 @@ require 'header.php';
                             </div>
 
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
                             <!-- Display Files Section -->
                             <div class="card mt-4">
@@ -1101,7 +1101,7 @@ require 'header.php';
                                 <div class="card-body" id="litterEntries">
                                     <?php while ($litter = mysqli_fetch_assoc($litters)) : ?>
                                         <div class="litter-entry">
-                                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
                                             <div class="mb-3">
                                                 <label for="dom[]" class="form-label">DOM <span class="required-asterisk">*</span></label>
                                                 <input type="date" class="form-control" name="dom[]" value="<?= htmlspecialchars($litter['dom']); ?>" required min="1900-01-01">

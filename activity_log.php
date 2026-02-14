@@ -192,12 +192,12 @@ require 'header.php';
         .filter-group label {
             font-size: 0.85em;
             font-weight: bold;
-            color: #555;
+            color: var(--bs-secondary-color);
         }
 
         .timestamp {
             font-size: 0.9em;
-            color: #666;
+            color: var(--bs-secondary-color);
         }
 
         .details-cell {
@@ -207,7 +207,7 @@ require 'header.php';
 
         .pagination-info {
             margin: 15px 0;
-            color: #666;
+            color: var(--bs-secondary-color);
         }
 
         .table td {
