@@ -443,6 +443,11 @@ if (isset($settings['r2_pres'])) {
     }
     [data-bs-theme="dark"] .select2-container--default .select2-results__option[aria-selected="true"] {
         background-color: #565e66 !important;
+        color: #adb5bd !important;
+    }
+    [data-bs-theme="dark"] .select2-results__option[aria-selected="true"] {
+        background-color: #565e66 !important;
+        color: #adb5bd !important;
     }
     [data-bs-theme="dark"] .select2-container--default .select2-results__option--disabled {
         color: #6c757d !important;
