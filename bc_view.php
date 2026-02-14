@@ -494,6 +494,10 @@ require 'header.php';
                     <td id="male-dob-data" data-value="<?= !empty($breedingcage['male_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
                 </tr>
                 <tr>
+                    <th>Male Source / Parent Cage</th>
+                    <td><?= htmlspecialchars($breedingcage['male_parent_cage'] ?? ''); ?></td>
+                </tr>
+                <tr>
                     <th>Female ID</th>
                     <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></td>
                 </tr>
@@ -504,6 +508,10 @@ require 'header.php';
                 <tr>
                     <th>Female DOB</th>
                     <td id="female-dob-data" data-value="<?= !empty($breedingcage['female_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_dob']); ?></td>
+                </tr>
+                <tr>
+                    <th>Female Source / Parent Cage</th>
+                    <td><?= htmlspecialchars($breedingcage['female_parent_cage'] ?? ''); ?></td>
                 </tr>
                 <tr>
                     <th>Remarks</th>

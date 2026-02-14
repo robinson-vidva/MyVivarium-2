@@ -336,6 +336,45 @@ if (isset($settings['r2_pres'])) {
     [data-bs-theme="dark"] .select2-container--default .select2-results__option--disabled {
         color: #6c757d !important;
     }
+
+    /* Form controls dark mode */
+    [data-bs-theme="dark"] .form-control,
+    [data-bs-theme="dark"] .form-select {
+        background-color: #454d55 !important;
+        border-color: #565e66 !important;
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .form-control::placeholder {
+        color: #6c757d !important;
+    }
+    [data-bs-theme="dark"] .form-control:focus,
+    [data-bs-theme="dark"] .form-select:focus {
+        background-color: #454d55 !important;
+        border-color: #86b7fe !important;
+        color: #dee2e6 !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    [data-bs-theme="dark"] option {
+        background-color: #454d55;
+        color: #dee2e6;
+    }
+    [data-bs-theme="dark"] .form-control:disabled,
+    [data-bs-theme="dark"] .form-control[readonly] {
+        background-color: #3d444d !important;
+        color: #adb5bd !important;
+    }
+
+    /* Alert dark mode */
+    [data-bs-theme="dark"] .alert-warning {
+        background-color: #664d03 !important;
+        border-color: #997404 !important;
+        color: #fff3cd !important;
+    }
+    [data-bs-theme="dark"] .alert-info {
+        background-color: #055160 !important;
+        border-color: #087990 !important;
+        color: #cff4fc !important;
+    }
     </style>
 
     <!-- Unified Table Styles -->
