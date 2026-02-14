@@ -125,7 +125,7 @@ while ($row = mysqli_fetch_assoc($result)) {
         $assignedCheck->close();
         if ($userRole === 'admin' || $isAssigned) {
             $tableRows .= '<a href="bc_edit.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
-                           <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($breedingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete Cage"><i class="fas fa-trash"></i></a>';
+                           <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($breedingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Archive Cage"><i class="fas fa-archive"></i></a>';
         }
         $tableRows .= '</td></tr>';
     }

@@ -147,7 +147,9 @@ if (isset($_GET['id'])) {
             $male_dob = trim($_POST['male_dob']);
             $female_dob = trim($_POST['female_dob']);
             $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
+            $male_parent_cage = !empty($_POST['male_parent_cage']) ? trim($_POST['male_parent_cage']) : null;
             $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
+            $female_parent_cage = !empty($_POST['female_parent_cage']) ? trim($_POST['female_parent_cage']) : null;
             $remarks = trim($_POST['remarks']);
 
             // Begin transaction
@@ -198,9 +200,11 @@ if (isset($_GET['id'])) {
                                     male_dob = ?,
                                     female_dob = ?,
                                     male_genotype = ?,
-                                    female_genotype = ?
+                                    male_parent_cage = ?,
+                                    female_genotype = ?,
+                                    female_parent_cage = ?
                                     WHERE cage_id = ?");
-                $updateBreedingQuery->bind_param("ssssssss", $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $female_genotype, $cage_id);
+                $updateBreedingQuery->bind_param("ssssssssss", $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $male_parent_cage, $female_genotype, $female_parent_cage, $cage_id);
                 $updateBreedingQuery->execute();
                 $updateBreedingQuery->close();
 
@@ -1009,6 +1013,11 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
+                                <label for="male_parent_cage" class="form-label">Male Source / Parent Cage</label>
+                                <input type="text" class="form-control" id="male_parent_cage" name="male_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($breedingcage['male_parent_cage'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
                                 <label for="female_genotype" class="form-label">Female Genotype</label>
                                 <input type="text" class="form-control" id="female_genotype" name="female_genotype" value="<?= htmlspecialchars($breedingcage['female_genotype'] ?? ''); ?>">
                             </div>
@@ -1016,6 +1025,11 @@ require 'header.php';
                             <div class="mb-3">
                                 <label for="female_dob" class="form-label">Female DOB <span class="badge bg-secondary">Useful</span></label>
                                 <input type="date" class="form-control" id="female_dob" name="female_dob" value="<?= htmlspecialchars($breedingcage['female_dob']); ?>" min="1900-01-01" data-field-type="useful">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="female_parent_cage" class="form-label">Female Source / Parent Cage</label>
+                                <input type="text" class="form-control" id="female_parent_cage" name="female_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($breedingcage['female_parent_cage'] ?? ''); ?>">
                             </div>
 
                             <div class="mb-3">

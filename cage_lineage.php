@@ -190,6 +190,14 @@ function renderTree($node, $con, $isRoot = false) {
 $searchCageId = isset($_GET['cage_id']) ? trim($_GET['cage_id']) : '';
 $direction = isset($_GET['direction']) ? $_GET['direction'] : 'both';
 
+// Fetch all cage IDs for the dropdown
+$allCagesQuery = "SELECT cage_id FROM cages ORDER BY cage_id";
+$allCagesResult = mysqli_query($con, $allCagesQuery);
+$allCageIds = [];
+while ($row = mysqli_fetch_assoc($allCagesResult)) {
+    $allCageIds[] = $row['cage_id'];
+}
+
 require 'header.php';
 ?>
 
@@ -201,23 +209,21 @@ require 'header.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cage Lineage | <?php echo htmlspecialchars($labName); ?></title>
 
-    <style>
-        body {
-            background: none !important;
-            background-color: transparent !important;
-        }
+    <!-- Include Select2 CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet" />
+    <!-- Include Select2 JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
 
+    <style>
         .container {
             max-width: 900px;
-            background-color: var(--bs-tertiary-bg);
-            padding: 20px;
-            border-radius: 8px;
+            padding: 20px 15px;
             margin: auto;
         }
 
         .tree-node {
             margin-left: 30px;
-            border-left: 2px solid #dee2e6;
+            border-left: 2px solid var(--bs-border-color);
             padding-left: 15px;
             margin-bottom: 10px;
         }
@@ -226,7 +232,7 @@ require 'header.php';
             padding: 8px 15px;
             background: var(--bs-tertiary-bg);
             border-radius: 6px;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--bs-border-color);
             display: inline-block;
         }
 
@@ -248,12 +254,11 @@ require 'header.php';
             padding: 15px;
             background: var(--bs-body-bg);
             border-radius: 8px;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--bs-border-color);
         }
 
         .lineage-section h5 {
             margin-bottom: 15px;
-            color: #495057;
         }
 
         .search-form {
@@ -263,6 +268,18 @@ require 'header.php';
         .highlight-cage {
             background-color: #fff3cd !important;
             border: 2px solid #ffc107 !important;
+        }
+
+        .select2-container .select2-selection--single {
+            height: 38px;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 38px;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 38px;
         }
     </style>
 </head>
@@ -279,9 +296,12 @@ require 'header.php';
                     <div class="row g-3 align-items-end">
                         <div class="col-md-5">
                             <label for="cage_id" class="form-label"><strong>Cage ID:</strong></label>
-                            <input type="text" class="form-control" id="cage_id" name="cage_id"
-                                   placeholder="Enter a cage ID"
-                                   value="<?php echo htmlspecialchars($searchCageId); ?>" required>
+                            <select class="form-control" id="cage_id" name="cage_id" required>
+                                <option value="">Select a cage</option>
+                                <?php foreach ($allCageIds as $cid) : ?>
+                                    <option value="<?= htmlspecialchars($cid); ?>" <?= ($searchCageId === $cid) ? 'selected' : ''; ?>><?= htmlspecialchars($cid); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label for="direction" class="form-label"><strong>Direction:</strong></label>
@@ -432,6 +452,15 @@ require 'header.php';
             </div>
         </div>
     </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#cage_id').select2({
+                placeholder: "Select a cage",
+                allowClear: true
+            });
+        });
+    </script>
 
     <br>
     <?php include 'footer.php'; ?>

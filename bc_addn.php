@@ -125,7 +125,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $male_dob = !empty($_POST['male_dob']) ? $_POST['male_dob'] : null;
     $female_dob = !empty($_POST['female_dob']) ? $_POST['female_dob'] : null;
     $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
+    $male_parent_cage = !empty($_POST['male_parent_cage']) ? trim($_POST['male_parent_cage']) : null;
     $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
+    $female_parent_cage = !empty($_POST['female_parent_cage']) ? trim($_POST['female_parent_cage']) : null;
     $remarks = $_POST['remarks'];
 
     // Check if the cage_id already exists in the cages table
@@ -143,8 +145,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $insert_cage_query->bind_param("sssss", $cage_id, $pi_id, $remarks, $room, $rack);
 
         // Insert into the breeding table
-        $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`, `male_genotype`, `female_genotype`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $insert_breeding_query->bind_param("ssssssss", $cage_id, $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $female_genotype);
+        $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`, `male_genotype`, `male_parent_cage`, `female_genotype`, `female_parent_cage`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $insert_breeding_query->bind_param("ssssssssss", $cage_id, $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $male_parent_cage, $female_genotype, $female_parent_cage);
 
         // Execute the statements and check if they were successful
         if ($insert_cage_query->execute() && $insert_breeding_query->execute()) {
@@ -699,6 +701,11 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
+                <label for="male_parent_cage" class="form-label">Male Source / Parent Cage</label>
+                <input type="text" class="form-control" id="male_parent_cage" name="male_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($cloneData['male_parent_cage'] ?? ''); ?>">
+            </div>
+
+            <div class="mb-3">
                 <label for="female_genotype" class="form-label">Female Genotype</label>
                 <input type="text" class="form-control" id="female_genotype" name="female_genotype" value="<?= htmlspecialchars($cloneData['female_genotype'] ?? ''); ?>">
             </div>
@@ -706,6 +713,11 @@ require 'header.php';
             <div class="mb-3">
                 <label for="female_dob" class="form-label">Female DOB <span class="badge bg-secondary">Useful</span></label>
                 <input type="date" class="form-control" id="female_dob" name="female_dob" min="1900-01-01" data-field-type="useful" value="<?= htmlspecialchars($cloneData['female_dob'] ?? ''); ?>">
+            </div>
+
+            <div class="mb-3">
+                <label for="female_parent_cage" class="form-label">Female Source / Parent Cage</label>
+                <input type="text" class="form-control" id="female_parent_cage" name="female_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($cloneData['female_parent_cage'] ?? ''); ?>">
             </div>
 
             <div class="mb-3">
