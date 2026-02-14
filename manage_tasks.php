@@ -314,7 +314,7 @@ ob_end_flush(); // Flush the output buffer
     <title>Manage Tasks</title>
     <!-- Bootstrap 5.3 loaded via header.php -->
     <!-- Font Awesome loaded via header.php -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
     <style>
         /* Popup and Overlay Styles */
         .popup-form,
@@ -545,6 +545,7 @@ ob_end_flush(); // Flush the output buffer
         <!-- Popup form for adding and editing tasks -->
         <div class="popup-overlay" id="popupOverlay"></div>
         <div class="popup-form" id="popupForm">
+            <button type="button" class="popup-close-btn" id="closePopupBtn" aria-label="Close">&times;</button>
             <h4 id="formTitle">Add New Task</h4>
             <form id="taskForm" action="manage_tasks.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
@@ -605,6 +606,7 @@ ob_end_flush(); // Flush the output buffer
         <!-- Popup form for viewing tasks -->
         <div class="popup-overlay" id="viewPopupOverlay"></div>
         <div class="view-popup-form" id="viewPopupForm">
+            <button type="button" class="popup-close-btn" id="closeViewPopupBtn" aria-label="Close">&times;</button>
             <h4 id="viewFormTitle">View Task Details</h4>
             <div id="viewTaskDetails"></div>
             <button type="button" class="btn btn-secondary mt-3" id="closeViewFormButton">Close</button>
@@ -726,15 +728,13 @@ ob_end_flush(); // Flush the output buffer
                 openForm();
             });
 
-            // Attach click event to the cancel button
-            $('#cancelButton').on('click', function() {
-                console.log('Cancel button clicked');
+            // Attach click event to the cancel and close buttons
+            $('#cancelButton, #closePopupBtn').on('click', function() {
                 closeForm();
             });
 
             // Attach click event to the close view form button
-            $('#closeViewFormButton').on('click', function() {
-                console.log('Close view form button clicked');
+            $('#closeViewFormButton, #closeViewPopupBtn').on('click', function() {
                 closeViewForm();
             });
 

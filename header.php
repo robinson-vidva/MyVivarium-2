@@ -92,6 +92,9 @@ if (isset($settings['r2_pres'])) {
     <!-- Google Font: Poppins -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
 
+    <!-- Select2 CSS (loaded here so dark mode overrides below take effect) -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
     <style>
         .header {
             display: flex;
@@ -216,6 +219,7 @@ if (isset($settings['r2_pres'])) {
                 display: flex !important;
                 flex-wrap: wrap;
                 justify-content: center;
+                align-items: center;
                 align-items: center;
             }
         }
@@ -367,6 +371,28 @@ if (isset($settings['r2_pres'])) {
     [data-bs-theme="dark"] .card { background-color: #454d55; border-color: #565e66; }
     [data-bs-theme="dark"] .card-header { background-color: #3d444d; border-color: #565e66; color: #dee2e6; }
     [data-bs-theme="dark"] .card-body { background-color: #454d55; color: #dee2e6; }
+
+    /* Popup close button */
+    .popup-close-btn {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        line-height: 1;
+        color: var(--bs-body-color);
+        cursor: pointer;
+        opacity: 0.6;
+        padding: 0;
+        z-index: 1;
+    }
+    .popup-close-btn:hover { opacity: 1; }
+    .popup-form, .view-popup-form { position: relative; }
+
+    /* Make Select2 full width inside forms */
+    .popup-form .select2-container,
+    .modal .select2-container { width: 100% !important; }
 
     /* Select2 Dark Mode */
     [data-bs-theme="dark"] .select2-container--default .select2-selection--single,

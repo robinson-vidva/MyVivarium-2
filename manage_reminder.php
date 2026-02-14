@@ -117,7 +117,7 @@ ob_end_flush(); // Flush the output buffer
     <!-- Include necessary styles and scripts -->
     <!-- Bootstrap 5.3 loaded via header.php -->
     <!-- Font Awesome loaded via header.php -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
     <style>
         /* Popup and Overlay Styles */
         .popup-form,
@@ -341,6 +341,7 @@ ob_end_flush(); // Flush the output buffer
         <!-- Popup form for adding and editing reminders -->
         <div class="popup-overlay" id="popupOverlay"></div>
         <div class="popup-form" id="popupForm">
+            <button type="button" class="popup-close-btn" id="closePopupBtn" aria-label="Close">&times;</button>
             <h4 id="formTitle">Add New Reminder</h4>
             <form id="reminderForm" action="manage_reminder.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
@@ -419,6 +420,7 @@ ob_end_flush(); // Flush the output buffer
         <!-- Popup form for viewing reminders -->
         <div class="popup-overlay" id="viewPopupOverlay"></div>
         <div class="popup-form" id="viewPopupForm">
+            <button type="button" class="popup-close-btn" id="closeViewPopupBtn" aria-label="Close">&times;</button>
             <h4>View Reminder Details</h4>
             <div class="mb-3">
                 <label>Title:</label>
@@ -562,9 +564,15 @@ ob_end_flush(); // Flush the output buffer
             });
 
             // Close the form
-            $('#cancelButton').on('click', function() {
+            $('#cancelButton, #closePopupBtn').on('click', function() {
                 $('#popupOverlay').hide();
                 $('#popupForm').hide();
+            });
+
+            // Close view popup
+            $('#closeViewPopupBtn').on('click', function() {
+                $('#viewPopupOverlay').hide();
+                $('#viewPopupForm').hide();
             });
 
             // Close the form when clicking outside
