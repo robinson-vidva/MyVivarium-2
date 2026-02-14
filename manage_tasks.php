@@ -704,7 +704,8 @@ ob_end_flush(); // Flush the output buffer
         $(document).ready(function() {
             $('#assigned_to').select2({
                 placeholder: "Select users",
-                allowClear: true
+                allowClear: true,
+                dropdownParent: $('#popupForm')
             });
 
             // Ensure the form closes when clicking outside
