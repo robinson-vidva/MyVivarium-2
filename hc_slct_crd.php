@@ -42,8 +42,7 @@ require 'header.php';
 <head>
     <title>Select Holding Cages for Printing</title>
 
-    <!-- Select2 CSS for enhanced dropdowns -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
 
     <!-- jQuery (required for Select2) -->
     <!-- jQuery loaded via header.php -->
