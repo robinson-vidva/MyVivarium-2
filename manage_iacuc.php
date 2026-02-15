@@ -260,34 +260,7 @@ function buildIacucQueryString($overrides = []) {
             }
         }
 
-        @media (max-width: 576px) {
-            .table thead {
-                display: none;
-            }
-
-            .table tr {
-                display: flex;
-                flex-direction: column;
-                margin-bottom: 20px;
-            }
-
-            .table td {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                border: 1px solid var(--bs-border-color);
-            }
-
-            .table td::before {
-                content: attr(data-label);
-                font-weight: bold;
-                text-transform: uppercase;
-                margin-bottom: 5px;
-                display: block;
-            }
-
-            /* Mobile action button styles handled by unified styles in header.php */
-        }
+        /* Mobile table card layout handled by unified styles in header.php */
 
         .table {
             width: 100%;

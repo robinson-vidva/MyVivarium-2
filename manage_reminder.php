@@ -214,49 +214,7 @@ ob_end_flush(); // Flush the output buffer
 
         /* Action button styles handled by unified styles in header.php */
 
-        @media (max-width: 576px) {
-            .table thead {
-                display: none;
-            }
-
-            .table tbody {
-                display: block;
-                width: 100%;
-            }
-
-            .table tbody tr {
-                display: block;
-                margin-bottom: 15px;
-                border-bottom: 1px solid var(--bs-border-color);
-                padding-bottom: 15px;
-            }
-
-            .table tbody tr td {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                border: none;
-                position: relative;
-                padding-left: 40%;
-                text-align: left;
-            }
-
-            .table tbody tr td:before {
-                content: attr(data-label);
-                font-weight: bold;
-                text-transform: uppercase;
-                position: absolute;
-                left: 10px;
-                width: 45%;
-                padding-right: 10px;
-                white-space: nowrap;
-                font-weight: bold;
-                color: var(--bs-body-color);
-                text-align: left;
-            }
-
-            /* Mobile action button styles handled by unified styles in header.php */
-        }
+        /* Mobile table card layout handled by unified styles in header.php */
 
         .pr-0 {
             padding-right: 0 !important;
