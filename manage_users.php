@@ -86,18 +86,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Pagination settings
-$records_per_page = 10;
+$allowed_per_page = [10, 25, 50];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
-// Count total users
-$count_result = mysqli_query($con, "SELECT COUNT(*) as total FROM users");
-$total_records = mysqli_fetch_assoc($count_result)['total'];
+// Search parameter
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+// Build query with optional search
+if (!empty($search)) {
+    $search_pattern = '%' . $search . '%';
+    $count_stmt = $con->prepare("SELECT COUNT(*) as total FROM users WHERE name LIKE ? OR username LIKE ? OR role LIKE ? OR status LIKE ?");
+    $count_stmt->bind_param("ssss", $search_pattern, $search_pattern, $search_pattern, $search_pattern);
+    $count_stmt->execute();
+    $total_records = $count_stmt->get_result()->fetch_assoc()['total'];
+    $count_stmt->close();
+
+    $user_stmt = $con->prepare("SELECT * FROM users WHERE name LIKE ? OR username LIKE ? OR role LIKE ? OR status LIKE ? ORDER BY name ASC LIMIT ? OFFSET ?");
+    $user_stmt->bind_param("ssssii", $search_pattern, $search_pattern, $search_pattern, $search_pattern, $records_per_page, $offset);
+    $user_stmt->execute();
+    $userresult = $user_stmt->get_result();
+    $user_stmt->close();
+} else {
+    $total_records = mysqli_query($con, "SELECT COUNT(*) as total FROM users")->fetch_assoc()['total'];
+    $user_stmt = $con->prepare("SELECT * FROM users ORDER BY name ASC LIMIT ? OFFSET ?");
+    $user_stmt->bind_param("ii", $records_per_page, $offset);
+    $user_stmt->execute();
+    $userresult = $user_stmt->get_result();
+    $user_stmt->close();
+}
 $total_pages = ceil($total_records / $records_per_page);
 
-// Fetch users with pagination
-$userquery = "SELECT * FROM users ORDER BY name ASC LIMIT $records_per_page OFFSET $offset";
-$userresult = mysqli_query($con, $userquery);
+// Helper to build query string
+function buildUserQueryString($overrides = []) {
+    $params = [
+        'search' => $_GET['search'] ?? '',
+        'per_page' => $_GET['per_page'] ?? 10,
+        'page' => $_GET['page'] ?? 1,
+    ];
+    $params = array_merge($params, $overrides);
+    return http_build_query($params);
+}
 
 // Include the header file
 require 'header.php';
@@ -198,16 +231,40 @@ mysqli_close($con);
     <div class="container mt-4 content" style="max-width: 900px;">
         <div class="main-content">
             <h1 class="text-center">User Management</h1>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div></div>
-                <small class="text-muted">
-                    <?php if ($total_records > 0): ?>
-                        Showing <?= $offset + 1; ?> - <?= min($offset + $records_per_page, $total_records); ?>
-                        of <?= $total_records; ?> users
-                    <?php else: ?>
-                        No users found
+
+            <!-- Search Bar -->
+            <form method="GET" action="">
+                <div class="header-actions">
+                    <div class="search-box">
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="search"
+                                   placeholder="Search name, username, role, status..."
+                                   value="<?php echo htmlspecialchars($search); ?>">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="per_page" class="form-label mb-0 text-nowrap">Show</label>
+                        <select class="form-select form-select-sm" id="per_page" name="per_page" style="width: auto;" onchange="this.form.submit()">
+                            <?php foreach ($allowed_per_page as $pp): ?>
+                                <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php if (!empty($search)): ?>
+                        <a href="manage_users.php" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
                     <?php endif; ?>
-                </small>
+                </div>
+            </form>
+            <div class="pagination-info">
+                <?php if ($total_records > 0): ?>
+                    Showing <?= $offset + 1; ?> - <?= min($offset + $records_per_page, $total_records); ?>
+                    of <?= $total_records; ?> users
+                <?php else: ?>
+                    No users found
+                <?php endif; ?>
             </div>
             <div class="table-responsive">
                 <table class="table table-striped">
@@ -266,19 +323,19 @@ mysqli_close($con);
                     <ul class="pagination justify-content-center">
                         <?php if ($current_page > 1): ?>
                             <li class="page-item">
-                                <a class="page-link" href="?page=<?= $current_page - 1; ?>">Previous</a>
+                                <a class="page-link" href="?<?= buildUserQueryString(['page' => $current_page - 1]); ?>">Previous</a>
                             </li>
                         <?php endif; ?>
 
                         <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
                             <li class="page-item <?= $i == $current_page ? 'active' : ''; ?>">
-                                <a class="page-link" href="?page=<?= $i; ?>"><?= $i; ?></a>
+                                <a class="page-link" href="?<?= buildUserQueryString(['page' => $i]); ?>"><?= $i; ?></a>
                             </li>
                         <?php endfor; ?>
 
                         <?php if ($current_page < $total_pages): ?>
                             <li class="page-item">
-                                <a class="page-link" href="?page=<?= $current_page + 1; ?>">Next</a>
+                                <a class="page-link" href="?<?= buildUserQueryString(['page' => $current_page + 1]); ?>">Next</a>
                             </li>
                         <?php endif; ?>
                     </ul>

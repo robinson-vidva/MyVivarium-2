@@ -298,6 +298,9 @@ require 'header.php';
                                 <thead>
                                     <tr>
                                         <th>Cage ID</th>
+                                        <th>Strain</th>
+                                        <th>Sex</th>
+                                        <th>Age</th>
                                         <th style="width: 220px;">Action</th>
                                     </tr>
                                 </thead>

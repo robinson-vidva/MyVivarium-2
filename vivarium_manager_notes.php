@@ -143,7 +143,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
 }
 
 // Pagination settings
-$records_per_page = 50;
+$allowed_per_page = [10, 25, 50, 100];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
@@ -379,6 +383,14 @@ require 'header.php';
 
                 <div class="filter-row">
                     <div class="filter-group">
+                        <label for="per_page">Show</label>
+                        <select class="form-select" id="per_page" name="per_page" onchange="this.form.submit()">
+                            <?php foreach ($allowed_per_page as $pp): ?>
+                                <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label for="date_from">Date From</label>
                         <input type="date" class="form-control" id="date_from" name="date_from"
                                value="<?php echo htmlspecialchars($date_from); ?>">
@@ -479,7 +491,7 @@ require 'header.php';
                 <ul class="pagination justify-content-center">
                     <?php if ($current_page > 1): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?>&view=<?php echo $filter_view; ?>&per_page=<?php echo $records_per_page; ?><?php echo $extraParams; ?>">
                                 Previous
                             </a>
                         </li>
@@ -487,7 +499,7 @@ require 'header.php';
 
                     <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
                         <li class="page-item <?php echo $i == $current_page ? 'active' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $i; ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
+                            <a class="page-link" href="?page=<?php echo $i; ?>&view=<?php echo $filter_view; ?>&per_page=<?php echo $records_per_page; ?><?php echo $extraParams; ?>">
                                 <?php echo $i; ?>
                             </a>
                         </li>
@@ -495,7 +507,7 @@ require 'header.php';
 
                     <?php if ($current_page < $total_pages): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?>&view=<?php echo $filter_view; ?>&per_page=<?php echo $records_per_page; ?><?php echo $extraParams; ?>">
                                 Next
                             </a>
                         </li>
