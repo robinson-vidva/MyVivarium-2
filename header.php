@@ -640,6 +640,9 @@ if (isset($settings['r2_pres'])) {
             flex-direction: column;
             align-items: stretch;
         }
+        .header-actions .btn:not(.input-group .btn) {
+            align-self: flex-start;
+        }
         .search-box {
             max-width: 100%;
         }
@@ -752,6 +755,54 @@ if (isset($settings['r2_pres'])) {
     .table-actions form,
     .action-icons form {
         display: contents;
+    }
+
+    /* Mobile Table Card Layout */
+    @media (max-width: 576px) {
+        .table thead {
+            display: none;
+        }
+        .table tbody {
+            display: block;
+            width: 100%;
+        }
+        .table tbody tr {
+            display: block;
+            margin-bottom: 15px;
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .table tbody tr td {
+            display: block;
+            padding: 8px 10px;
+            border: none;
+            position: relative;
+            padding-left: 40%;
+            text-align: left;
+        }
+        .table tbody tr td::before {
+            content: attr(data-label);
+            font-weight: bold;
+            text-transform: uppercase;
+            position: absolute;
+            left: 10px;
+            width: 35%;
+            padding-right: 10px;
+            white-space: nowrap;
+            color: var(--bs-body-color);
+            text-align: left;
+        }
+        .table tbody tr td[data-label="Actions"] {
+            padding-left: 10px;
+        }
+        .table tbody tr td[data-label="Actions"]::before {
+            display: none;
+        }
+        .table tbody tr td[data-label="Actions"] .action-buttons,
+        .table tbody tr td[data-label="Actions"] .table-actions {
+            justify-content: flex-start;
+        }
     }
     </style>
     <!-- Session Timeout Warning -->

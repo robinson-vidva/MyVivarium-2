@@ -163,56 +163,7 @@ mysqli_close($con);
 
         /* Action button styles handled by unified styles in header.php */
 
-        @media (max-width: 576px) {
-            .table th,
-            .table td {
-                display: block;
-                width: 100%;
-            }
-
-            .table thead {
-                display: none;
-            }
-
-            .table tr {
-                margin-bottom: 15px;
-                display: block;
-                border: 1px solid var(--bs-border-color);
-                border-radius: 8px;
-                padding: 10px;
-            }
-
-            .table td {
-                border: none;
-                padding: 6px 10px;
-                position: relative;
-                padding-left: 40%;
-                text-align: left;
-            }
-
-            .table td::before {
-                content: attr(data-label);
-                font-weight: bold;
-                text-transform: uppercase;
-                position: absolute;
-                left: 10px;
-                width: 35%;
-                white-space: nowrap;
-                color: var(--bs-body-color);
-            }
-
-            .table td[data-label="Actions"] {
-                padding-left: 10px;
-            }
-
-            .table td[data-label="Actions"]::before {
-                display: none;
-            }
-
-            .table td[data-label="Actions"] .action-buttons {
-                justify-content: flex-start;
-            }
-        }
+        /* Mobile table card layout handled by unified styles in header.php */
     </style>
 
     <script>
