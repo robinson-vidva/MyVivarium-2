@@ -173,8 +173,6 @@ require 'header.php';
             max-width: 400px;
         }
 
-        /* Action button styles handled by unified styles in header.php */
-
         .filter-row {
             display: flex;
             flex-wrap: wrap;
@@ -198,11 +196,6 @@ require 'header.php';
             color: var(--bs-secondary-color);
         }
 
-        .details-cell {
-            max-width: 300px;
-            word-wrap: break-word;
-        }
-
         .pagination-info {
             margin: 15px 0;
             color: var(--bs-secondary-color);
@@ -212,14 +205,67 @@ require 'header.php';
             vertical-align: middle;
         }
 
-        .badge-action {
+        .table tbody tr {
+            cursor: pointer;
         }
 
-        .ip-cell {
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .entity-label {
+            display: inline;
+        }
+
+        /* Detail popup overlay */
+        .detail-popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1050;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .detail-popup-overlay.active {
+            display: flex;
+        }
+
+        .detail-popup {
+            background: var(--bs-body-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 550px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .detail-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--bs-border-color);
+        }
+
+        .detail-popup-header h5 {
+            margin: 0;
+        }
+
+        .detail-popup-body {
+            padding: 20px;
+        }
+
+        .detail-popup-body .details-table th {
+            width: 35%;
             white-space: nowrap;
+        }
+
+        .detail-popup-body .details-table td {
+            word-break: break-word;
         }
 
         @media print {
@@ -256,10 +302,13 @@ require 'header.php';
                 max-width: 100%;
             }
 
-            /* Action button styles handled by unified styles in header.php */
-
             .filter-row {
                 flex-direction: column;
+            }
+
+            .detail-popup {
+                width: 95%;
+                max-height: 90vh;
             }
         }
     </style>
@@ -366,20 +415,16 @@ require 'header.php';
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Date/Time</th>
                         <th>User</th>
                         <th>Action</th>
-                        <th>Entity Type</th>
-                        <th>Entity ID</th>
-                        <th>Details</th>
-                        <th>IP Address</th>
+                        <th>Entity</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($log_entries)): ?>
                         <tr>
-                            <td colspan="8" class="text-center py-4">
+                            <td colspan="4" class="text-center py-4">
                                 <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                 <p>No activity log entries found.</p>
                                 <?php if (!empty($search) || $entity_type_filter !== 'all' || !empty($date_from) || !empty($date_to)): ?>
@@ -388,41 +433,94 @@ require 'header.php';
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($log_entries as $entry): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($entry['id']); ?></td>
+                        <?php foreach ($log_entries as $entry):
+                            $action_class = 'bg-secondary';
+                            switch ($entry['action']) {
+                                case 'create': $action_class = 'bg-success'; break;
+                                case 'edit': $action_class = 'bg-primary'; break;
+                                case 'delete': $action_class = 'bg-danger'; break;
+                                case 'archive': $action_class = 'bg-warning text-dark'; break;
+                                case 'restore': $action_class = 'bg-info text-dark'; break;
+                                case 'rename': $action_class = 'bg-primary'; break;
+                                case 'role_change': $action_class = 'bg-dark'; break;
+                            }
+                        ?>
+                            <tr onclick="showDetail(this)"
+                                data-id="<?php echo htmlspecialchars($entry['id']); ?>"
+                                data-date="<?php echo date('Y-m-d H:i:s', strtotime($entry['created_at'])); ?>"
+                                data-user="<?php echo htmlspecialchars($entry['user_name'] ?? 'Unknown'); ?>"
+                                data-action="<?php echo htmlspecialchars(ucfirst($entry['action'])); ?>"
+                                data-action-class="<?php echo $action_class; ?>"
+                                data-entity-type="<?php echo htmlspecialchars(ucfirst($entry['entity_type'])); ?>"
+                                data-entity-id="<?php echo htmlspecialchars($entry['entity_id']); ?>"
+                                data-details="<?php echo htmlspecialchars($entry['details'] ?? '—'); ?>"
+                                data-ip="<?php echo htmlspecialchars($entry['ip_address'] ?? '—'); ?>">
                                 <td class="timestamp">
                                     <?php echo date('Y-m-d', strtotime($entry['created_at'])); ?><br>
                                     <small><?php echo date('H:i:s', strtotime($entry['created_at'])); ?></small>
                                 </td>
                                 <td><?php echo htmlspecialchars($entry['user_name'] ?? 'Unknown'); ?></td>
                                 <td>
-                                    <?php
-                                    $action_class = 'bg-secondary';
-                                    switch ($entry['action']) {
-                                        case 'create': $action_class = 'bg-success'; break;
-                                        case 'edit': $action_class = 'bg-primary'; break;
-                                        case 'delete': $action_class = 'bg-danger'; break;
-                                        case 'archive': $action_class = 'bg-warning text-dark'; break;
-                                        case 'restore': $action_class = 'bg-info text-dark'; break;
-                                        case 'rename': $action_class = 'bg-primary'; break;
-                                        case 'role_change': $action_class = 'bg-dark'; break;
-                                    }
-                                    ?>
-                                    <span class="badge <?php echo $action_class; ?> badge-action">
+                                    <span class="badge <?php echo $action_class; ?>">
                                         <?php echo htmlspecialchars(ucfirst($entry['action'])); ?>
                                     </span>
                                 </td>
-                                <td><?php echo htmlspecialchars(ucfirst($entry['entity_type'])); ?></td>
-                                <td><strong><?php echo htmlspecialchars($entry['entity_id']); ?></strong></td>
-                                <td class="details-cell"><?php echo htmlspecialchars($entry['details'] ?? ''); ?></td>
-                                <td class="ip-cell" title="<?php echo htmlspecialchars($entry['ip_address'] ?? ''); ?>"><small><?php echo htmlspecialchars($entry['ip_address'] ?? ''); ?></small></td>
+                                <td>
+                                    <span class="entity-label"><?php echo htmlspecialchars(ucfirst($entry['entity_type'])); ?></span>
+                                    <strong>#<?php echo htmlspecialchars($entry['entity_id']); ?></strong>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div><!-- End table-responsive -->
+
+        <!-- Detail Popup -->
+        <div class="detail-popup-overlay" id="detailPopup">
+            <div class="detail-popup">
+                <div class="detail-popup-header">
+                    <h5><i class="fas fa-info-circle"></i> Log Entry Details</h5>
+                    <button type="button" class="popup-close-btn" onclick="closeDetail()">&times;</button>
+                </div>
+                <div class="detail-popup-body">
+                    <table class="details-table">
+                        <tr>
+                            <th>Log ID</th>
+                            <td id="detailId"></td>
+                        </tr>
+                        <tr>
+                            <th>Date / Time</th>
+                            <td id="detailDate"></td>
+                        </tr>
+                        <tr>
+                            <th>User</th>
+                            <td id="detailUser"></td>
+                        </tr>
+                        <tr>
+                            <th>Action</th>
+                            <td id="detailAction"></td>
+                        </tr>
+                        <tr>
+                            <th>Entity Type</th>
+                            <td id="detailEntityType"></td>
+                        </tr>
+                        <tr>
+                            <th>Entity ID</th>
+                            <td id="detailEntityId"></td>
+                        </tr>
+                        <tr>
+                            <th>Details</th>
+                            <td id="detailDetails"></td>
+                        </tr>
+                        <tr>
+                            <th>IP Address</th>
+                            <td id="detailIp"></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
 
         <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
@@ -457,6 +555,38 @@ require 'header.php';
     </div>
 
     <?php include 'footer.php'; ?>
+
+    <script>
+    function showDetail(row) {
+        document.getElementById('detailId').textContent = row.dataset.id;
+        document.getElementById('detailDate').textContent = row.dataset.date;
+        document.getElementById('detailUser').textContent = row.dataset.user;
+        document.getElementById('detailEntityType').textContent = row.dataset.entityType;
+        document.getElementById('detailEntityId').textContent = row.dataset.entityId;
+        document.getElementById('detailDetails').textContent = row.dataset.details;
+        document.getElementById('detailIp').textContent = row.dataset.ip;
+
+        // Action badge
+        var actionCell = document.getElementById('detailAction');
+        actionCell.innerHTML = '<span class="badge ' + row.dataset.actionClass + '">' + row.dataset.action + '</span>';
+
+        document.getElementById('detailPopup').classList.add('active');
+    }
+
+    function closeDetail() {
+        document.getElementById('detailPopup').classList.remove('active');
+    }
+
+    // Close on overlay click
+    document.getElementById('detailPopup').addEventListener('click', function(e) {
+        if (e.target === this) closeDetail();
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeDetail();
+    });
+    </script>
 </body>
 </html>
 
