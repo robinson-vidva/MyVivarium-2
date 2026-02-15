@@ -136,7 +136,7 @@ require 'header.php';
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4>Add Cage Maintenance Record</h4>
+                        <h1 class="mb-0">Add Cage Maintenance Record</h1>
                         <div class="action-buttons">
                             <!-- Button to go back to the previous page -->
                             <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">

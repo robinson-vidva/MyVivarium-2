@@ -285,7 +285,6 @@ require 'header.php';
         /* Action button styles handled by unified styles in header.php */
 
         .timestamp {
-            font-size: 0.9em;
             color: var(--bs-secondary-color);
         }
 

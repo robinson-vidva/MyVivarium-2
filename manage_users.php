@@ -165,7 +165,6 @@ mysqli_close($con);
                 left: 10px;
                 width: 35%;
                 white-space: nowrap;
-                font-size: 0.8rem;
                 color: var(--bs-body-color);
             }
 
