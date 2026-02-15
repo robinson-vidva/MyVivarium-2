@@ -610,6 +610,8 @@ if (isset($settings['r2_pres'])) {
     [data-bs-theme="dark"] .table-wrapper td,
     [data-bs-theme="dark"] .table th,
     [data-bs-theme="dark"] .table td { border-color: #565e66; }
+    [data-bs-theme="dark"] .details-table th,
+    [data-bs-theme="dark"] .details-table td { border-bottom-color: #565e66; }
     [data-bs-theme="dark"] .table-wrapper thead,
     [data-bs-theme="dark"] .table thead { background-color: #343a40; }
     [data-bs-theme="dark"] .table-wrapper thead th,
