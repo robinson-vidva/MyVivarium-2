@@ -288,8 +288,8 @@ if (isset($settings['r2_pres'])) {
                             ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'vivarium_manager')) {
                             echo '<li><hr class="dropdown-divider"></li>';
                             echo '<li class="dropdown-header">Vivarium Management</li>';
-                            echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php"><i class="fas fa-clipboard-list"></i> Maintenance Notes</a></li>';
-                            echo '<li><a class="dropdown-item" href="activity_log.php"><i class="fas fa-history"></i> Activity Log</a></li>';
+                            echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php">Maintenance Notes</a></li>';
+                            echo '<li><a class="dropdown-item" href="activity_log.php">Activity Log</a></li>';
                         }
 
                         // Display admin options if the user is an admin
