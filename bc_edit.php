@@ -773,8 +773,7 @@ require 'header.php';
 
     <title>Edit Breeding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
-    <!-- Include Select2 CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
 
     <!-- Include Select2 JavaScript -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
