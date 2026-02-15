@@ -522,11 +522,11 @@ ob_end_flush(); // Flush the output buffer
                     <input type="text" name="search" class="form-control" placeholder="Search tasks..." value="<?= htmlspecialchars($search); ?>">
                 </div>
                 <div class="col-auto">
-                    <button type="submit" class="btn btn-primary">Search</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
                 </div>
                 <?php if ($search || $filter): ?>
                     <div class="col-auto">
-                        <a href="manage_tasks.php<?= $cageIdFilter ? '?id=' . urlencode($cageIdFilter) : ''; ?>" class="btn btn-outline-secondary"><i class="fas fa-times"></i> Clear</a>
+                        <a href="manage_tasks.php<?= $cageIdFilter ? '?id=' . urlencode($cageIdFilter) : ''; ?>" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
                     </div>
                 <?php endif; ?>
             </div>

@@ -600,6 +600,55 @@ if (isset($settings['r2_pres'])) {
     .content .filter-group label { font-size: 0.85rem; }
     </style>
 
+    <!-- Unified Search/Filter Bar Styles -->
+    <style>
+    .header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .search-box {
+        flex: 1;
+        max-width: 400px;
+    }
+    .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 15px;
+        align-items: flex-end;
+    }
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .filter-group label {
+        font-weight: bold;
+        color: var(--bs-secondary-color);
+    }
+    .pagination-info {
+        margin: 15px 0;
+        color: var(--bs-secondary-color);
+    }
+    @media (max-width: 768px) {
+        .header-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .search-box {
+            max-width: 100%;
+        }
+        .filter-row {
+            flex-direction: column;
+        }
+    }
+    </style>
+
     <!-- Unified Table Styles -->
     <style>
     .table-wrapper table,

@@ -267,22 +267,7 @@ require 'header.php';
             min-height: 80vh;
         }
 
-        .header-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .search-box {
-            flex: 1;
-            max-width: 400px;
-        }
-
-        /* Action button styles handled by unified styles in header.php */
+        /* header-actions, search-box, filter-row, filter-group, pagination-info loaded via header.php */
 
         .timestamp {
             color: var(--bs-secondary-color);
@@ -291,11 +276,6 @@ require 'header.php';
         .comments-cell {
             max-width: 400px;
             word-wrap: break-word;
-        }
-
-        .pagination-info {
-            margin: 15px 0;
-            color: var(--bs-secondary-color);
         }
 
         .modal-header {
@@ -329,19 +309,6 @@ require 'header.php';
 
         .print-header {
             display: none;
-        }
-
-        @media (max-width: 768px) {
-            .header-actions {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .search-box {
-                max-width: 100%;
-            }
-
-            /* Action button styles handled by unified styles in header.php */
         }
     </style>
 </head>
@@ -387,48 +354,56 @@ require 'header.php';
             </div>
 
             <!-- Search and Action Bar -->
-            <div class="header-actions">
-                <form method="GET" action="" class="w-100">
-                    <input type="hidden" name="view" value="<?php echo htmlspecialchars($filter_view); ?>">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-4">
-                            <div class="input-group">
-                                <input type="text"
-                                       class="form-control"
-                                       name="search"
-                                       placeholder="Search cage ID, comments, or user..."
-                                       value="<?php echo htmlspecialchars($search); ?>">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-0">From</label>
-                            <input type="date" class="form-control form-control-sm" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-0">To</label>
-                            <input type="date" class="form-control form-control-sm" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-primary" type="submit">
-                                    <i class="fas fa-search"></i> Search
-                                </button>
-                                <?php if (!empty($search) || !empty($date_from) || !empty($date_to)): ?>
-                                    <a href="?view=<?php echo htmlspecialchars($filter_view); ?>" class="btn btn-secondary">
-                                        <i class="fas fa-times"></i> Clear
-                                    </a>
-                                <?php endif; ?>
-                                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">
-                                    <i class="fas fa-plus"></i> Add Note
-                                </button>
-                                <button type="button" class="btn btn-info" onclick="window.print()">
-                                    <i class="fas fa-print"></i> Print
-                                </button>
-                            </div>
+            <form method="GET" action="">
+                <input type="hidden" name="view" value="<?php echo htmlspecialchars($filter_view); ?>">
+                <div class="header-actions">
+                    <div class="search-box">
+                        <div class="input-group">
+                            <input type="text"
+                                   class="form-control"
+                                   name="search"
+                                   placeholder="Search cage ID, comments, or user..."
+                                   value="<?php echo htmlspecialchars($search); ?>">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                            <button type="button" class="btn btn-info" onclick="window.print()">
+                                <i class="fas fa-print"></i>
+                            </button>
                         </div>
                     </div>
-                </form>
-            </div>
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                        <i class="fas fa-plus"></i> Add Note
+                    </button>
+                </div>
+
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="date_from">Date From</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from"
+                               value="<?php echo htmlspecialchars($date_from); ?>">
+                    </div>
+                    <div class="filter-group">
+                        <label for="date_to">Date To</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to"
+                               value="<?php echo htmlspecialchars($date_to); ?>">
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Apply
+                        </button>
+                    </div>
+                    <?php if (!empty($search) || !empty($date_from) || !empty($date_to)): ?>
+                        <div class="filter-group">
+                            <label>&nbsp;</label>
+                            <a href="?view=<?php echo htmlspecialchars($filter_view); ?>" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Clear All
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </form>
 
             <!-- Pagination Info -->
             <div class="pagination-info">
