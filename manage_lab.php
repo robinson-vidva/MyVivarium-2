@@ -145,7 +145,6 @@ require 'header.php';
         }
 
         .section-header > i {
-            font-size: 1.15rem;
             color: var(--bs-primary);
             width: 24px;
             text-align: center;
@@ -153,8 +152,6 @@ require 'header.php';
 
         .section-header h5 {
             margin: 0;
-            font-weight: 600;
-            font-size: 1.05rem;
         }
 
         .form-group {
@@ -163,13 +160,8 @@ require 'header.php';
 
         .form-group label {
             font-weight: 500;
-            font-size: 0.9rem;
             margin-bottom: 4px;
             color: var(--bs-body-color);
-        }
-
-        .form-group .form-text {
-            font-size: 0.78rem;
         }
 
         .sensor-grid {
@@ -189,7 +181,6 @@ require 'header.php';
         }
 
         .sensor-grid textarea {
-            font-size: 0.82rem;
             min-height: 60px;
         }
 
@@ -198,7 +189,6 @@ require 'header.php';
             width: 100%;
             padding: 12px;
             border-radius: 8px;
-            font-size: 1rem;
             font-weight: 600;
         }
 
@@ -210,7 +200,6 @@ require 'header.php';
         .collapse-toggle .chevron {
             transition: transform 0.2s ease;
             margin-left: auto;
-            font-size: 0.85rem;
             color: var(--bs-secondary-color);
         }
 

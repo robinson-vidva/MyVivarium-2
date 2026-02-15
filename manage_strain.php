@@ -166,7 +166,6 @@ $strainResult = $con->query($strainQuery);
         .table td:nth-child(3) {
             width: 160px;
             white-space: nowrap;
-            font-size: 0.85rem;
         }
 
         /* Actions column */

@@ -578,6 +578,28 @@ if (isset($settings['r2_pres'])) {
     }
     </style>
 
+    <!-- Global Typography Scale -->
+    <style>
+    .content h1 { font-size: 1.55rem; font-weight: 600; }
+    .content h2 { font-size: 1.35rem; font-weight: 600; }
+    .content h3 { font-size: 1.2rem; font-weight: 600; }
+    .content h4 { font-size: 1.1rem; font-weight: 600; }
+    .content h5 { font-size: 1.0rem; font-weight: 600; }
+    .content h6 { font-size: 0.9rem; font-weight: 600; }
+    .content label { font-size: 0.9rem; }
+    .content .form-text { font-size: 0.8rem; }
+    .content .details-table th,
+    .content .details-table td { font-size: 0.92rem; }
+    .content .section-header h5 { font-size: 1.0rem; }
+    .content .section-header > i { font-size: 1.05rem; }
+    .content .badge { font-size: 0.8rem; }
+    .content .timestamp { font-size: 0.85rem; }
+    .content .warning-text { font-size: 0.85rem; }
+    .content .note, .content .note1 { font-size: 0.82rem; color: var(--bs-secondary-color); }
+    .content .char-count { font-size: 0.8rem; }
+    .content .filter-group label { font-size: 0.85rem; }
+    </style>
+
     <!-- Unified Table Styles -->
     <style>
     .table-wrapper table,

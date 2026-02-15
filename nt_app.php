@@ -91,7 +91,6 @@ $result = $stmt->get_result();
         .timestamp,
         .userid {
             display: block;
-            font-size: 12px;
         }
 
         .timestamp {
@@ -194,7 +193,6 @@ $result = $stmt->get_result();
         }
 
         .char-count {
-            font-size: 12px;
             color: var(--bs-secondary-color);
             margin-bottom: 10px;
             text-align: right;

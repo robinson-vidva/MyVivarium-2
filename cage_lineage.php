@@ -287,7 +287,7 @@ require 'header.php';
     <div class="container content mt-4">
         <div class="card">
             <div class="card-header">
-                <h4>Cage Lineage Viewer</h4>
+                <h1 class="mb-0">Cage Lineage Viewer</h1>
             </div>
             <div class="card-body">
                 <!-- Search Form -->

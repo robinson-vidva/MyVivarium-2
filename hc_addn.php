@@ -305,7 +305,6 @@ require 'header.php';
 
         .warning-text {
             color: var(--bs-danger);
-            font-size: 14px;
         }
 
         .select2-container .select2-selection--single {

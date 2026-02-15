@@ -190,13 +190,11 @@ require 'header.php';
         }
 
         .filter-group label {
-            font-size: 0.85em;
             font-weight: bold;
             color: var(--bs-secondary-color);
         }
 
         .timestamp {
-            font-size: 0.9em;
             color: var(--bs-secondary-color);
         }
 
@@ -215,7 +213,6 @@ require 'header.php';
         }
 
         .badge-action {
-            font-size: 0.85em;
         }
 
         .ip-cell {

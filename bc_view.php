@@ -317,7 +317,6 @@ require 'header.php';
         }
 
         .section-header > i {
-            font-size: 1.1rem;
             color: var(--bs-primary);
             width: 22px;
             text-align: center;
@@ -325,8 +324,6 @@ require 'header.php';
 
         .section-header h5 {
             margin: 0;
-            font-weight: 600;
-            font-size: 1.05rem;
         }
 
         .section-header .action-buttons {
@@ -344,7 +341,6 @@ require 'header.php';
             padding: 10px 14px;
             border-bottom: 1px solid var(--bs-border-color);
             vertical-align: middle;
-            font-size: 0.92rem;
         }
 
         .details-table th {

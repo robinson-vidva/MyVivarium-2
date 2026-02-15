@@ -100,11 +100,12 @@ require 'header.php';
 
 <body>
     <div class="container mt-4 content" style="max-width: 900px;">
+        <h1 class="text-center">IOT Sensors</h1>
         <!-- Section for Room 1 IOT Sensors -->
         <?php if (!empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres)) : ?>
             <div class="row mb-4">
                 <div class="col-12">
-                    <h2><?php echo htmlspecialchars($labName); ?> - Room 1 IOT Sensors</h2>
+                    <h3><?php echo htmlspecialchars($labName); ?> - Room 1 IOT Sensors</h3>
                 </div>
 
                 <div class="col-md-6 mb-4">
@@ -126,7 +127,7 @@ require 'header.php';
         <?php if (!empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres)) : ?>
             <div class="row">
                 <div class="col-12">
-                    <h2><?php echo htmlspecialchars($labName); ?> - Room 2 IOT Sensors</h2>
+                    <h3><?php echo htmlspecialchars($labName); ?> - Room 2 IOT Sensors</h3>
                 </div>
 
                 <div class="col-md-6 mb-4">

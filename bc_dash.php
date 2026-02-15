@@ -248,7 +248,7 @@ require 'header.php';
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-center">
-                        <h4>Breeding Cage Dashboard</h4>
+                        <h1 class="mb-0">Breeding Cage Dashboard</h1>
                         <div class="action-icons mt-3 mt-md-0">
                             <!-- Add new cage button with tooltip -->
                             <a href="bc_addn.php" class="btn btn-primary btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add New Cage">
