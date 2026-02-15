@@ -133,7 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Pagination settings
-$records_per_page = 10;
+$allowed_per_page = [10, 25, 50];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
@@ -168,6 +172,7 @@ $total_pages = ceil($total_records / $records_per_page);
 function buildIacucQueryString($overrides = []) {
     $params = [
         'search' => $_GET['search'] ?? '',
+        'per_page' => $_GET['per_page'] ?? 10,
         'page' => $_GET['page'] ?? 1,
     ];
     $params = array_merge($params, $overrides);
@@ -333,6 +338,14 @@ function buildIacucQueryString($overrides = []) {
                             <i class="fas fa-search"></i> Search
                         </button>
                     </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label for="per_page" class="form-label mb-0 text-nowrap">Show</label>
+                    <select class="form-select form-select-sm" id="per_page" name="per_page" style="width: auto;" onchange="this.form.submit()">
+                        <?php foreach ($allowed_per_page as $pp): ?>
+                            <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <button type="button" onclick="openForm()" class="btn btn-success"><i class="fas fa-plus"></i> Add New IACUC</button>
             </div>

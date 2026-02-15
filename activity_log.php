@@ -27,7 +27,11 @@ if (!isset($_SESSION['role']) ||
 }
 
 // Pagination settings
-$records_per_page = 50;
+$allowed_per_page = [10, 25, 50, 100];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
@@ -131,6 +135,7 @@ function buildQueryString($overrides = []) {
         'entity_type' => $_GET['entity_type'] ?? 'all',
         'date_from' => $_GET['date_from'] ?? '',
         'date_to' => $_GET['date_to'] ?? '',
+        'per_page' => $_GET['per_page'] ?? 10,
         'page' => $_GET['page'] ?? 1,
     ];
     $params = array_merge($params, $overrides);
@@ -307,6 +312,15 @@ require 'header.php';
                 </div>
 
                 <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="per_page">Show</label>
+                        <select class="form-select" id="per_page" name="per_page" onchange="this.form.submit()">
+                            <?php foreach ($allowed_per_page as $pp): ?>
+                                <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
                     <div class="filter-group">
                         <label for="entity_type">Entity Type</label>
                         <select class="form-select" id="entity_type" name="entity_type" onchange="this.form.submit()">
