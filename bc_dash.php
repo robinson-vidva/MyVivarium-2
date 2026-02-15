@@ -270,7 +270,7 @@ require 'header.php';
                         <!-- Breeding Cage Search Box -->
                         <div class="input-group mb-3">
                             <input type="text" id="searchInput" class="form-control" placeholder="Enter Cage ID" onkeyup="searchCages()">
-                            <button class="btn btn-primary" type="button" onclick="searchCages()">Search</button>
+                            <button class="btn btn-primary" type="button" onclick="searchCages()"><i class="fas fa-search"></i> Search</button>
                         </div>
 
                         <!-- Controls row: page size, sort toggle, archive toggle -->
