@@ -110,7 +110,9 @@ while ($row = mysqli_fetch_assoc($result)) {
     while ($breedingcage = mysqli_fetch_assoc($cageResult)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
-            $tableRows .= '<td>' . htmlspecialchars($breedingcage['cage_id']) . '</td>'; // Display cage ID only once per group
+            $tableRows .= '<td>' . htmlspecialchars($breedingcage['cage_id']) . '</td>';
+            $tableRows .= '<td>' . htmlspecialchars($breedingcage['cross'] ?? '') . '</td>';
+            $tableRows .= '<td>' . htmlspecialchars($breedingcage['male_id'] ?? '') . ' / ' . htmlspecialchars($breedingcage['female_id'] ?? '') . '</td>';
             $firstRow = false;
         }
         $tableRows .= '<td class="action-icons" style="white-space: nowrap;">

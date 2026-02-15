@@ -109,7 +109,24 @@ while ($row = mysqli_fetch_assoc($result)) {
     while ($holdingcage = mysqli_fetch_assoc($cageResult)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
-            $tableRows .= '<td>' . htmlspecialchars($holdingcage['cage_id']) . '</td>'; // Display cage ID only once per group
+            $tableRows .= '<td>' . htmlspecialchars($holdingcage['cage_id']) . '</td>';
+            $tableRows .= '<td>' . htmlspecialchars($holdingcage['strain'] ?? '') . '</td>';
+            $tableRows .= '<td>' . htmlspecialchars(ucfirst($holdingcage['sex'] ?? '')) . '</td>';
+            // Calculate age from DOB
+            $ageStr = '';
+            if (!empty($holdingcage['dob'])) {
+                $dob = new DateTime($holdingcage['dob']);
+                $now = new DateTime();
+                $diff = $now->diff($dob);
+                if ($diff->y > 0) {
+                    $ageStr = $diff->y . 'y ' . $diff->m . 'm';
+                } elseif ($diff->m > 0) {
+                    $ageStr = $diff->m . 'm ' . $diff->d . 'd';
+                } else {
+                    $ageStr = $diff->d . 'd';
+                }
+            }
+            $tableRows .= '<td>' . htmlspecialchars($ageStr) . '</td>';
             $firstRow = false;
         }
         $tableRows .= '<td class="action-icons" style="white-space: nowrap;">
