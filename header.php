@@ -158,6 +158,12 @@ if (isset($settings['r2_pres'])) {
             margin: 0 5px;
         }
 
+        #darkModeToggle {
+            padding: .3rem .65rem;
+            font-size: .95rem;
+            line-height: inherit;
+        }
+
         .dropdown-menu {
             min-width: auto;
         }
@@ -282,8 +288,8 @@ if (isset($settings['r2_pres'])) {
                             ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'vivarium_manager')) {
                             echo '<li><hr class="dropdown-divider"></li>';
                             echo '<li class="dropdown-header">Vivarium Management</li>';
-                            echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php"><i class="fas fa-clipboard-list"></i> Maintenance Notes</a></li>';
-                            echo '<li><a class="dropdown-item" href="activity_log.php"><i class="fas fa-history"></i> Activity Log</a></li>';
+                            echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php">Maintenance Notes</a></li>';
+                            echo '<li><a class="dropdown-item" href="activity_log.php">Activity Log</a></li>';
                         }
 
                         // Display admin options if the user is an admin
@@ -443,6 +449,11 @@ if (isset($settings['r2_pres'])) {
     }
     [data-bs-theme="dark"] .select2-container--default .select2-results__option[aria-selected="true"] {
         background-color: #565e66 !important;
+        color: #adb5bd !important;
+    }
+    [data-bs-theme="dark"] .select2-results__option[aria-selected="true"] {
+        background-color: #565e66 !important;
+        color: #adb5bd !important;
     }
     [data-bs-theme="dark"] .select2-container--default .select2-results__option--disabled {
         color: #6c757d !important;
@@ -599,6 +610,8 @@ if (isset($settings['r2_pres'])) {
     [data-bs-theme="dark"] .table-wrapper td,
     [data-bs-theme="dark"] .table th,
     [data-bs-theme="dark"] .table td { border-color: #565e66; }
+    [data-bs-theme="dark"] .details-table th,
+    [data-bs-theme="dark"] .details-table td { border-bottom-color: #565e66; }
     [data-bs-theme="dark"] .table-wrapper thead,
     [data-bs-theme="dark"] .table thead { background-color: #343a40; }
     [data-bs-theme="dark"] .table-wrapper thead th,
