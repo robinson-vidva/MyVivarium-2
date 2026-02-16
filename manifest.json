@@ -1,6 +1,6 @@
 {
     "name": "MyVivarium",
-    "short_name": "Vivarium",
+    "short_name": "MyVivarium",
     "description": "An online platform for managing your vivarium",
     "start_url": "/home.php",
     "scope": "/",
