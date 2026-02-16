@@ -160,19 +160,19 @@ if (isset($_GET['id'])) {
             // Retrieve and sanitize form data
             $cage_id = trim($_POST['cage_id']);
             $new_cage_id = trim($_POST['new_cage_id']);
-            $pi_name = trim($_POST['pi_name']);
+            $pi_name = !empty($_POST['pi_name']) ? (int)$_POST['pi_name'] : null;
             $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
             $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-            $strain = trim($_POST['strain']);
+            $strain = !empty($_POST['strain']) ? trim($_POST['strain']) : null;
             if ($strain === 'custom') {
                 $strain = !empty($_POST['custom_strain']) ? trim($_POST['custom_strain']) : null;
             }
             $cage_genotype = !empty($_POST['cage_genotype']) ? trim($_POST['cage_genotype']) : null;
             $iacuc = isset($_POST['iacuc']) ? array_map('trim', $_POST['iacuc']) : [];
             $users = isset($_POST['user']) ? array_map('trim', $_POST['user']) : [];
-            $dob = trim($_POST['dob']);
-            $sex = trim($_POST['sex']);
-            $parent_cg = trim($_POST['parent_cg']);
+            $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
+            $sex = !empty($_POST['sex']) ? strtolower(trim($_POST['sex'])) : null;
+            $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
             $remarks = trim($_POST['remarks']);
 
             // Handle cage ID change if new_cage_id differs from current cage_id
@@ -227,7 +227,7 @@ if (isset($_GET['id'])) {
                                  WHERE `cage_id` = ?";
 
             $stmtCages = $con->prepare($updateQueryCages);
-            $stmtCages->bind_param("issss", $pi_name, $remarks, $room, $rack, $cage_id);
+            $stmtCages->bind_param("sssss", $pi_name, $remarks, $room, $rack, $cage_id);
             $resultCages = $stmtCages->execute();
             $stmtCages->close();
 
@@ -1044,8 +1044,8 @@ require 'header.php';
                                 <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
                                 <select class="form-control" id="sex" name="sex" data-field-type="critical">
                                     <option value="">Select Sex</option>
-                                    <option value="Male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
-                                    <option value="Female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
+                                    <option value="male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
+                                    <option value="female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
                                 </select>
                             </div>
 

@@ -735,8 +735,8 @@ require 'header.php';
                 <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
                 <select class="form-control" id="sex" name="sex" data-field-type="critical">
                     <option value="">Select Sex</option>
-                    <option value="Male" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'Male') ? 'selected' : '' ?>>Male</option>
-                    <option value="Female" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'Female') ? 'selected' : '' ?>>Female</option>
+                    <option value="male" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'male') ? 'selected' : '' ?>>Male</option>
+                    <option value="female" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'female') ? 'selected' : '' ?>>Female</option>
                 </select>
             </div>
 
