@@ -1129,8 +1129,8 @@ require 'header.php';
                                                     $file_id = intval($file['id']);
 
                                                     echo "<tr>";
-                                                    echo "<td>$file_name</td>";
-                                                    echo "<td>
+                                                    echo "<td data-label='File Name'>$file_name</td>";
+                                                    echo "<td data-label='Actions'>
                                                     <a href='$file_path' download='$file_name' class='btn btn-sm btn-outline-primary'><i class='fas fa-cloud-download-alt fa-sm'></i></a>
                                                     <a href='delete_file.php?url=hc_edit&id=$file_id' class='btn-sm' onclick='return confirm(\"Are you sure you want to delete this file?\");' aria-label='Delete $file_name'><i class='fas fa-trash fa-sm' style='color:red'></i></a>
                                                     </td>";
@@ -1199,13 +1199,13 @@ require 'header.php';
                                             <tbody>
                                                 <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                                     <tr id="log-row-<?= $log['id']; ?>">
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                                        <td style="width: 40%;">
+                                                        <td data-label="Date" style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                                        <td data-label="User" style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                                        <td data-label="Comment" style="width: 40%;">
                                                             <input type="hidden" name="log_ids[]" value="<?= htmlspecialchars($log['id']); ?>">
                                                             <textarea name="log_comments[]" class="form-control"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></textarea>
                                                         </td>
-                                                        <td style="width: 10%;">
+                                                        <td data-label="Action" style="width: 10%;">
                                                             <button type="button" class="btn btn-danger btn-icon" onclick="markLogForDeletion(<?= $log['id']; ?>)">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>

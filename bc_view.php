@@ -537,8 +537,8 @@ require 'header.php';
                             $hasFiles = true;
                         ?>
                             <tr>
-                                <td><?= htmlspecialchars($file['file_name']); ?></td>
-                                <td><div class="action-buttons"><a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-primary" title="Download"><i class="fas fa-cloud-download-alt"></i></a></div></td>
+                                <td data-label="File Name"><?= htmlspecialchars($file['file_name']); ?></td>
+                                <td data-label="Actions"><div class="action-buttons"><a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-primary" title="Download"><i class="fas fa-cloud-download-alt"></i></a></div></td>
                             </tr>
                         <?php endwhile; ?>
                         <?php if (!$hasFiles) : ?>
@@ -625,9 +625,9 @@ require 'header.php';
                         <tbody>
                             <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                    <td><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                    <td><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
+                                    <td data-label="Date"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                    <td data-label="User"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                    <td data-label="Comment"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>

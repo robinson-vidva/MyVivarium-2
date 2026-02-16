@@ -542,10 +542,10 @@ require 'header.php';
                         <tbody>
                             <?php foreach ($mice as $mouse) : ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($mouse['mouse_id']); ?></td>
-                                    <td><?= htmlspecialchars($mouse['genotype']); ?></td>
-                                    <td><?= htmlspecialchars($mouse['notes']); ?></td>
-                                    <td>
+                                    <td data-label="Mouse ID"><?= htmlspecialchars($mouse['mouse_id']); ?></td>
+                                    <td data-label="Genotype"><?= htmlspecialchars($mouse['genotype']); ?></td>
+                                    <td data-label="Notes"><?= htmlspecialchars($mouse['notes']); ?></td>
+                                    <td data-label="Actions">
                                         <div class="action-buttons">
                                             <button class="btn btn-sm btn-info" onclick="openTransferModal(<?= (int)$mouse['id']; ?>, <?= htmlspecialchars(json_encode($mouse['mouse_id'])); ?>)" title="Transfer Mouse">
                                                 <i class="fas fa-exchange-alt"></i>
@@ -584,8 +584,8 @@ require 'header.php';
                             $file_path = htmlspecialchars($file['file_path']);
                             $file_name = htmlspecialchars($file['file_name']);
                             echo "<tr>";
-                            echo "<td>$file_name</td>";
-                            echo "<td><div class='action-buttons'><a href='$file_path' download='$file_name' class='btn btn-sm btn-primary' title='Download'><i class='fas fa-cloud-download-alt'></i></a></div></td>";
+                            echo "<td data-label='File Name'>$file_name</td>";
+                            echo "<td data-label='Actions'><div class='action-buttons'><a href='$file_path' download='$file_name' class='btn btn-sm btn-primary' title='Download'><i class='fas fa-cloud-download-alt'></i></a></div></td>";
                             echo "</tr>";
                         }
                         if (!$hasFiles) {
@@ -624,9 +624,9 @@ require 'header.php';
                         <tbody>
                             <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                    <td><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                    <td><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
+                                    <td data-label="Date"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                    <td data-label="User"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                    <td data-label="Comment"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>

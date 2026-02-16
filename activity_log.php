@@ -419,17 +419,17 @@ require 'header.php';
                                 data-entity-id="<?php echo htmlspecialchars($entry['entity_id']); ?>"
                                 data-details="<?php echo htmlspecialchars($entry['details'] ?? '—'); ?>"
                                 data-ip="<?php echo htmlspecialchars($entry['ip_address'] ?? '—'); ?>">
-                                <td class="timestamp">
+                                <td data-label="Date/Time" class="timestamp">
                                     <?php echo date('Y-m-d', strtotime($entry['created_at'])); ?><br>
                                     <small><?php echo date('H:i:s', strtotime($entry['created_at'])); ?></small>
                                 </td>
-                                <td><?php echo htmlspecialchars($entry['user_name'] ?? 'Unknown'); ?></td>
-                                <td>
+                                <td data-label="User"><?php echo htmlspecialchars($entry['user_name'] ?? 'Unknown'); ?></td>
+                                <td data-label="Action">
                                     <span class="badge <?php echo $action_class; ?>">
                                         <?php echo htmlspecialchars(ucfirst($entry['action'])); ?>
                                     </span>
                                 </td>
-                                <td>
+                                <td data-label="Entity">
                                     <span class="entity-label"><?php echo htmlspecialchars(ucfirst($entry['entity_type'])); ?></span>
                                     <strong>#<?php echo htmlspecialchars($entry['entity_id']); ?></strong>
                                 </td>

@@ -451,22 +451,22 @@ require 'header.php';
                     <?php else: ?>
                         <?php foreach ($maintenance_notes as $note): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($note['id']); ?></td>
-                                <td><strong><?php echo htmlspecialchars($note['cage_id']); ?></strong></td>
-                                <td class="timestamp">
+                                <td data-label="ID"><?php echo htmlspecialchars($note['id']); ?></td>
+                                <td data-label="Cage ID"><strong><?php echo htmlspecialchars($note['cage_id']); ?></strong></td>
+                                <td data-label="Date/Time" class="timestamp">
                                     <?php echo date('Y-m-d', strtotime($note['timestamp'])); ?><br>
                                     <small><?php echo date('H:i:s', strtotime($note['timestamp'])); ?></small>
                                 </td>
-                                <td>
+                                <td data-label="Added By">
                                     <?php echo htmlspecialchars($note['user_name'] ?? 'Unknown'); ?>
                                     <?php if (!empty($note['initials'])): ?>
                                         <br><small class="text-muted">(<?php echo htmlspecialchars($note['initials']); ?>)</small>
                                     <?php endif; ?>
                                 </td>
-                                <td class="comments-cell">
+                                <td data-label="Comments" class="comments-cell">
                                     <?php echo htmlspecialchars($note['comments'] ?? 'No comments'); ?>
                                 </td>
-                                <td class="no-print">
+                                <td data-label="Actions" class="no-print">
                                     <button class="btn btn-sm btn-primary"
                                             onclick="editNote(<?php echo $note['id']; ?>)"
                                             title="Edit Note">
