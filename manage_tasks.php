@@ -480,26 +480,20 @@ ob_end_flush(); // Flush the output buffer
             <?php if ($cageIdFilter): ?>
                 <input type="hidden" name="id" value="<?= htmlspecialchars($cageIdFilter); ?>">
             <?php endif; ?>
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <input type="text" name="search" class="form-control" placeholder="Search tasks..." value="<?= htmlspecialchars($search); ?>">
-                </div>
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
-                </div>
-                <div class="col-auto d-flex align-items-center gap-1">
-                    <label for="per_page" class="form-label mb-0 text-nowrap">Show</label>
-                    <select class="form-select form-select-sm" id="per_page" name="per_page" style="width: auto;" onchange="this.form.submit()">
-                        <?php foreach ($allowed_per_page as $pp): ?>
-                            <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+            <div class="d-flex gap-2 align-items-center">
+                <input type="text" name="search" class="form-control" placeholder="Search tasks..." value="<?= htmlspecialchars($search); ?>">
+                <button type="submit" class="btn btn-primary text-nowrap"><i class="fas fa-search"></i> Search</button>
                 <?php if ($search || $filter): ?>
-                    <div class="col-auto">
-                        <a href="manage_tasks.php<?= $cageIdFilter ? '?id=' . urlencode($cageIdFilter) : ''; ?>" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
-                    </div>
+                    <a href="manage_tasks.php<?= $cageIdFilter ? '?id=' . urlencode($cageIdFilter) : ''; ?>" class="btn btn-secondary text-nowrap"><i class="fas fa-times"></i> Clear</a>
                 <?php endif; ?>
+            </div>
+            <div class="d-flex align-items-center gap-1 mt-2">
+                <label for="per_page" class="form-label mb-0 text-nowrap">Show</label>
+                <select class="form-select form-select-sm" id="per_page" name="per_page" style="width: auto;" onchange="this.form.submit()">
+                    <?php foreach ($allowed_per_page as $pp): ?>
+                        <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="mt-2">
                 <div class="form-check form-check-inline">
