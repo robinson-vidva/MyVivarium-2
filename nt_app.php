@@ -228,6 +228,26 @@ $result = $stmt->get_result();
             background-color: #3a3520;
             color: #dee2e6;
         }
+
+        /* Mobile popup sizing */
+        @media (max-width: 576px) {
+            .popup,
+            .edit-popup {
+                width: 90vw;
+                max-width: 90vw;
+                max-height: 80vh;
+                padding: 16px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                box-sizing: border-box;
+                overflow-y: auto;
+            }
+            #addNoteForm,
+            #editNoteForm {
+                width: 100%;
+            }
+        }
     </style>
     <!-- jQuery loaded via header.php -->
 </head>
