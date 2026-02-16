@@ -42,9 +42,9 @@ ob_end_flush();
 
     <style>
         .calendar-container {
-            max-width: 1100px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 20px 30px;
+            padding: 20px;
         }
 
         /* FullCalendar overrides */
@@ -92,6 +92,15 @@ ob_end_flush();
         /* Grid view — slightly taller day cells */
         .fc .fc-daygrid-day-frame {
             min-height: 90px;
+        }
+
+        /* List view — full width */
+        .fc .fc-list {
+            width: 100%;
+        }
+
+        .fc .fc-list-table {
+            width: 100%;
         }
 
         /* Legend */
