@@ -783,6 +783,14 @@ if (isset($settings['r2_pres'])) {
 
     /* Mobile Table Card Layout — only for tables with data-label cells */
     @media (max-width: 576px) {
+        /* Disable table-responsive overflow on mobile so cards aren't clipped */
+        .table-responsive:has(td[data-label]) {
+            overflow: visible;
+        }
+        .table:has(td[data-label]) {
+            display: block;
+            width: 100%;
+        }
         .table:has(td[data-label]) thead {
             display: none;
         }
@@ -804,6 +812,7 @@ if (isset($settings['r2_pres'])) {
             position: relative;
             padding-left: 40%;
             text-align: left;
+            min-height: 36px;
         }
         .table td[data-label]::before {
             content: attr(data-label);
