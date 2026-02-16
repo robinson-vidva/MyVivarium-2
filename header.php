@@ -826,6 +826,8 @@ if (isset($settings['r2_pres'])) {
             padding-left: 40%;
             text-align: left;
             min-height: 36px;
+            overflow-wrap: normal;
+            word-wrap: normal;
         }
         .table td[data-label]::before {
             content: attr(data-label);
