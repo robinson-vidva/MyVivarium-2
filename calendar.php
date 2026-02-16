@@ -211,28 +211,44 @@ ob_end_flush();
             width: 100%;
         }
 
-        /* Legend */
-        .calendar-legend {
+        /* Calendar top bar — actions + legend */
+        .calendar-top-bar {
             display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 0;
-            padding: 12px 16px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 10px 16px;
             border-radius: 8px;
             background-color: var(--bs-tertiary-bg);
             border: 1px solid var(--bs-border-color);
         }
 
-        .legend-item {
+        .calendar-actions {
             display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .calendar-legend {
+            display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 6px;
-            font-size: 0.85rem;
+            gap: 12px;
+            margin: 0;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            color: var(--bs-secondary-color);
         }
 
         .legend-dot {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             display: inline-block;
             flex-shrink: 0;
@@ -254,12 +270,25 @@ ob_end_flush();
                 font-size: 0.75rem;
                 padding: 4px 8px;
             }
-            .calendar-legend {
+            .calendar-top-bar {
+                flex-direction: column;
+                align-items: stretch;
                 gap: 10px;
-                padding: 10px;
+                padding: 10px 12px;
+            }
+            .calendar-actions {
+                justify-content: center;
+            }
+            .calendar-legend {
+                justify-content: center;
+                gap: 10px;
             }
             .legend-item {
-                font-size: 0.8rem;
+                font-size: 0.72rem;
+            }
+            .legend-dot {
+                width: 8px;
+                height: 8px;
             }
         }
 
@@ -464,23 +493,9 @@ ob_end_flush();
     <div class="calendar-container content">
         <?php include('message.php'); ?>
 
-        <!-- Legend + Quick Actions -->
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-            <div class="calendar-legend mb-0" style="flex: 1;">
-                <div class="legend-item">
-                    <span class="legend-dot" style="background-color: #dc3545;"></span> Pending
-                </div>
-                <div class="legend-item">
-                    <span class="legend-dot" style="background-color: #ffc107;"></span> In Progress
-                </div>
-                <div class="legend-item">
-                    <span class="legend-dot" style="background-color: #198754;"></span> Completed
-                </div>
-                <div class="legend-item">
-                    <span class="legend-dot" style="background-color: #6f42c1;"></span> Reminder
-                </div>
-            </div>
-            <div class="d-flex gap-2 flex-shrink-0">
+        <!-- Top Bar: Actions + Legend -->
+        <div class="calendar-top-bar">
+            <div class="calendar-actions">
                 <a href="manage_tasks.php" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus"></i> Add Task
                 </a>
@@ -489,6 +504,12 @@ ob_end_flush();
                     <i class="fas fa-bell"></i> Add Reminder
                 </a>
                 <?php endif; ?>
+            </div>
+            <div class="calendar-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#dc3545;"></span>Pending</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#ffc107;"></span>In Progress</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Completed</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#6f42c1;"></span>Reminder</span>
             </div>
         </div>
 
