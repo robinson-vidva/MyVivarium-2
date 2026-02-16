@@ -825,10 +825,20 @@ if (isset($settings['r2_pres'])) {
         .table td[data-label="Action"]::before {
             display: none;
         }
+        /* Restore flex layout for action cells (overrides display:block from td[data-label]) */
+        .table td[data-label="Actions"].action-icons,
+        .table td[data-label="Action"].action-icons,
+        .table td[data-label="Actions"].action-buttons,
+        .table td[data-label="Actions"].table-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-start;
+        }
         .table td[data-label="Actions"] .action-buttons,
         .table td[data-label="Actions"] .table-actions,
-        .table td[data-label="Actions"].action-icons,
-        .table td[data-label="Action"].action-icons {
+        .table td[data-label="Action"] .action-buttons,
+        .table td[data-label="Action"] .table-actions {
             justify-content: flex-start;
         }
     }
