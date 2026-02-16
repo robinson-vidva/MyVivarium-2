@@ -199,9 +199,21 @@ if (isset($settings['r2_pres'])) {
             .nav-collapsible .nav-label {
                 display: none;
             }
-            /* Remove caret spacing when label is hidden */
+            /* Replace default caret with a small dot indicator on mobile */
             .nav-collapsible .dropdown-toggle::after {
-                margin-left: 0;
+                content: '';
+                display: block;
+                position: absolute;
+                bottom: 4px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 5px;
+                height: 5px;
+                border: none;
+                border-radius: 50%;
+                background-color: rgba(255, 255, 255, 0.6);
+                margin: 0;
+                vertical-align: unset;
             }
             /* Compact icon-only buttons */
             .nav-collapsible > .btn,
@@ -216,6 +228,7 @@ if (isset($settings['r2_pres'])) {
                 font-size: 1.1rem;
                 margin: 0;
                 border-radius: 8px;
+                position: relative;
             }
         }
 
