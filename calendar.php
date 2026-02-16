@@ -681,6 +681,8 @@ ob_end_flush();
 
                 document.getElementById('eventViewLink').href =
                     'manage_tasks.php?search=' + encodeURIComponent(event.title);
+                document.getElementById('eventViewLink').innerHTML =
+                    '<i class="fas fa-external-link-alt"></i> View in Tasks';
                 document.getElementById('eventViewLink').style.display = 'inline-block';
             } else if (props.type === 'reminder') {
                 html =
@@ -692,7 +694,10 @@ ob_end_flush();
                     '<p><strong>Assigned To:</strong> ' + esc(props.assignedTo) + '</p>' +
                     (props.cageId ? '<p><strong>Cage ID:</strong> ' + esc(props.cageId) + '</p>' : '');
 
-                document.getElementById('eventViewLink').style.display = 'none';
+                document.getElementById('eventViewLink').href = 'manage_reminder.php';
+                document.getElementById('eventViewLink').innerHTML =
+                    '<i class="fas fa-external-link-alt"></i> View in Reminders';
+                document.getElementById('eventViewLink').style.display = 'inline-block';
             }
 
             document.getElementById('eventTitle').textContent = event.title;
