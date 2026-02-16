@@ -17,8 +17,6 @@ if (!isset($_SESSION['name'])) {
     exit;
 }
 
-$isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
-
 // Fetch lab name for title
 $labName = '';
 $labQuery = "SELECT value FROM settings WHERE name = 'lab_name'";
@@ -211,23 +209,16 @@ ob_end_flush();
             width: 100%;
         }
 
-        /* Calendar top bar — actions + legend */
+        /* Calendar top bar — legend */
         .calendar-top-bar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 12px;
+            justify-content: center;
             margin-bottom: 16px;
             padding: 10px 16px;
             border-radius: 8px;
             background-color: var(--bs-tertiary-bg);
             border: 1px solid var(--bs-border-color);
-        }
-
-        .calendar-actions {
-            display: flex;
-            gap: 8px;
-            flex-shrink: 0;
         }
 
         .calendar-legend {
@@ -271,13 +262,7 @@ ob_end_flush();
                 padding: 4px 8px;
             }
             .calendar-top-bar {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 10px;
-                padding: 10px 12px;
-            }
-            .calendar-actions {
-                justify-content: center;
+                padding: 8px 10px;
             }
             .calendar-legend {
                 justify-content: center;
@@ -493,18 +478,8 @@ ob_end_flush();
     <div class="calendar-container content">
         <?php include('message.php'); ?>
 
-        <!-- Top Bar: Actions + Legend -->
+        <!-- Legend -->
         <div class="calendar-top-bar">
-            <div class="calendar-actions">
-                <a href="manage_tasks.php" class="btn btn-primary btn-sm">
-                    <i class="fas fa-tasks"></i> Manage Tasks
-                </a>
-                <?php if ($isAdmin) : ?>
-                <a href="manage_reminder.php" class="btn btn-sm" style="background-color: #6f42c1; color: #fff;">
-                    <i class="fas fa-bell"></i> Manage Reminders
-                </a>
-                <?php endif; ?>
-            </div>
             <div class="calendar-legend">
                 <span class="legend-item"><span class="legend-dot" style="background:#dc3545;"></span>Pending</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#ffc107;"></span>In Progress</span>
