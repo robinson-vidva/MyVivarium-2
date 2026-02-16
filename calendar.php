@@ -209,16 +209,17 @@ ob_end_flush();
             width: 100%;
         }
 
-        /* Calendar top bar — legend */
+        /* Calendar top bar — legend + actions */
         .calendar-top-bar {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
             margin-bottom: 16px;
             padding: 10px 16px;
             border-radius: 8px;
             background-color: var(--bs-tertiary-bg);
             border: 1px solid var(--bs-border-color);
+            gap: 12px;
         }
 
         .calendar-legend {
@@ -227,6 +228,18 @@ ob_end_flush();
             align-items: center;
             gap: 12px;
             margin: 0;
+        }
+
+        .calendar-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .calendar-actions .btn {
+            font-size: 0.8rem;
+            padding: 4px 12px;
+            white-space: nowrap;
         }
 
         .legend-item {
@@ -262,11 +275,16 @@ ob_end_flush();
                 padding: 4px 8px;
             }
             .calendar-top-bar {
+                flex-direction: column;
                 padding: 8px 10px;
             }
             .calendar-legend {
                 justify-content: center;
                 gap: 10px;
+            }
+            .calendar-actions {
+                justify-content: center;
+                width: 100%;
             }
             .legend-item {
                 font-size: 0.72rem;
@@ -478,13 +496,17 @@ ob_end_flush();
     <div class="calendar-container content">
         <?php include('message.php'); ?>
 
-        <!-- Legend -->
+        <!-- Legend + Actions -->
         <div class="calendar-top-bar">
             <div class="calendar-legend">
                 <span class="legend-item"><span class="legend-dot" style="background:#dc3545;"></span>Pending</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#ffc107;"></span>In Progress</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#198754;"></span>Completed</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#6f42c1;"></span>Reminder</span>
+            </div>
+            <div class="calendar-actions">
+                <a href="manage_tasks.php" class="btn btn-sm btn-outline-primary"><i class="fas fa-plus me-1"></i>Add Task</a>
+                <a href="manage_reminder.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-plus me-1"></i>Add Reminder</a>
             </div>
         </div>
 
