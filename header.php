@@ -339,7 +339,7 @@ if (isset($settings['r2_pres'])) {
                 </button>
 
                 <!-- Logout Button -->
-                <a href="logout.php" class="btn btn-outline-light" aria-label="Logout" title="Logout">
+                <a href="logout.php" class="btn btn-outline-danger" aria-label="Logout" title="Logout">
                     <i class="fas fa-sign-out-alt"></i> <span class="nav-label">Logout</span>
                 </a>
             </div>
