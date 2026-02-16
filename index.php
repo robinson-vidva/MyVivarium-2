@@ -378,6 +378,14 @@ mysqli_close($con);
             padding: 32px;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         }
+        /* Scale Turnstile widget to fit form width */
+        .login-card .cf-turnstile {
+            overflow: hidden;
+        }
+        .login-card .cf-turnstile iframe {
+            width: 100% !important;
+            max-width: 100%;
+        }
 
         .login-card h3 {
             font-family: 'Poppins', sans-serif;
@@ -548,7 +556,7 @@ mysqli_close($con);
 
                             <!-- Conditionally include Cloudflare Turnstile Widget -->
                             <?php if (!empty($turnstileSiteKey)) { ?>
-                                <div class="cf-turnstile mb-3" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>" data-size="compact"></div>
+                                <div class="cf-turnstile mb-3" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>"></div>
                                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
                             <?php } ?>
 
