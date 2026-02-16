@@ -370,7 +370,7 @@ if (isset($settings['r2_pres'])) {
 
                 <!-- Logout Button -->
                 <a href="logout.php" class="btn btn-danger" aria-label="Logout" title="Logout">
-                    <i class="fas fa-sign-out-alt"></i> <span class="nav-label">Logout</span>
+                    <i class="fas fa-sign-out-alt"></i>
                 </a>
             </div>
         </nav>
