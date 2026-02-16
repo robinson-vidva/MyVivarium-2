@@ -470,7 +470,7 @@ ob_end_flush(); // Flush the output buffer
             <?php endif; ?>
             <?php if ($isAdmin) : ?>
                 <a href="manage_reminder.php" class="btn btn-warning ml-2">
-                    <i class="fas fa-bell"></i> Add New Reminder
+                    <i class="fas fa-bell"></i> Manage Reminders
                 </a>
             <?php endif; ?>
         </div>
