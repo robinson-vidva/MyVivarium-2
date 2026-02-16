@@ -757,23 +757,23 @@ if (isset($settings['r2_pres'])) {
         display: contents;
     }
 
-    /* Mobile Table Card Layout */
+    /* Mobile Table Card Layout — only for tables with data-label cells */
     @media (max-width: 576px) {
-        .table thead {
+        .table:has(td[data-label]) thead {
             display: none;
         }
-        .table tbody {
+        .table:has(td[data-label]) tbody {
             display: block;
             width: 100%;
         }
-        .table tbody tr {
+        .table:has(td[data-label]) tbody tr {
             display: block;
             margin-bottom: 15px;
             border: 1px solid var(--bs-border-color);
             border-radius: 8px;
             padding: 10px;
         }
-        .table tbody tr td {
+        .table td[data-label] {
             display: block;
             padding: 8px 10px;
             border: none;
@@ -781,7 +781,7 @@ if (isset($settings['r2_pres'])) {
             padding-left: 40%;
             text-align: left;
         }
-        .table tbody tr td::before {
+        .table td[data-label]::before {
             content: attr(data-label);
             font-weight: bold;
             text-transform: uppercase;
@@ -793,14 +793,14 @@ if (isset($settings['r2_pres'])) {
             color: var(--bs-body-color);
             text-align: left;
         }
-        .table tbody tr td[data-label="Actions"] {
+        .table td[data-label="Actions"] {
             padding-left: 10px;
         }
-        .table tbody tr td[data-label="Actions"]::before {
+        .table td[data-label="Actions"]::before {
             display: none;
         }
-        .table tbody tr td[data-label="Actions"] .action-buttons,
-        .table tbody tr td[data-label="Actions"] .table-actions {
+        .table td[data-label="Actions"] .action-buttons,
+        .table td[data-label="Actions"] .table-actions {
             justify-content: flex-start;
         }
     }
