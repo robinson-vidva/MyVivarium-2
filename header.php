@@ -826,6 +826,19 @@ if (isset($settings['r2_pres'])) {
             color: var(--bs-body-color);
             text-align: left;
         }
+        /* Compact ID cell — show as inline badge instead of full-width row */
+        .table td[data-label="ID"] {
+            padding-left: 10px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+            min-height: auto;
+        }
+        .table td[data-label="ID"]::before {
+            position: static;
+            display: inline;
+            width: auto;
+            margin-right: 6px;
+        }
         .table td[data-label="Actions"],
         .table td[data-label="Action"] {
             padding-left: 10px;
