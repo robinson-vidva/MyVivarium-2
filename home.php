@@ -118,12 +118,11 @@ require 'header.php';
         <br>
         <div class="row align-items-center">
             <!-- Welcome message with user information -->
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h2>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?>
-                    <span style="font-size: smaller; color: var(--bs-secondary-color); border-bottom: 2px solid var(--bs-border-color); padding: 0 5px;">
-                        [<?php echo htmlspecialchars($_SESSION['position']); ?>]
-                    </span>
-                </h2>
+            <div class="pt-3 pb-2 mb-3 border-bottom">
+                <h2 class="mb-1">Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h2>
+                <span class="text-secondary" style="font-size: 0.9rem;">
+                    <?php echo htmlspecialchars($_SESSION['position']); ?>
+                </span>
             </div>
 
             <!-- Display stats for Holding Cage and Breeding Cage -->
