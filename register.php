@@ -398,7 +398,7 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
 
             <!-- Conditionally include Cloudflare Turnstile widget -->
             <?php if (!empty($turnstileSiteKey)) { ?>
-                <div class="cf-turnstile" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>"></div>
+                <div class="cf-turnstile" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>" data-size="flexible"></div>
                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <?php } ?>
 
