@@ -77,12 +77,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             redirectToPage("Error: " . $stmt->error);
         }
         $stmt->close();
+    } elseif (isset($_POST['toggle_status'])) {
+        $id = (int)$_POST['id'];
+        // Fetch current status
+        $fetchStmt = $con->prepare("SELECT status FROM reminders WHERE id = ?");
+        $fetchStmt->bind_param("i", $id);
+        $fetchStmt->execute();
+        $fetchStmt->bind_result($currentStatus);
+        $fetchStmt->fetch();
+        $fetchStmt->close();
+
+        $newStatus = ($currentStatus === 'active') ? 'inactive' : 'active';
+        $stmt = $con->prepare("UPDATE reminders SET status = ? WHERE id = ?");
+        $stmt->bind_param("si", $newStatus, $id);
+        if ($stmt->execute()) {
+            $label = ($newStatus === 'active') ? 'resumed' : 'paused';
+            redirectToPage("Reminder {$label} successfully.");
+        } else {
+            redirectToPage("Error: " . $stmt->error);
+        }
+        $stmt->close();
     } elseif (isset($_POST['delete'])) {
         $id = (int)$_POST['id'];
         $stmt = $con->prepare("DELETE FROM reminders WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
-            redirectToPage("Reminder deleted successfully.");
+            redirectToPage("Reminder deleted permanently.");
         } else {
             redirectToPage("Error: " . $stmt->error);
         }
@@ -277,6 +297,15 @@ ob_end_flush(); // Flush the output buffer
             padding: 10px;
             border-radius: 5px;
         }
+
+        /* Inactive/paused reminder rows */
+        tr.reminder-inactive {
+            opacity: 0.55;
+        }
+        tr.reminder-inactive td[data-label="Status"] {
+            color: var(--bs-secondary-color);
+            font-style: italic;
+        }
     </style>
 </head>
 
@@ -436,7 +465,7 @@ ob_end_flush(); // Flush the output buffer
                         </tr>
                     <?php endif; ?>
                     <?php while ($row = $reminderResult->fetch_assoc()) : ?>
-                        <tr>
+                        <tr class="<?= $row['status'] === 'inactive' ? 'reminder-inactive' : ''; ?>">
                             <td data-label="ID"><?= htmlspecialchars($row['id']); ?></td>
                             <td data-label="Title"><?= htmlspecialchars($row['title']); ?></td>
                             <td data-label="Recurrence">
@@ -463,7 +492,20 @@ ob_end_flush(); // Flush the output buffer
                                     <form action="manage_reminder.php" method="post" style="display:inline-block;">
                                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                                         <input type="hidden" name="id" value="<?= $row['id']; ?>">
-                                        <button type="submit" name="delete" class="btn btn-danger btn-sm" title="Delete" onclick="return confirm('Are you sure you want to delete this reminder?');">
+                                        <?php if ($row['status'] === 'active') : ?>
+                                            <button type="submit" name="toggle_status" class="btn btn-secondary btn-sm" title="Pause Reminder">
+                                                <i class="fas fa-pause"></i>
+                                            </button>
+                                        <?php else : ?>
+                                            <button type="submit" name="toggle_status" class="btn btn-success btn-sm" title="Resume Reminder">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                    </form>
+                                    <form action="manage_reminder.php" method="post" style="display:inline-block;">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                        <input type="hidden" name="id" value="<?= $row['id']; ?>">
+                                        <button type="submit" name="delete" class="btn btn-danger btn-sm" title="Delete Permanently" onclick="return confirm('Permanently delete this reminder? This cannot be undone.');">
                                             <i class="fas fa-trash-alt"></i>
                                         </button>
                                     </form>
