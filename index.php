@@ -378,13 +378,12 @@ mysqli_close($con);
             padding: 32px;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         }
-        /* Scale Turnstile widget to fit form width */
-        .login-card .cf-turnstile {
-            overflow: hidden;
-        }
-        .login-card .cf-turnstile iframe {
-            width: 100% !important;
-            max-width: 100%;
+        /* Scale Turnstile widget on small screens without breaking verification */
+        @media (max-width: 380px) {
+            .login-card .cf-turnstile {
+                transform: scale(0.9);
+                transform-origin: left top;
+            }
         }
 
         .login-card h3 {
