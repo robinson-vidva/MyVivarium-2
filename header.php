@@ -175,6 +175,20 @@ if (isset($settings['r2_pres'])) {
             align-items: center;
             justify-content: center;
             gap: 6px;
+            height: 40px;
+            padding: 0 14px;
+            font-size: 0.9rem;
+        }
+
+        /* Icon-only buttons: square, same height */
+        #darkModeToggle {
+            width: 40px;
+            padding: 0;
+        }
+
+        .nav .btn-danger {
+            width: 40px;
+            padding: 0;
         }
 
         .dropdown-menu {
