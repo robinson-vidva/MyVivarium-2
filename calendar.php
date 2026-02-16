@@ -109,12 +109,69 @@ ob_end_flush();
             overflow-y: auto;
         }
 
-        /* List view — event title truncation */
+        /* List view — rich event content */
         .fc .fc-list-event-title {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 500px;
+            width: 100%;
+        }
+
+        .list-event-rich {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 4px 0;
+            width: 100%;
+        }
+
+        .list-event-rich .event-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .list-event-rich .event-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+        }
+
+        .list-event-rich .event-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .list-event-rich .event-status {
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .list-event-rich .event-meta {
+            font-size: 0.78rem;
+            color: var(--bs-secondary-color);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+        }
+
+        .list-event-rich .event-meta span i {
+            width: 14px;
+            text-align: center;
+            margin-right: 3px;
+            opacity: 0.7;
+        }
+
+        /* On mobile keep list view compact */
+        @media (max-width: 576px) {
+            .list-event-rich .event-meta {
+                display: none;
+            }
+            .list-event-rich .event-name {
+                font-size: 0.82rem;
+            }
         }
 
         .fc .fc-daygrid-day-number {
@@ -125,6 +182,11 @@ ob_end_flush();
         /* Grid view — slightly taller day cells */
         .fc .fc-daygrid-day-frame {
             min-height: 90px;
+        }
+
+        /* List view — hide "all-day" time column for cleaner look */
+        .fc .fc-list-event-time {
+            display: none;
         }
 
         /* List view — full width */
@@ -495,6 +557,64 @@ ob_end_flush();
                 } else if (!newMobile && calendar.view.type === 'listMonth') {
                     calendar.changeView('dayGridMonth');
                 }
+            },
+
+            // Rich content for list view
+            eventContent: function(arg) {
+                if (arg.view.type !== 'listMonth') return; // grid view uses default
+
+                var props = arg.event.extendedProps;
+                var statusColors = {
+                    'Pending': '#dc3545',
+                    'In Progress': '#ffc107',
+                    'Completed': '#198754'
+                };
+                var statusTextColors = { 'In Progress': '#000' };
+
+                var html = '<div class="list-event-rich">';
+                html += '<div class="event-main">';
+
+                // Title row with status badge
+                html += '<div class="event-title-row">';
+                html += '<span class="event-name">' + esc(arg.event.title) + '</span>';
+                if (props.status) {
+                    var bg = statusColors[props.status] || '#6f42c1';
+                    var txtColor = statusTextColors[props.status] || '#fff';
+                    html += '<span class="event-status" style="background-color:' + bg + ';color:' + txtColor + ';">' + esc(props.status) + '</span>';
+                }
+                html += '</div>';
+
+                // Meta row with details
+                html += '<div class="event-meta">';
+                if (props.type === 'task') {
+                    if (props.description) {
+                        html += '<span><i class="fas fa-align-left"></i>' + esc(props.description) + '</span>';
+                    }
+                    if (props.assignedTo) {
+                        html += '<span><i class="fas fa-user"></i>' + esc(props.assignedTo) + '</span>';
+                    }
+                    if (props.cageId) {
+                        html += '<span><i class="fas fa-box"></i>Cage ' + esc(props.cageId) + '</span>';
+                    }
+                } else if (props.type === 'reminder') {
+                    if (props.description) {
+                        html += '<span><i class="fas fa-align-left"></i>' + esc(props.description) + '</span>';
+                    }
+                    if (props.recurrenceType) {
+                        html += '<span><i class="fas fa-redo"></i>' + esc(capitalize(props.recurrenceType)) + '</span>';
+                    }
+                    if (props.timeOfDay) {
+                        html += '<span><i class="fas fa-clock"></i>' + formatTime(props.timeOfDay) + '</span>';
+                    }
+                    if (props.assignedTo) {
+                        html += '<span><i class="fas fa-user"></i>' + esc(props.assignedTo) + '</span>';
+                    }
+                }
+                html += '</div>';
+
+                html += '</div></div>';
+
+                return { html: html };
             },
 
             // Event click
