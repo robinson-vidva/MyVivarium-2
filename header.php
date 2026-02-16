@@ -826,18 +826,20 @@ if (isset($settings['r2_pres'])) {
             color: var(--bs-body-color);
             text-align: left;
         }
-        /* Compact ID cell — show as inline badge instead of full-width row */
+        /* Compact ID cell — show as inline label + value on one line */
         .table td[data-label="ID"] {
-            padding-left: 10px;
-            padding-top: 4px;
-            padding-bottom: 4px;
+            display: flex;
+            align-items: center;
+            padding: 4px 10px;
             min-height: auto;
+            white-space: nowrap;
         }
         .table td[data-label="ID"]::before {
             position: static;
             display: inline;
             width: auto;
             margin-right: 6px;
+            font-size: 0.8rem;
         }
         .table td[data-label="Actions"],
         .table td[data-label="Action"] {
