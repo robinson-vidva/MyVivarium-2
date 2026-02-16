@@ -17,6 +17,8 @@ if (!isset($_SESSION['name'])) {
     exit;
 }
 
+$isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
+
 // Fetch lab name for title
 $labName = '';
 $labQuery = "SELECT value FROM settings WHERE name = 'lab_name'";
@@ -82,6 +84,37 @@ ob_end_flush();
             font-size: 0.78rem;
             border-radius: 4px;
             padding: 2px 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* "+N more" link styling */
+        .fc .fc-daygrid-more-link {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--bs-primary);
+            padding: 2px 4px;
+        }
+
+        /* More-events popover */
+        .fc .fc-more-popover {
+            max-width: 280px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .fc .fc-more-popover .fc-popover-body {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        /* List view — event title truncation */
+        .fc .fc-list-event-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 500px;
         }
 
         .fc .fc-daygrid-day-number {
@@ -121,7 +154,7 @@ ob_end_flush();
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
-            margin-bottom: 15px;
+            margin-bottom: 0;
             padding: 12px 16px;
             border-radius: 8px;
             background-color: var(--bs-tertiary-bg);
@@ -227,7 +260,8 @@ ob_end_flush();
             border-color: #565e66;
         }
 
-        [data-bs-theme="dark"] .fc .fc-popover {
+        [data-bs-theme="dark"] .fc .fc-popover,
+        [data-bs-theme="dark"] .fc .fc-more-popover {
             background-color: #2b3035;
             border-color: #565e66;
         }
@@ -235,6 +269,10 @@ ob_end_flush();
         [data-bs-theme="dark"] .fc .fc-popover-header {
             background-color: #212529;
             color: #dee2e6;
+        }
+
+        [data-bs-theme="dark"] .fc .fc-daygrid-more-link {
+            color: #6ea8fe;
         }
 
         [data-bs-theme="dark"] .fc .fc-col-header-cell {
@@ -364,19 +402,31 @@ ob_end_flush();
     <div class="calendar-container content">
         <?php include('message.php'); ?>
 
-        <!-- Legend -->
-        <div class="calendar-legend">
-            <div class="legend-item">
-                <span class="legend-dot" style="background-color: #dc3545;"></span> Pending
+        <!-- Legend + Quick Actions -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div class="calendar-legend mb-0" style="flex: 1;">
+                <div class="legend-item">
+                    <span class="legend-dot" style="background-color: #dc3545;"></span> Pending
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background-color: #ffc107;"></span> In Progress
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background-color: #198754;"></span> Completed
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background-color: #6f42c1;"></span> Reminder
+                </div>
             </div>
-            <div class="legend-item">
-                <span class="legend-dot" style="background-color: #ffc107;"></span> In Progress
-            </div>
-            <div class="legend-item">
-                <span class="legend-dot" style="background-color: #198754;"></span> Completed
-            </div>
-            <div class="legend-item">
-                <span class="legend-dot" style="background-color: #6f42c1;"></span> Reminder
+            <div class="d-flex gap-2 flex-shrink-0">
+                <a href="manage_tasks.php" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Add Task
+                </a>
+                <?php if ($isAdmin) : ?>
+                <a href="manage_reminder.php" class="btn btn-sm" style="background-color: #6f42c1; color: #fff;">
+                    <i class="fas fa-bell"></i> Add Reminder
+                </a>
+                <?php endif; ?>
             </div>
         </div>
 
