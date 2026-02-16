@@ -1054,8 +1054,8 @@ require 'header.php';
                                             <tbody>
                                                 <?php while ($file = $files->fetch_assoc()) : ?>
                                                     <tr>
-                                                        <td><?= htmlspecialchars($file['file_name']); ?></td>
-                                                        <td>
+                                                        <td data-label="File Name"><?= htmlspecialchars($file['file_name']); ?></td>
+                                                        <td data-label="Actions">
                                                             <a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-outline-primary">
                                                                 <i class="fas fa-cloud-download-alt fa-sm"></i>
                                                             </a>
@@ -1178,13 +1178,13 @@ require 'header.php';
                                             <tbody>
                                                 <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                                     <tr id="log-row-<?= $log['id']; ?>">
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                                        <td style="width: 40%;">
+                                                        <td data-label="Date" style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                                        <td data-label="User" style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                                        <td data-label="Comment" style="width: 40%;">
                                                             <input type="hidden" name="log_ids[]" value="<?= htmlspecialchars($log['id']); ?>">
                                                             <textarea name="log_comments[]" class="form-control"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></textarea>
                                                         </td>
-                                                        <td style="width: 10%;">
+                                                        <td data-label="Action" style="width: 10%;">
                                                             <button type="button" class="btn btn-danger btn-icon" onclick="markLogForDeletion(<?= $log['id']; ?>)">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>

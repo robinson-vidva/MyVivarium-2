@@ -793,14 +793,18 @@ if (isset($settings['r2_pres'])) {
             color: var(--bs-body-color);
             text-align: left;
         }
-        .table td[data-label="Actions"] {
+        .table td[data-label="Actions"],
+        .table td[data-label="Action"] {
             padding-left: 10px;
         }
-        .table td[data-label="Actions"]::before {
+        .table td[data-label="Actions"]::before,
+        .table td[data-label="Action"]::before {
             display: none;
         }
         .table td[data-label="Actions"] .action-buttons,
-        .table td[data-label="Actions"] .table-actions {
+        .table td[data-label="Actions"] .table-actions,
+        .table td[data-label="Actions"].action-icons,
+        .table td[data-label="Action"].action-icons {
             justify-content: flex-start;
         }
     }

@@ -109,9 +109,9 @@ while ($row = mysqli_fetch_assoc($result)) {
     while ($holdingcage = mysqli_fetch_assoc($cageResult)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
-            $tableRows .= '<td>' . htmlspecialchars($holdingcage['cage_id']) . '</td>';
-            $tableRows .= '<td>' . htmlspecialchars($holdingcage['strain'] ?? '') . '</td>';
-            $tableRows .= '<td>' . htmlspecialchars(ucfirst($holdingcage['sex'] ?? '')) . '</td>';
+            $tableRows .= '<td data-label="Cage ID">' . htmlspecialchars($holdingcage['cage_id']) . '</td>';
+            $tableRows .= '<td data-label="Strain">' . htmlspecialchars($holdingcage['strain'] ?? '') . '</td>';
+            $tableRows .= '<td data-label="Sex">' . htmlspecialchars(ucfirst($holdingcage['sex'] ?? '')) . '</td>';
             // Calculate age from DOB
             $ageStr = '';
             if (!empty($holdingcage['dob'])) {
@@ -126,10 +126,10 @@ while ($row = mysqli_fetch_assoc($result)) {
                     $ageStr = $diff->d . 'd';
                 }
             }
-            $tableRows .= '<td>' . htmlspecialchars($ageStr) . '</td>';
+            $tableRows .= '<td data-label="Age">' . htmlspecialchars($ageStr) . '</td>';
             $firstRow = false;
         }
-        $tableRows .= '<td class="action-icons" style="white-space: nowrap;">
+        $tableRows .= '<td data-label="Action" class="action-icons" style="white-space: nowrap;">
                         <a href="hc_view.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View"><i class="fas fa-eye"></i></a>
                         <a href="manage_tasks.php?id=' . rawurlencode($holdingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Tasks"><i class="fas fa-tasks"></i></a>';
 

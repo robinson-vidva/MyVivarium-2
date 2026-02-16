@@ -110,12 +110,12 @@ while ($row = mysqli_fetch_assoc($result)) {
     while ($breedingcage = mysqli_fetch_assoc($cageResult)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
-            $tableRows .= '<td>' . htmlspecialchars($breedingcage['cage_id']) . '</td>';
-            $tableRows .= '<td>' . htmlspecialchars($breedingcage['cross'] ?? '') . '</td>';
-            $tableRows .= '<td>' . htmlspecialchars($breedingcage['male_id'] ?? '') . ' / ' . htmlspecialchars($breedingcage['female_id'] ?? '') . '</td>';
+            $tableRows .= '<td data-label="Cage ID">' . htmlspecialchars($breedingcage['cage_id']) . '</td>';
+            $tableRows .= '<td data-label="Cross">' . htmlspecialchars($breedingcage['cross'] ?? '') . '</td>';
+            $tableRows .= '<td data-label="Male / Female">' . htmlspecialchars($breedingcage['male_id'] ?? '') . ' / ' . htmlspecialchars($breedingcage['female_id'] ?? '') . '</td>';
             $firstRow = false;
         }
-        $tableRows .= '<td class="action-icons" style="white-space: nowrap;">
+        $tableRows .= '<td data-label="Action" class="action-icons" style="white-space: nowrap;">
                         <a href="bc_view.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View"><i class="fas fa-eye"></i></a>
                         <a href="manage_tasks.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Tasks"><i class="fas fa-tasks"></i></a>';
 
