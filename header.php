@@ -297,6 +297,10 @@ if (isset($settings['r2_pres'])) {
                     <i class="fas fa-home"></i> <span class="nav-label">Home</span>
                 </a>
 
+                <a href="calendar.php" class="btn btn-primary" aria-label="Calendar">
+                    <i class="fas fa-calendar-alt"></i> <span class="nav-label">Calendar</span>
+                </a>
+
                 <!-- Dropdown for Dashboard -->
                 <div class="dropdown">
                     <button class="btn btn-primary dropdown-toggle" type="button" id="dashboardMenuButton" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Dashboards">
