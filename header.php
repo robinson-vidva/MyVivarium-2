@@ -158,76 +158,93 @@ if (isset($settings['r2_pres'])) {
             margin: 0 5px;
         }
 
-        #darkModeToggle {
-            padding: .3rem .65rem;
-            font-size: .95rem;
-            line-height: inherit;
-        }
-
         .dropdown-menu {
             min-width: auto;
         }
 
-        /* Mobile hamburger menu */
-        .navbar-toggler-custom {
-            background: none;
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: none;
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-        }
-
-        .navbar-toggler-custom:hover {
-            border-color: rgba(255,255,255,0.6);
-        }
-
-        @media (max-width: 576px) {
-            .navbar-toggler-custom {
-                display: inline-block;
-            }
-
-            .nav-collapsible {
-                display: none;
-                flex-direction: column;
-                gap: 5px;
-                width: 100%;
-                padding: 0 10px;
-            }
-
-            .nav-collapsible.show {
-                display: flex;
-            }
-
-            .nav-collapsible .btn,
-            .nav-collapsible .dropdown {
-                width: 100%;
-            }
-
-            .nav-collapsible .btn {
-                margin: 2px 0;
-            }
-
-            .nav-collapsible .dropdown .btn {
-                width: 100%;
-            }
-
-            .nav-container {
-                padding: 10px 0;
-            }
-        }
-
+        /* Desktop nav: horizontal layout with labels */
         @media (min-width: 577px) {
             .nav-collapsible {
                 display: flex !important;
                 flex-wrap: wrap;
                 justify-content: center;
                 align-items: center;
+            }
+        }
+
+        /* Mobile nav: icon-only bar */
+        @media (max-width: 576px) {
+            .header {
+                flex-direction: column;
                 align-items: center;
             }
+            .header h2 {
+                margin-left: 0;
+                margin-top: 6px;
+                text-align: center;
+            }
+            .nav-container {
+                padding: 8px 0 12px 0;
+            }
+            .nav-collapsible {
+                display: flex !important;
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+                width: auto;
+                padding: 0;
+            }
+            /* Hide text labels on mobile */
+            .nav-collapsible .nav-label {
+                display: none;
+            }
+            /* Remove caret spacing when label is hidden */
+            .nav-collapsible .dropdown-toggle::after {
+                margin-left: 0;
+            }
+            /* Compact icon-only buttons */
+            .nav-collapsible > .btn,
+            .nav-collapsible > .dropdown > .btn,
+            .nav-collapsible > #darkModeToggle {
+                width: 44px;
+                height: 44px;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.1rem;
+                margin: 0;
+                border-radius: 8px;
+            }
+        }
+
+        /* Scroll-to-top floating button */
+        .scroll-to-top-btn {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 1050;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            align-items: center;
+            justify-content: center;
+        }
+        .scroll-to-top-btn.visible {
+            display: inline-flex;
+        }
+        .scroll-to-top-btn:hover {
+            background-color: #0b5ed7;
+            transform: translateY(-2px);
         }
     </style>
 </head>
@@ -247,20 +264,15 @@ if (isset($settings['r2_pres'])) {
     <!-- Navigation Menu Section -->
     <div class="nav-container">
         <nav class="nav justify-content-center flex-column align-items-center">
-            <!-- Hamburger toggle for mobile -->
-            <button class="navbar-toggler-custom" id="navToggler" aria-label="Toggle navigation">
-                <i class="fas fa-bars"></i>
-            </button>
-
             <div class="nav-collapsible" id="navCollapsible">
-                <a href="home.php" class="btn btn-primary">
-                    <i class="fas fa-home"></i> Home
+                <a href="home.php" class="btn btn-primary" aria-label="Home">
+                    <i class="fas fa-home"></i> <span class="nav-label">Home</span>
                 </a>
 
                 <!-- Dropdown for Dashboard -->
                 <div class="dropdown">
-                    <button class="btn btn-primary dropdown-toggle" type="button" id="dashboardMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-tachometer-alt"></i> Dashboards
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="dashboardMenuButton" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Dashboards">
+                        <i class="fas fa-tachometer-alt"></i> <span class="nav-label">Dashboards</span>
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dashboardMenuButton">
                         <li><a class="dropdown-item" href="hc_dash.php">Holding Cage</a></li>
@@ -276,8 +288,8 @@ if (isset($settings['r2_pres'])) {
 
                 <!-- Dropdown for Settings -->
                 <div class="dropdown">
-                    <button class="btn btn-primary dropdown-toggle" type="button" id="settingsMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-cog"></i> Settings
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="settingsMenuButton" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Settings">
+                        <i class="fas fa-cog"></i> <span class="nav-label">Settings</span>
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="settingsMenuButton">
                         <li><a class="dropdown-item" href="user_profile.php">User Profile</a></li>
@@ -309,12 +321,17 @@ if (isset($settings['r2_pres'])) {
                 </div>
 
                 <!-- Dark Mode Toggle -->
-                <button id="darkModeToggle" class="btn btn-outline-light" style="margin-left: 5px;">
+                <button id="darkModeToggle" class="btn btn-outline-light" aria-label="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                 </button>
             </div>
         </nav>
     </div>
+
+    <!-- Scroll to Top Button -->
+    <button id="scrollToTopBtn" class="scroll-to-top-btn" aria-label="Scroll to top" title="Back to top">
+        <i class="fas fa-chevron-up"></i>
+    </button>
 
     <!-- Bootstrap and jQuery JS -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -352,14 +369,21 @@ if (isset($settings['r2_pres'])) {
     })();
     </script>
 
-    <!-- Mobile Nav Toggle -->
+    <!-- Select2 Dark Mode & Scroll-to-Top -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var toggler = document.getElementById('navToggler');
-        var nav = document.getElementById('navCollapsible');
-        if (toggler && nav) {
-            toggler.addEventListener('click', function() {
-                nav.classList.toggle('show');
+        // Scroll-to-top button
+        var scrollBtn = document.getElementById('scrollToTopBtn');
+        if (scrollBtn) {
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 300) {
+                    scrollBtn.classList.add('visible');
+                } else {
+                    scrollBtn.classList.remove('visible');
+                }
+            }, { passive: true });
+            scrollBtn.addEventListener('click', function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         }
 
