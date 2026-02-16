@@ -45,19 +45,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die('CSRF token validation failed');
     }
 
-    $title = trim($_POST['title']);
-    $description = trim($_POST['description']);
-    $assignedBy = $currentUserId;
-    $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
-    $recurrenceType = trim($_POST['recurrence_type']);
-    $dayOfWeek = !empty($_POST['day_of_week']) ? trim($_POST['day_of_week']) : null;
-    $dayOfMonth = !empty($_POST['day_of_month']) ? (int)$_POST['day_of_month'] : null;
-    $timeOfDay = trim($_POST['time_of_day']);
-    $status = trim($_POST['status']);
-    $cageId = empty($_POST['cage_id']) ? NULL : trim($_POST['cage_id']);
-    $reminder_id = null;
+    // Determine the action to perform
+    if (isset($_POST['add']) || isset($_POST['edit'])) {
+        // Only read form fields for add/edit actions
+        $title = trim($_POST['title']);
+        $description = trim($_POST['description']);
+        $assignedBy = $currentUserId;
+        $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
+        $recurrenceType = trim($_POST['recurrence_type']);
+        $dayOfWeek = !empty($_POST['day_of_week']) ? trim($_POST['day_of_week']) : null;
+        $dayOfMonth = !empty($_POST['day_of_month']) ? (int)$_POST['day_of_month'] : null;
+        $timeOfDay = trim($_POST['time_of_day']);
+        $status = trim($_POST['status']);
+        $cageId = empty($_POST['cage_id']) ? NULL : trim($_POST['cage_id']);
+    }
 
-    // Determine the action to perform (add, edit, or delete)
     if (isset($_POST['add'])) {
         $stmt = $con->prepare("INSERT INTO reminders (cage_id, title, description, assigned_by, assigned_to, recurrence_type, day_of_week, day_of_month, time_of_day, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("sssissssss", $cageId, $title, $description, $assignedBy, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status);
@@ -77,24 +79,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             redirectToPage("Error: " . $stmt->error);
         }
         $stmt->close();
-    } elseif (isset($_POST['toggle_status'])) {
+    } elseif (isset($_POST['archive'])) {
         $id = (int)$_POST['id'];
-        // Fetch current status
-        $fetchStmt = $con->prepare("SELECT status FROM reminders WHERE id = ?");
-        $fetchStmt->bind_param("i", $id);
-        $fetchStmt->execute();
-        $fetchStmt->bind_result($currentStatus);
-        $fetchStmt->fetch();
-        $fetchStmt->close();
-
-        $newStatus = ($currentStatus === 'active') ? 'inactive' : 'active';
-        $stmt = $con->prepare("UPDATE reminders SET status = ? WHERE id = ?");
-        $stmt->bind_param("si", $newStatus, $id);
+        $stmt = $con->prepare("UPDATE reminders SET status = 'inactive' WHERE id = ?");
+        $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
-            $label = ($newStatus === 'active') ? 'resumed' : 'paused';
-            redirectToPage("Reminder {$label} successfully.");
+            redirectToPage("Reminder archived successfully.");
         } else {
             redirectToPage("Error: " . $stmt->error);
+        }
+        $stmt->close();
+    } elseif (isset($_POST['restore'])) {
+        $id = (int)$_POST['id'];
+        $stmt = $con->prepare("UPDATE reminders SET status = 'active' WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        if ($stmt->execute()) {
+            $_SESSION['message'] = "Reminder restored successfully.";
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
+        } else {
+            $_SESSION['message'] = "Error: " . $stmt->error;
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
         }
         $stmt->close();
     } elseif (isset($_POST['delete'])) {
@@ -102,9 +108,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt = $con->prepare("DELETE FROM reminders WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
-            redirectToPage("Reminder deleted permanently.");
+            $_SESSION['message'] = "Reminder deleted permanently.";
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
         } else {
-            redirectToPage("Error: " . $stmt->error);
+            $_SESSION['message'] = "Error: " . $stmt->error;
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
         }
         $stmt->close();
     }
@@ -115,9 +125,15 @@ $userQuery = "SELECT id, name FROM users";
 $userResult = $con->query($userQuery);
 $users = $userResult ? array_column($userResult->fetch_all(MYSQLI_ASSOC), 'name', 'id') : [];
 
-// Fetch reminders for display
-$reminderQuery = "SELECT * FROM reminders";
-$reminderResult = $con->query($reminderQuery);
+// Determine if showing archived or active reminders
+$showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
+$reminderStatus = $showArchived ? 'inactive' : 'active';
+
+// Fetch reminders for display (filtered by status)
+$reminderStmt = $con->prepare("SELECT * FROM reminders WHERE status = ?");
+$reminderStmt->bind_param("s", $reminderStatus);
+$reminderStmt->execute();
+$reminderResult = $reminderStmt->get_result();
 
 // Fetch cages for the dropdown
 $cageQuery = "SELECT cage_id FROM cages";
@@ -298,11 +314,11 @@ ob_end_flush(); // Flush the output buffer
             border-radius: 5px;
         }
 
-        /* Inactive/paused reminder rows */
-        tr.reminder-inactive {
-            opacity: 0.55;
+        /* Archived reminder rows */
+        tr.reminder-archived {
+            opacity: 0.6;
         }
-        tr.reminder-inactive td[data-label="Status"] {
+        tr.reminder-archived td[data-label="Status"] {
             color: var(--bs-secondary-color);
             font-style: italic;
         }
@@ -320,9 +336,16 @@ ob_end_flush(); // Flush the output buffer
             </div>
         <?php endif; ?>
 
-        <!-- Button to add a new reminder -->
+        <!-- Button row: Add New + Archive Toggle -->
         <div class="add-button">
-            <button id="addNewReminderButton" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Reminder</button>
+            <?php if (!$showArchived): ?>
+                <button id="addNewReminderButton" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Reminder</button>
+            <?php endif; ?>
+            <a href="manage_reminder.php<?= $showArchived ? '' : '?show_archived=1'; ?>"
+               class="btn btn-sm <?= $showArchived ? 'btn-outline-warning' : 'btn-outline-secondary'; ?>">
+                <i class="fas <?= $showArchived ? 'fa-box-open' : 'fa-archive'; ?> me-1"></i>
+                <?= $showArchived ? 'Show Active' : 'Show Archived'; ?>
+            </a>
         </div>
 
         <!-- Popup form for adding and editing reminders -->
@@ -380,13 +403,8 @@ ob_end_flush(); // Flush the output buffer
                     <label for="time_of_day">Time of Day <span class="required-asterisk">*</span></label>
                     <input type="time" name="time_of_day" id="time_of_day" class="form-control" required>
                 </div>
-                <div class="mb-3">
-                    <label>Status <span class="required-asterisk">*</span></label>
-                    <select name="status" id="status" class="form-control" required>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
+                <!-- Status is managed via archive/restore buttons -->
+                <input type="hidden" name="status" id="status" value="active">
                 <div class="mb-3">
                     <label for="cage_id">Cage ID</label>
                     <select name="cage_id" id="cage_id" class="form-control">
@@ -443,7 +461,7 @@ ob_end_flush(); // Flush the output buffer
         </div>
 
         <!-- Table for displaying reminders -->
-        <h3>Existing Reminders</h3>
+        <h3><?= $showArchived ? 'Archived Reminders' : 'Active Reminders'; ?></h3>
         <div class="table-responsive">
             <table class="table">
                 <thead>
@@ -459,13 +477,18 @@ ob_end_flush(); // Flush the output buffer
                     <?php if ($reminderResult->num_rows === 0): ?>
                         <tr>
                             <td colspan="5" class="text-center py-4">
-                                <i class="fas fa-bell-slash fa-3x text-muted d-block mb-2"></i>
-                                <p class="text-muted mb-0">No reminders found. Click "Add New Reminder" to create one.</p>
+                                <?php if ($showArchived): ?>
+                                    <i class="fas fa-archive fa-3x text-muted d-block mb-2"></i>
+                                    <p class="text-muted mb-0">No archived reminders found.</p>
+                                <?php else: ?>
+                                    <i class="fas fa-bell-slash fa-3x text-muted d-block mb-2"></i>
+                                    <p class="text-muted mb-0">No reminders found. Click "Add New Reminder" to create one.</p>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endif; ?>
                     <?php while ($row = $reminderResult->fetch_assoc()) : ?>
-                        <tr class="<?= $row['status'] === 'inactive' ? 'reminder-inactive' : ''; ?>">
+                        <tr class="<?= $showArchived ? 'reminder-archived' : ''; ?>">
                             <td data-label="ID"><?= htmlspecialchars($row['id']); ?></td>
                             <td data-label="Title"><?= htmlspecialchars($row['title']); ?></td>
                             <td data-label="Recurrence">
@@ -480,35 +503,43 @@ ob_end_flush(); // Flush the output buffer
                             <td data-label="Status"><?= htmlspecialchars(ucfirst($row['status'])); ?></td>
                             <td data-label="Actions" class="table-actions">
                                 <div class="action-buttons">
-                                    <!-- Add the View button here -->
+                                    <!-- View button (always visible) -->
                                     <button class="btn btn-info btn-sm viewButton" data-id="<?= $row['id']; ?>">
                                         <i class="fas fa-eye"></i>
                                     </button>
 
-                                    <!-- Existing Edit and Delete buttons -->
-                                    <button class="btn btn-warning btn-sm editButton" data-id="<?= $row['id']; ?>">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <form action="manage_reminder.php" method="post" style="display:inline-block;">
-                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                                        <input type="hidden" name="id" value="<?= $row['id']; ?>">
-                                        <?php if ($row['status'] === 'active') : ?>
-                                            <button type="submit" name="toggle_status" class="btn btn-secondary btn-sm" title="Pause Reminder">
-                                                <i class="fas fa-pause"></i>
+                                    <?php if ($showArchived): ?>
+                                        <!-- Archived view: Restore + Delete Forever -->
+                                        <form action="manage_reminder.php" method="post" style="display:inline-block;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                            <input type="hidden" name="id" value="<?= $row['id']; ?>">
+                                            <button type="submit" name="restore" class="btn btn-success btn-sm" title="Restore"
+                                                onclick="return confirm('Restore this reminder back to active?');">
+                                                <i class="fas fa-undo"></i>
                                             </button>
-                                        <?php else : ?>
-                                            <button type="submit" name="toggle_status" class="btn btn-success btn-sm" title="Resume Reminder">
-                                                <i class="fas fa-play"></i>
+                                        </form>
+                                        <form action="manage_reminder.php" method="post" style="display:inline-block;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                            <input type="hidden" name="id" value="<?= $row['id']; ?>">
+                                            <button type="submit" name="delete" class="btn btn-danger btn-sm" title="Delete Forever"
+                                                onclick="return confirm('PERMANENTLY delete this reminder?\n\nThis action CANNOT be undone.') && confirm('Are you absolutely sure?');">
+                                                <i class="fas fa-trash"></i>
                                             </button>
-                                        <?php endif; ?>
-                                    </form>
-                                    <form action="manage_reminder.php" method="post" style="display:inline-block;">
-                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                                        <input type="hidden" name="id" value="<?= $row['id']; ?>">
-                                        <button type="submit" name="delete" class="btn btn-danger btn-sm" title="Delete Permanently" onclick="return confirm('Permanently delete this reminder? This cannot be undone.');">
-                                            <i class="fas fa-trash-alt"></i>
+                                        </form>
+                                    <?php else: ?>
+                                        <!-- Active view: Edit + Archive -->
+                                        <button class="btn btn-warning btn-sm editButton" data-id="<?= $row['id']; ?>">
+                                            <i class="fas fa-edit"></i>
                                         </button>
-                                    </form>
+                                        <form action="manage_reminder.php" method="post" style="display:inline-block;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                            <input type="hidden" name="id" value="<?= $row['id']; ?>">
+                                            <button type="submit" name="archive" class="btn btn-secondary btn-sm" title="Archive"
+                                                onclick="return confirm('Archive this reminder?');">
+                                                <i class="fas fa-archive"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
