@@ -825,6 +825,7 @@ if (isset($settings['r2_pres'])) {
         }
         .table td[data-label] {
             display: block;
+            width: 100% !important;
             padding: 4px 14px;
             border: none;
             border-bottom: 1px solid var(--bs-border-color);
