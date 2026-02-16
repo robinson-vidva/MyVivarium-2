@@ -328,6 +328,52 @@ require 'header.php';
 
         .section-header .action-buttons {
             margin-left: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        /* Mobile layout for view pages */
+        @media (max-width: 576px) {
+            /* Stack title and buttons */
+            .section-header {
+                flex-wrap: wrap;
+            }
+            .section-header h5 {
+                flex: 1 1 100%;
+                margin-bottom: 8px;
+            }
+            .section-header .action-buttons {
+                margin-left: 0;
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            /* Make details-table match the card style of data-label tables */
+            .details-table th,
+            .details-table td {
+                display: block;
+                width: 100% !important;
+                padding: 4px 14px;
+                border-bottom: none;
+            }
+            .details-table th {
+                padding-top: 10px;
+                padding-bottom: 0;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--bs-secondary-color);
+                font-weight: 700;
+            }
+            .details-table td {
+                padding-bottom: 10px;
+                border-bottom: 1px solid var(--bs-border-color);
+                color: var(--bs-body-color);
+            }
+            .details-table tr:last-child td {
+                border-bottom: none;
+            }
         }
 
         /* Details Table (key-value pairs) */

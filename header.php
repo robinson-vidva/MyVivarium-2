@@ -825,26 +825,29 @@ if (isset($settings['r2_pres'])) {
         }
         .table td[data-label] {
             display: block;
-            padding: 8px 10px;
+            padding: 4px 14px;
             border: none;
-            position: relative;
-            padding-left: 40%;
+            border-bottom: 1px solid var(--bs-border-color);
             text-align: left;
-            min-height: 36px;
             overflow-wrap: normal;
             word-wrap: normal;
+            padding-top: 4px;
+            padding-bottom: 10px;
+            color: var(--bs-body-color);
+        }
+        .table td[data-label]:last-child {
+            border-bottom: none;
         }
         .table td[data-label]::before {
             content: attr(data-label);
-            font-weight: bold;
+            display: block;
+            font-weight: 700;
             text-transform: uppercase;
-            position: absolute;
-            left: 10px;
-            width: 35%;
-            padding-right: 10px;
-            white-space: nowrap;
-            color: var(--bs-body-color);
-            text-align: left;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            color: var(--bs-secondary-color);
+            margin-top: 6px;
+            margin-bottom: 2px;
         }
         .table td[data-label="Actions"],
         .table td[data-label="Action"] {
