@@ -136,16 +136,16 @@ if (isset($_GET['id'])) {
             /// Retrieve and sanitize form data
             $cage_id = trim($_POST['cage_id']);
             $new_cage_id = trim($_POST['new_cage_id']);
-            $pi_name = trim($_POST['pi_name']);
+            $pi_name = !empty($_POST['pi_name']) ? (int)$_POST['pi_name'] : null;
             $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
             $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-            $cross = trim($_POST['cross']);
+            $cross = !empty($_POST['cross']) ? trim($_POST['cross']) : null;
             $iacuc = isset($_POST['iacuc']) ? $_POST['iacuc'] : []; // Array of selected IACUC values
             $users = isset($_POST['user']) ? $_POST['user'] : []; // Array of selected users
-            $male_id = trim($_POST['male_id']);
-            $female_id = trim($_POST['female_id']);
-            $male_dob = trim($_POST['male_dob']);
-            $female_dob = trim($_POST['female_dob']);
+            $male_id = !empty($_POST['male_id']) ? trim($_POST['male_id']) : null;
+            $female_id = !empty($_POST['female_id']) ? trim($_POST['female_id']) : null;
+            $male_dob = !empty($_POST['male_dob']) ? trim($_POST['male_dob']) : null;
+            $female_dob = !empty($_POST['female_dob']) ? trim($_POST['female_dob']) : null;
             $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
             $male_parent_cage = !empty($_POST['male_parent_cage']) ? trim($_POST['male_parent_cage']) : null;
             $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
@@ -348,8 +348,8 @@ if (isset($_GET['id'])) {
             if (isset($_POST['dom']) && isset($_POST['litter_dob'])) {
                 // Iterate over each new litter entry
                 for ($i = 0; $i < count($_POST['dom']); $i++) {
-                    $dom_i = trim($_POST['dom'][$i]);
-                    $litter_dob_i = trim($_POST['litter_dob'][$i]);
+                    $dom_i = !empty($_POST['dom'][$i]) ? trim($_POST['dom'][$i]) : null;
+                    $litter_dob_i = !empty($_POST['litter_dob'][$i]) ? trim($_POST['litter_dob'][$i]) : null;
                     $pups_alive_i = !empty($_POST['pups_alive'][$i]) ? intval($_POST['pups_alive'][$i]) : 0;
                     $pups_dead_i = !empty($_POST['pups_dead'][$i]) ? intval($_POST['pups_dead'][$i]) : 0;
                     $pups_male_i = !empty($_POST['pups_male'][$i]) ? intval($_POST['pups_male'][$i]) : 0;
