@@ -1,17 +1,15 @@
 # Database Schema and Migrations
 
-This folder contains the database schema, migration scripts, and tools for MyVivarium-2.
+This folder contains the database schema, migration scripts, and tools for MyVivarium v2.
 
 ## Files Overview
 
 | File | Purpose |
 |------|---------|
-| `schema.sql` | Complete v2 schema for **new installations** |
+| `schema.sql` | Complete v2 schema (17 tables) for **new installations** |
 | `migrate_v1_to_v2.sql` | **In-place upgrade** from MyVivarium v1 to v2 |
 | `migrate_v1_to_v2.sh` | **Full migration** script (old DB -> new DB, with verification) |
-| `add_vivarium_manager_role.sql` | Legacy: adds vivarium_manager role (included in v2 schema) |
-| `add_features_v2.sql` | Legacy: adds v2 columns (included in migrate_v1_to_v2.sql) |
-| `make_cage_fields_optional.sql` | Legacy: optional fields (included in migrate_v1_to_v2.sql) |
+| `migrate_add_parent_cage.sql` | Adds parent cage columns to breeding table |
 | `erd.png` | Entity-Relationship Diagram |
 
 ## New Installation
@@ -21,6 +19,55 @@ Use `schema.sql` to create all tables with the latest v2 structure:
 ```bash
 mysql -u root -p your_database_name < database/schema.sql
 ```
+
+## Database Tables
+
+### Core Tables
+| Table | Description |
+|-------|-------------|
+| `users` | User accounts (name, email, role, password, login security fields) |
+| `cages` | Base cage info (cage_id, PI, quantity, status, room, rack) |
+| `cage_users` | Junction: cage-to-user assignments |
+| `cage_iacuc` | Junction: cage-to-IACUC protocol associations |
+| `strains` | Mouse strains (JAX ID, name, aliases, RRID, URL) |
+| `settings` | System settings (key-value pairs) |
+
+### Cage Data Tables
+| Table | Description |
+|-------|-------------|
+| `holding` | Holding cage details (strain, DOB, sex, parent cage, genotype) |
+| `breeding` | Breeding cage details (cross, male/female IDs, DOBs, genotypes, parent cages) |
+| `litters` | Litter records (DOM, DOB, pup counts, sex counts) |
+| `mice` | Individual mouse tracking (mouse ID, genotype, notes) |
+| `files` | File attachments per cage |
+| `notes` | Sticky notes per cage |
+| `maintenance` | Maintenance log entries per cage |
+
+### Task & Reminder Tables
+| Table | Description |
+|-------|-------------|
+| `tasks` | Tasks with title, description, assignment, status (Pending/In Progress/Completed), due date |
+| `reminders` | Recurring reminders (daily/weekly/monthly) with status (active/inactive for archiving) |
+| `outbox` | Email queue for reminder notifications (pending/sent/failed) |
+
+### Audit Tables
+| Table | Description |
+|-------|-------------|
+| `activity_log` | Audit trail (user, action, entity, details, IP, timestamp) |
+| `iacuc` | IACUC protocols (ID, title, file URL) |
+
+## Key Schema Details
+
+### Status Fields
+- **Cages**: `status` ENUM('active', 'archived') -- supports cage archiving workflow
+- **Reminders**: `status` ENUM('active', 'inactive') -- supports reminder archiving workflow
+- **Tasks**: `status` ENUM('Pending', 'In Progress', 'Completed') -- task progress tracking
+- **Outbox**: `status` ENUM('pending', 'sent', 'failed') -- email delivery tracking
+
+### Foreign Keys
+- Cage deletions cascade through `cage_users`, `cage_iacuc`, and related tables
+- Cage ID renames propagate via `ON UPDATE CASCADE` on all foreign keys
+- User deletions use `ON DELETE SET NULL` for ownership fields, `ON DELETE CASCADE` for assignments
 
 ## Upgrading from MyVivarium v1
 
@@ -58,7 +105,18 @@ The script will:
 
 ## What Changed in v2
 
-### New Columns
+### New Tables (v2 only)
+| Table | Purpose |
+|-------|---------|
+| `tasks` | Task management with status workflow |
+| `reminders` | Recurring reminder scheduling |
+| `outbox` | Email notification queue |
+| `maintenance` | Cage maintenance log |
+| `activity_log` | Audit trail |
+| `settings` | System configuration |
+| `mice` | Individual mouse tracking |
+
+### New Columns on Existing Tables
 
 | Table | Column | Type | Default | Purpose |
 |-------|--------|------|---------|---------|
@@ -68,6 +126,8 @@ The script will:
 | `holding` | `genotype` | VARCHAR(255) | NULL | Cage-level genotype |
 | `breeding` | `male_genotype` | VARCHAR(255) | NULL | Male parent genotype |
 | `breeding` | `female_genotype` | VARCHAR(255) | NULL | Female parent genotype |
+| `breeding` | `male_parent_cage` | VARCHAR(255) | NULL | Male source cage |
+| `breeding` | `female_parent_cage` | VARCHAR(255) | NULL | Female source cage |
 
 ### Fields Made Optional (Allow NULL)
 
@@ -87,12 +147,17 @@ After migration, run these queries to verify:
 DESCRIBE cages;
 DESCRIBE holding;
 DESCRIBE breeding;
+DESCRIBE tasks;
+DESCRIBE reminders;
 
 -- Check cage counts
 SELECT status, COUNT(*) FROM cages GROUP BY status;
 
 -- Check roles
 SELECT role, COUNT(*) FROM users GROUP BY role;
+
+-- Check new tables exist
+SHOW TABLES;
 ```
 
 ## Best Practices

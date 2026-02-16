@@ -8,7 +8,7 @@
 
 ![PHP](https://img.shields.io/badge/php-%23777BB4.svg?&style=for-the-badge&logo=php&logoColor=white) ![HTML](https://img.shields.io/badge/html5-%23E34F26.svg?&style=for-the-badge&logo=html5&logoColor=white) ![CSS](https://img.shields.io/badge/css3-%231572B6.svg?&style=for-the-badge&logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/javascript-%23F7DF1E.svg?&style=for-the-badge&logo=javascript&logoColor=black) ![Font Awesome](https://img.shields.io/badge/font%20awesome-%23339AF0.svg?&style=for-the-badge&logo=font-awesome&logoColor=white) ![Bootstrap](https://img.shields.io/badge/bootstrap-%23563D7C.svg?&style=for-the-badge&logo=bootstrap&logoColor=white)
 
-MyVivarium is an online platform designed to manage your vivarium effectively. It provides features such as user registration, profile management, lab management, and real-time environmental monitoring with IoT sensors.
+MyVivarium is an online platform designed to manage your vivarium effectively. It provides features such as user registration, profile management, lab management, task and reminder scheduling, calendar views, and real-time environmental monitoring with IoT sensors.
 
 **MyVivarium-2** is the enhanced version with improved security, new features, and a better user experience. The original [MyVivarium](https://github.com/myvivarium/MyVivarium) repository is preserved as the initial release.
 
@@ -27,10 +27,15 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 ## What's New in v2
 
 ### New Features
+- **Calendar View** -- Interactive monthly calendar (FullCalendar v6) showing tasks and reminders with color-coded status, grid and list views, rich event details, and mobile-responsive layout
+- **Task Management** -- Create, assign, and track tasks with status workflow (Pending, In Progress, Completed), due dates, cage association, and user assignment
+- **Reminder System** -- Recurring reminders (daily, weekly, monthly) with automated email notifications via cron jobs, archive/restore workflow, and calendar integration
+- **Reminder Archiving** -- Archive reminders instead of deleting, with restore and permanent delete options (matches cage archive pattern)
 - **Cage Archiving** -- Soft-delete cages instead of permanent deletion, with restore capability
 - **Cage ID Editing** -- Rename cage IDs with automatic propagation across all related tables
 - **Cage Duplication** -- Clone an existing cage to quickly create a similar one (copies strain, IACUC, users, location, mice)
 - **Move Mouse Between Cages** -- Transfer mice from one holding cage to another with validation and quantity tracking
+- **Sticky Notes** -- Per-cage sticky notes for quick annotations visible on cage view pages
 - **Configurable Pagination** -- Choose 10, 20, 30, or 50 cages per page on dashboards
 - **Column Sorting** -- Sort cage lists by cage ID in ascending or descending order
 - **Location Tracking** -- Room and rack fields on all cage types
@@ -43,6 +48,7 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - **Cage Lineage View** -- Visual tree with searchable Select2 dropdown for cage selection
 - **Date Range Filters** -- Filter maintenance notes by date range with From/To date inputs
 - **Dark Mode** -- Full dark mode support across all pages using Bootstrap 5.3 CSS variables (preference saved in localStorage)
+- **PWA Support** -- Progressive Web App with service worker for offline fallback, installable on mobile and desktop
 - **Dashboard Stats** -- Home page shows active vs. archived cage counts
 - **Archive Workflow** -- Intuitive Restore and Delete Forever buttons on archived cages with double confirmation for permanent deletion
 
@@ -51,6 +57,7 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - CSRF token validation on all state-changing operations
 - XSS prevention with proper output encoding
 - Session security hardening (HttpOnly, SameSite, 30-min timeout, ID regeneration)
+- Security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
 - Authentication checks on all API endpoints
 - Removed deprecated `FILTER_SANITIZE_STRING` (PHP 8.2+ compatible)
 - Fixed double-escaping bugs with `mysqli_real_escape_string` + `bind_param`
@@ -58,14 +65,17 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - Standardized on Bootstrap 5.3.3 (removed all Bootstrap 4 conflicts)
 
 ### UI/UX Improvements
+- Responsive mobile-first design with card-based table layouts on small screens
+- Hamburger menu for mobile navigation with dropdown sub-menus
+- Calendar dropdown in nav with Calendar, Tasks, and Reminders sub-pages
 - Replaced all hardcoded CSS colors with Bootstrap CSS variables for consistent dark mode
 - Migrated from Bootstrap 4 `.form-group` class to Bootstrap 5 `mb-3` utility
 - Button tooltips on dashboard action buttons (View, Tasks, Edit, Archive, Restore, Delete Forever)
 - Tooltips properly initialize on dynamically loaded AJAX content
 - Section cards with consistent styling across all view pages
-- Consistent action button sizing (34x34px) across all tables
+- Consistent action button sizing across all tables
 - Footer positioning fix (no longer overlaps content on long pages)
-- Dark mode support for Select2 dropdowns, form controls, alerts, and modals
+- Dark mode support for Select2 dropdowns, form controls, alerts, modals, and FullCalendar
 
 ### Bug Fixes
 - Fixed broken cage permission checks (now uses `cage_users` junction table)
@@ -81,15 +91,20 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - User profile management and password reset
 - Admin functionalities for managing users and labs
 - Vivarium Manager role for maintenance oversight
+- Interactive calendar with task and reminder visualization
+- Task management with status tracking and cage association
+- Recurring reminders with email notifications and archive support
 - Cage archiving with restore and permanent delete options
 - Cage duplication (clone) for quick cage creation
 - Mouse transfer between holding cages
 - Cage lineage view (visual parent-child tree)
+- Sticky notes per cage for quick annotations
 - Activity/audit log with search, date range, and entity filters
 - Configurable pagination and sorting on cage dashboards
 - Date range filters on maintenance notes
 - Location tracking (room/rack) and genotype fields
 - Dark mode with localStorage persistence
+- Progressive Web App (PWA) with offline support
 - Real-time environmental monitoring using IoT sensors ([RPi-IoT Repository](https://github.com/myvivarium/RPi-IoT))
 - Secure and compliant data management
 
@@ -118,7 +133,7 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 
 4. **Download and run the installation script**:
    ```bash
-   curl -O https://raw.githubusercontent.com/myvivarium/MyVivarium/main/setup/setup.sh
+   curl -O https://raw.githubusercontent.com/robinson-vidva/MyVivarium-2/main/setup/setup.sh
    chmod +x setup.sh
    sudo ./setup.sh
    ```
@@ -148,15 +163,14 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
     ```
     Update `.env` with your database and SMTP settings (see [Configuration](#configuration)).
 
-3. **Place files in the web server directory:**
-    ```bash
-    mv * /path/to/your/public_html/
-    cp .env /path/to/your/public_html/
-    ```
-
-4. **Install dependencies:**
+3. **Install dependencies:**
     ```bash
     composer install
+    ```
+
+4. **Place files in the web server directory:**
+    ```bash
+    sudo cp -r . /var/www/html/
     ```
 
 5. **Set up the database:**
@@ -166,21 +180,23 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
     ```sql
     CREATE DATABASE myvivarium;
     USE myvivarium;
-    SOURCE /path/to/your/public_html/database/schema.sql;
+    SOURCE /var/www/html/database/schema.sql;
     ```
 
 6. **Set up cron jobs:**
     ```bash
-    # Process reminders every 5 minutes
-    */5 * * * * php /path/to/your/public_html/process_reminders.php
-    # Send queued emails every minute
-    * * * * * php /path/to/your/public_html/send_email.php
+    crontab -e
+    ```
+    Add:
+    ```
+    * * * * * /usr/bin/php /var/www/html/send_email.php > /dev/null 2>&1
+    * * * * * /usr/bin/php /var/www/html/process_reminders.php > /dev/null 2>&1
     ```
 
 7. **Set ownership and permissions:**
     ```bash
-    sudo chown -R www-data:www-data /path/to/your/public_html
-    sudo chmod -R 755 /path/to/your/public_html
+    sudo chown -R www-data:www-data /var/www/html
+    sudo chmod -R 755 /var/www/html
     ```
 
 #### Configuration
@@ -269,98 +285,116 @@ See `database/README.md` for full migration details.
 ### Core
 | File | Description |
 |------|-------------|
-| `dbcon.php` | Database connection |
-| `config.php` | SMTP configuration |
-| `session_config.php` | Secure session settings (HttpOnly, HTTPS, CSRF, 30-min timeout) |
-| `header.php` | Navigation header |
-| `footer.php` | Footer with dynamic lab name |
-| `message.php` | Session message display |
+| `dbcon.php` | Database connection using environment variables |
+| `config.php` | SMTP configuration loader (PHPMailer + Dotenv) |
+| `session_config.php` | Secure session settings (HttpOnly, HTTPS, SameSite, 30-min timeout) |
+| `header.php` | Navigation header with dark mode toggle and responsive mobile menu |
+| `footer.php` | Footer with dynamic lab name and copyright year |
+| `message.php` | Session message display helper |
+| `log_activity.php` | Helper function for recording audit trail entries |
 
 ### Authentication
 | File | Description |
 |------|-------------|
-| `index.php` | Login page |
+| `index.php` | Login page with brute-force protection |
 | `register.php` | User registration with email verification |
-| `forgot_password.php` | Password reset emails |
-| `reset_password.php` | Password reset form |
-| `confirm_email.php` | Email verification |
+| `forgot_password.php` | Password reset email sender |
+| `reset_password.php` | Password reset form handler |
+| `confirm_email.php` | Email verification handler |
 | `logout.php` | Session destruction |
 
 ### Dashboard & Home
 | File | Description |
 |------|-------------|
-| `home.php` | Home page with cage stats (active/archived counts) |
+| `home.php` | Home page with active/archived cage stats and quick links |
 | `user_profile.php` | User profile management |
 
 ### Admin
 | File | Description |
 |------|-------------|
 | `manage_users.php` | User management (roles: admin, vivarium_manager, user) |
-| `manage_lab.php` | Lab settings |
-| `manage_strain.php` | Strain management |
-| `manage_iacuc.php` | IACUC protocol management |
-| `export_data.php` | CSV export of all tables |
+| `manage_lab.php` | Lab settings (name, logo) |
+| `manage_strain.php` | Strain management (JAX IDs, RRID, aliases) |
+| `manage_iacuc.php` | IACUC protocol management with file uploads |
+| `export_data.php` | CSV export of all database tables |
 
 ### Holding Cages
 | File | Description |
 |------|-------------|
-| `hc_dash.php` | Dashboard with pagination, sort, archive toggle |
+| `hc_dash.php` | Dashboard with pagination, sort, search, archive toggle |
 | `hc_fetch_data.php` | AJAX data fetch with dynamic limit/sort/filter |
 | `hc_addn.php` | Add cage (room, rack, genotype, custom strain) |
-| `hc_view.php` | View cage details |
-| `hc_edit.php` | Edit cage (includes cage ID rename) |
-| `hc_drop.php` | Archive/restore/permanent delete |
+| `hc_view.php` | View cage details with notes, files, mice, maintenance log |
+| `hc_edit.php` | Edit cage (includes cage ID rename with propagation) |
+| `hc_drop.php` | Archive/restore/permanent delete with permission checks |
 | `hc_slct_crd.php` | Select cages for card printing |
 | `hc_prnt_crd.php` | Print cage cards |
 
 ### Breeding Cages
 | File | Description |
 |------|-------------|
-| `bc_dash.php` | Dashboard with pagination, sort, archive toggle |
+| `bc_dash.php` | Dashboard with pagination, sort, search, archive toggle |
 | `bc_fetch_data.php` | AJAX data fetch with dynamic limit/sort/filter |
-| `bc_addn.php` | Add cage (room, rack, genotypes, custom strain) |
-| `bc_view.php` | View cage details |
-| `bc_edit.php` | Edit cage (includes cage ID rename) |
-| `bc_drop.php` | Archive/restore/permanent delete |
+| `bc_addn.php` | Add cage (room, rack, genotypes, parent cages, custom strain) |
+| `bc_view.php` | View cage details with litters, files, maintenance log |
+| `bc_edit.php` | Edit cage (includes cage ID rename with propagation) |
+| `bc_drop.php` | Archive/restore/permanent delete with permission checks |
 | `bc_slct_crd.php` | Select cages for card printing |
 | `bc_prnt_crd.php` | Print cage cards |
+
+### Calendar, Tasks & Reminders
+| File | Description |
+|------|-------------|
+| `calendar.php` | Interactive calendar (FullCalendar v6) with grid and list views |
+| `calendar_events.php` | AJAX JSON endpoint for calendar event data |
+| `manage_tasks.php` | Task management (add/edit/delete with status tracking) |
+| `get_task.php` | Retrieve task details (AJAX endpoint) |
+| `manage_reminder.php` | Reminder management with archive/restore/permanent delete |
+| `get_reminder.php` | Retrieve reminder details (AJAX endpoint) |
+| `process_reminders.php` | Process scheduled reminders and create tasks (cron job, CLI only) |
+| `send_email.php` | Send queued emails from outbox (cron job) |
 
 ### Vivarium Management
 | File | Description |
 |------|-------------|
 | `vivarium_manager_notes.php` | Maintenance notes CRUD with search, date range filter, pagination, print |
-| `maintenance.php` | Add maintenance records from cage view |
+| `maintenance.php` | Add maintenance records from cage view pages |
 | `activity_log.php` | Activity/audit log viewer with search, date range, entity type filter |
-| `log_activity.php` | Helper function for recording audit trail entries |
 | `cage_lineage.php` | Visual tree view of parent-child cage relationships |
-| `mouse_transfer.php` | Backend for transferring mice between holding cages |
+| `mouse_transfer.php` | Transfer mice between holding cages with validation |
 
-### Tasks & Reminders
+### Sticky Notes
 | File | Description |
 |------|-------------|
-| `manage_tasks.php` | Task management (add/edit/delete) |
-| `get_task.php` | Retrieve task details (AJAX) |
-| `manage_reminder.php` | Reminder management |
-| `get_reminder.php` | Retrieve reminder details (AJAX) |
-| `process_reminders.php` | Process scheduled reminders (cron job, CLI only) |
-| `send_email.php` | Send queued emails (cron job) |
+| `nt_app.php` | Sticky notes application (embedded in cage views) |
+| `nt_add.php` | Add a new sticky note |
+| `nt_edit.php` | Edit an existing sticky note |
+| `nt_rmv.php` | Remove a sticky note |
 
 ### Other
 | File | Description |
 |------|-------------|
-| `nt_app.php` | Sticky notes application |
-| `nt_add.php` / `nt_edit.php` / `nt_rmv.php` | Sticky note CRUD |
-| `iot_sensors.php` | IoT sensor data display |
-| `delete_file.php` | File attachment deletion |
+| `iot_sensors.php` | IoT sensor data display (temperature, humidity, light) |
+| `delete_file.php` | File attachment deletion handler |
+| `sw.js` | Service worker for PWA offline support and caching |
+| `manifest.json` | PWA manifest (app name, icons, theme) |
 
 ### Database
 | File | Description |
 |------|-------------|
-| `database/schema.sql` | Full v2 database schema (use for fresh installs) |
+| `database/schema.sql` | Full v2 database schema -- 17 tables (use for fresh installs) |
 | `database/migrate_v1_to_v2.sql` | In-place SQL migration from v1 to v2 |
 | `database/migrate_v1_to_v2.sh` | Interactive shell migration script |
 | `database/migrate_add_parent_cage.sql` | Adds male/female parent cage columns to breeding table |
-| `database/README.md` | Detailed migration documentation |
+| `database/README.md` | Detailed migration and schema documentation |
+| `database/erd.png` | Entity-Relationship Diagram |
+
+### Setup & Configuration
+| File | Description |
+|------|-------------|
+| `setup/setup.sh` | Automated deployment script (Apache, MySQL, SSL, cron) |
+| `.env.example` | Environment variables template (database + SMTP) |
+| `composer.json` | PHP dependencies (PHPMailer, Dotenv) |
 
 ## Demo Website
 
