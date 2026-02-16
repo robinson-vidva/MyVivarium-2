@@ -157,6 +157,13 @@ function handlePasswordReset($con, $email, $url) {
     <link rel="icon" sizes="512x512" href="/icons/android-chrome-512x512.png">
     <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="MyVivarium">
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Google Font: Poppins -->
