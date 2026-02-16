@@ -820,14 +820,12 @@ ob_end_flush(); // Flush the output buffer
                         document.getElementById('cage_id').value = response.cage_id;
 
                     } else if (action === 'view') {
-                        const assignedToUsers = response.assigned_to.split(',').map(userId => users[userId] || userId).join(', ');
-
                         const taskDetails = `
                             <p><strong>ID:</strong> ${response.id}</p>
                             <p><strong>Title:</strong> ${response.title}</p>
                             <p><strong>Description/Update:</strong> ${response.description}</p>
-                            <p><strong>Assigned By:</strong> ${users[response.assigned_by] || response.assigned_by}</p>
-                            <p><strong>Assigned To:</strong> ${assignedToUsers}</p>
+                            <p><strong>Assigned By:</strong> ${response.assigned_by_name || users[response.assigned_by] || response.assigned_by}</p>
+                            <p><strong>Assigned To:</strong> ${response.assigned_to_names || response.assigned_to}</p>
                             <p><strong>Status:</strong> ${response.status}</p>
                             <p><strong>Completion Date:</strong> ${response.completion_date}</p>
                             <p><strong>Creation Date:</strong> ${response.creation_date}</p>
