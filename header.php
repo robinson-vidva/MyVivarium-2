@@ -862,13 +862,13 @@ if (isset($settings['r2_pres'])) {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            justify-content: flex-start;
+            justify-content: flex-end;
         }
         .table td[data-label="Actions"] .action-buttons,
         .table td[data-label="Actions"] .table-actions,
         .table td[data-label="Action"] .action-buttons,
         .table td[data-label="Action"] .table-actions {
-            justify-content: flex-start;
+            justify-content: flex-end;
         }
     }
     </style>
