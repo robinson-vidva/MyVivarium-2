@@ -342,7 +342,7 @@ ob_end_flush(); // Flush the output buffer
                 <button id="addNewReminderButton" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Reminder</button>
             <?php endif; ?>
             <a href="manage_reminder.php<?= $showArchived ? '' : '?show_archived=1'; ?>"
-               class="btn btn-sm <?= $showArchived ? 'btn-outline-warning' : 'btn-outline-secondary'; ?>">
+               class="btn <?= $showArchived ? 'btn-outline-warning' : 'btn-outline-secondary'; ?>">
                 <i class="fas <?= $showArchived ? 'fa-box-open' : 'fa-archive'; ?> me-1"></i>
                 <?= $showArchived ? 'Show Active' : 'Show Archived'; ?>
             </a>
