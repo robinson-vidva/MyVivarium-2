@@ -548,7 +548,7 @@ mysqli_close($con);
 
                             <!-- Conditionally include Cloudflare Turnstile Widget -->
                             <?php if (!empty($turnstileSiteKey)) { ?>
-                                <div class="cf-turnstile mb-3" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>"></div>
+                                <div class="cf-turnstile mb-3" data-sitekey="<?php echo htmlspecialchars($turnstileSiteKey); ?>" data-size="flexible"></div>
                                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
                             <?php } ?>
 
