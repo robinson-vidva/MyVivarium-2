@@ -120,7 +120,7 @@ require 'header.php';
             <!-- Welcome message with user information -->
             <div class="pt-3 pb-2 mb-3 border-bottom">
                 <h2 class="mb-1">Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h2>
-                <span class="text-secondary" style="font-size: 0.9rem;">
+                <span class="text-body-secondary" style="font-size: 0.9rem; opacity: 0.85;">
                     <?php echo htmlspecialchars($_SESSION['position']); ?>
                 </span>
             </div>
