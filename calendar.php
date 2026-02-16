@@ -42,9 +42,9 @@ ob_end_flush();
 
     <style>
         .calendar-container {
-            max-width: 900px;
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 20px 30px;
         }
 
         /* FullCalendar overrides */
@@ -52,14 +52,29 @@ ob_end_flush();
             font-family: 'Poppins', sans-serif;
         }
 
+        /* Toolbar layout — spread items across full width */
+        .fc .fc-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 12px 0;
+        }
+
         .fc .fc-toolbar-title {
-            font-size: 1.35rem;
+            font-size: 1.5rem;
             font-weight: 600;
         }
 
         .fc .fc-button {
             font-size: 0.85rem;
             border-radius: 6px;
+            padding: 6px 14px;
+        }
+
+        .fc .fc-button-group {
+            gap: 0;
         }
 
         .fc-event {
@@ -72,6 +87,11 @@ ob_end_flush();
         .fc .fc-daygrid-day-number {
             font-size: 0.85rem;
             padding: 4px 8px;
+        }
+
+        /* Grid view — slightly taller day cells */
+        .fc .fc-daygrid-day-frame {
+            min-height: 90px;
         }
 
         /* Legend */
