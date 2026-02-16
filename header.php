@@ -337,6 +337,11 @@ if (isset($settings['r2_pres'])) {
                 <button id="darkModeToggle" class="btn btn-outline-light" aria-label="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                 </button>
+
+                <!-- Logout Button -->
+                <a href="logout.php" class="btn btn-outline-light" aria-label="Logout" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i> <span class="nav-label">Logout</span>
+                </a>
             </div>
         </nav>
     </div>
