@@ -318,9 +318,17 @@ if (isset($settings['r2_pres'])) {
                     </ul>
                 </div>
 
-                <a href="calendar.php" class="btn btn-primary" aria-label="Calendar">
-                    <i class="fas fa-calendar-alt"></i> <span class="nav-label">Calendar</span>
-                </a>
+                <!-- Dropdown for Calendar -->
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="calendarMenuButton" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Calendar">
+                        <i class="fas fa-calendar-alt"></i> <span class="nav-label">Calendar</span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="calendarMenuButton">
+                        <li><a class="dropdown-item" href="calendar.php">Calendar</a></li>
+                        <li><a class="dropdown-item" href="manage_tasks.php">Tasks</a></li>
+                        <li><a class="dropdown-item" href="manage_reminder.php">Reminders</a></li>
+                    </ul>
+                </div>
 
                 <!-- Dropdown for Settings -->
                 <div class="dropdown">
@@ -329,7 +337,6 @@ if (isset($settings['r2_pres'])) {
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="settingsMenuButton">
                         <li><a class="dropdown-item" href="user_profile.php">User Profile</a></li>
-                        <li><a class="dropdown-item" href="manage_tasks.php">Tasks &amp; Reminders</a></li>
                         <?php
                         // Display Vivarium Manager menu for vivarium_manager and admin roles
                         if (isset($_SESSION['role']) &&

@@ -468,11 +468,6 @@ ob_end_flush(); // Flush the output buffer
             <?php if (isset($_GET['id']) && !empty($_GET['id'])) : ?>
                 <a href="manage_tasks.php" class="btn btn-secondary ml-2">Show All Tasks</a>
             <?php endif; ?>
-            <?php if ($isAdmin) : ?>
-                <a href="manage_reminder.php" class="btn btn-warning ml-2">
-                    <i class="fas fa-bell"></i> Manage Reminders
-                </a>
-            <?php endif; ?>
         </div>
 
         <!-- Search form -->
