@@ -3,10 +3,10 @@
 /**
  * Activity / Audit Log Viewer
  *
- * This page allows Admins and Vivarium Managers to view the system audit trail.
+ * This page allows Admins to view the system audit trail.
  * It displays a searchable, filterable, paginated table of all logged user actions.
  *
- * Access: Admin and Vivarium Manager roles only
+ * Access: Admin role only
  */
 
 // Start session
@@ -19,9 +19,8 @@ require 'dbcon.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-// SECURITY: Check if user is logged in and has appropriate role
-if (!isset($_SESSION['role']) ||
-    ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'vivarium_manager')) {
+// SECURITY: Check if user is logged in and has admin role
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     header("Location: index.php");
     exit;
 }
