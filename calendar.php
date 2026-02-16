@@ -497,11 +497,11 @@ ob_end_flush();
         <div class="calendar-top-bar">
             <div class="calendar-actions">
                 <a href="manage_tasks.php" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus"></i> Add Task
+                    <i class="fas fa-tasks"></i> Manage Tasks
                 </a>
                 <?php if ($isAdmin) : ?>
                 <a href="manage_reminder.php" class="btn btn-sm" style="background-color: #6f42c1; color: #fff;">
-                    <i class="fas fa-bell"></i> Add Reminder
+                    <i class="fas fa-bell"></i> Manage Reminders
                 </a>
                 <?php endif; ?>
             </div>
