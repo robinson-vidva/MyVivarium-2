@@ -95,11 +95,24 @@ ob_end_flush();
         }
 
         /* List view — full width */
+        .fc .fc-view-harness {
+            width: 100% !important;
+        }
+
+        .fc .fc-scroller {
+            width: 100%;
+        }
+
         .fc .fc-list {
             width: 100%;
         }
 
         .fc .fc-list-table {
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        .fc .fc-listMonth-view {
             width: 100%;
         }
 
@@ -417,6 +430,7 @@ ob_end_flush();
 
             // Display
             dayMaxEvents: 3,
+            fixedWeekCount: false,
             navLinks: false,
             editable: false,
             selectable: false,
