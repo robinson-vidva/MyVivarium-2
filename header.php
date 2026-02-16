@@ -81,7 +81,22 @@ if (isset($settings['r2_pres'])) {
     <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16x16.png">
     <link rel="icon" sizes="192x192" href="./icons/android-chrome-192x192.png">
     <link rel="icon" sizes="512x512" href="./icons/android-chrome-512x512.png">
+
+    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- Apple PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="MyVivarium">
+
+    <!-- Microsoft Tile -->
+    <meta name="msapplication-TileImage" content="./icons/android-chrome-192x192.png">
+    <meta name="msapplication-TileColor" content="#0d6efd">
 
     <!-- Bootstrap 5.3 CSS (supports dark mode via data-bs-theme) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
@@ -939,6 +954,29 @@ if (isset($settings['r2_pres'])) {
             resetTimers();
         });
     })();
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then(function(registration) {
+                    // Check for updates periodically
+                    registration.addEventListener('updatefound', function() {
+                        var newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'activated') {
+                                console.log('MyVivarium PWA updated.');
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('SW registration failed:', error);
+                });
+        });
+    }
     </script>
 
 <!-- Note: Document structure (html/head/body) is managed by the including page -->
