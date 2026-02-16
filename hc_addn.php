@@ -161,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $iacuc = isset($_POST['iacuc']) ? trim(implode(',', $_POST['iacuc'])) : '';
     $user = isset($_POST['user']) ? implode(',', array_map('trim', $_POST['user'])) : '';
     $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
-    $sex = !empty($_POST['sex']) ? trim($_POST['sex']) : null;
+    $sex = !empty($_POST['sex']) ? strtolower(trim($_POST['sex'])) : null;
     $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
     $remarks = trim($_POST['remarks']);
     $mouse_data = [];

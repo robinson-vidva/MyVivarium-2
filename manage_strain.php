@@ -40,10 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Add new strain - prepared statements handle SQL safety
         $strainId = trim($_POST['strain_id']);
         $strainName = trim($_POST['strain_name']);
-        $strainAka = trim($_POST['strain_aka']);
-        $strainUrl = trim($_POST['strain_url']);
-        $strainRrid = trim($_POST['strain_rrid']);
-        $strainNotes = trim($_POST['strain_notes']);
+        $strainAka = !empty($_POST['strain_aka']) ? trim($_POST['strain_aka']) : null;
+        $strainUrl = !empty($_POST['strain_url']) ? trim($_POST['strain_url']) : null;
+        $strainRrid = !empty($_POST['strain_rrid']) ? trim($_POST['strain_rrid']) : null;
+        $strainNotes = !empty($_POST['strain_notes']) ? trim($_POST['strain_notes']) : null;
 
         // Check if strain ID already exists
         $checkStmt = $con->prepare("SELECT COUNT(*) FROM strains WHERE str_id = ?");
@@ -69,10 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Update existing strain - prepared statements handle SQL safety
         $strainId = trim($_POST['strain_id']);
         $strainName = trim($_POST['strain_name']);
-        $strainAka = trim($_POST['strain_aka']);
-        $strainUrl = trim($_POST['strain_url']);
-        $strainRrid = trim($_POST['strain_rrid']);
-        $strainNotes = trim($_POST['strain_notes']);
+        $strainAka = !empty($_POST['strain_aka']) ? trim($_POST['strain_aka']) : null;
+        $strainUrl = !empty($_POST['strain_url']) ? trim($_POST['strain_url']) : null;
+        $strainRrid = !empty($_POST['strain_rrid']) ? trim($_POST['strain_rrid']) : null;
+        $strainNotes = !empty($_POST['strain_notes']) ? trim($_POST['strain_notes']) : null;
         $stmt = $con->prepare("UPDATE strains SET str_name = ?, str_aka = ?, str_url = ?, str_rrid = ?, str_notes = ? WHERE str_id = ?");
         $stmt->bind_param("ssssss", $strainName, $strainAka, $strainUrl, $strainRrid, $strainNotes, $strainId);
         if ($stmt->execute()) {

@@ -117,18 +117,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pi_id = !empty($_POST['pi_name']) ? $_POST['pi_name'] : null;
     $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
     $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-    $cross = !empty($_POST['cross']) ? $_POST['cross'] : null;
+    $cross = !empty($_POST['cross']) ? trim($_POST['cross']) : null;
     $iacuc_ids = $_POST['iacuc'] ?? [];
     $user_ids = $_POST['user'] ?? [];
-    $male_id = !empty($_POST['male_id']) ? $_POST['male_id'] : null;
-    $female_id = !empty($_POST['female_id']) ? $_POST['female_id'] : null;
-    $male_dob = !empty($_POST['male_dob']) ? $_POST['male_dob'] : null;
-    $female_dob = !empty($_POST['female_dob']) ? $_POST['female_dob'] : null;
+    $male_id = !empty($_POST['male_id']) ? trim($_POST['male_id']) : null;
+    $female_id = !empty($_POST['female_id']) ? trim($_POST['female_id']) : null;
+    $male_dob = !empty($_POST['male_dob']) ? trim($_POST['male_dob']) : null;
+    $female_dob = !empty($_POST['female_dob']) ? trim($_POST['female_dob']) : null;
     $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
     $male_parent_cage = !empty($_POST['male_parent_cage']) ? trim($_POST['male_parent_cage']) : null;
     $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
     $female_parent_cage = !empty($_POST['female_parent_cage']) ? trim($_POST['female_parent_cage']) : null;
-    $remarks = $_POST['remarks'];
+    $remarks = trim($_POST['remarks'] ?? '');
 
     // Check if the cage_id already exists in the cages table
     $check_query = $con->prepare("SELECT * FROM cages WHERE cage_id = ?");
@@ -174,8 +174,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Process litter data insertion if provided
             if (isset($_POST['dom'])) {
-                $dom = $_POST['dom'];
-                $litter_dob = $_POST['litter_dob'];
+                $dom = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['dom']);
+                $litter_dob = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['litter_dob']);
                 $pups_alive = array_map(function ($value) {
                     return !empty($value) ? intval($value) : 0;
                 }, $_POST['pups_alive']);
