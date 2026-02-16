@@ -42,13 +42,41 @@ if (isset($_GET['id']) && is_numeric($_GET['id'])) {
             // Fetch task data if a matching task is found
             $task = $result->fetch_assoc();
 
+            // Resolve assigned_by name
+            $assignedByName = $task['assigned_by'];
+            $nameStmt = $con->prepare("SELECT name FROM users WHERE id = ?");
+            $nameStmt->bind_param("i", $task['assigned_by']);
+            $nameStmt->execute();
+            $nameResult = $nameStmt->get_result();
+            if ($nameRow = $nameResult->fetch_assoc()) {
+                $assignedByName = $nameRow['name'];
+            }
+            $nameStmt->close();
+
+            // Resolve assigned_to names
+            $assignedToNames = [];
+            $assignedToIds = array_filter(explode(',', $task['assigned_to']));
+            foreach ($assignedToIds as $uid) {
+                $uid = trim($uid);
+                $nameStmt = $con->prepare("SELECT name FROM users WHERE id = ?");
+                $nameStmt->bind_param("i", $uid);
+                $nameStmt->execute();
+                $nameResult = $nameStmt->get_result();
+                if ($nameRow = $nameResult->fetch_assoc()) {
+                    $assignedToNames[] = $nameRow['name'];
+                }
+                $nameStmt->close();
+            }
+
             // Populate the response array with task data
             $response = [
                 'id' => $task['id'],
                 'title' => $task['title'],
                 'description' => $task['description'],
                 'assigned_by' => $task['assigned_by'],
+                'assigned_by_name' => $assignedByName,
                 'assigned_to' => $task['assigned_to'],
+                'assigned_to_names' => implode(', ', $assignedToNames),
                 'status' => $task['status'],
                 'completion_date' => $task['completion_date'],
                 'creation_date' => $task['creation_date'],
