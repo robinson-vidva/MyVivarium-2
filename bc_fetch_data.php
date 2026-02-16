@@ -115,7 +115,7 @@ while ($row = mysqli_fetch_assoc($result)) {
             $tableRows .= '<td data-label="Male / Female">' . htmlspecialchars($breedingcage['male_id'] ?? '') . ' / ' . htmlspecialchars($breedingcage['female_id'] ?? '') . '</td>';
             $firstRow = false;
         }
-        $tableRows .= '<td data-label="Action" class="action-icons" style="white-space: nowrap;">
+        $tableRows .= '<td data-label="Action" class="action-icons">
                         <a href="bc_view.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View"><i class="fas fa-eye"></i></a>
                         <a href="manage_tasks.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Tasks"><i class="fas fa-tasks"></i></a>';
 
