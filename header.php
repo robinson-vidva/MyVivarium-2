@@ -171,6 +171,10 @@ if (isset($settings['r2_pres'])) {
 
         .nav .btn {
             margin: 0 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
         .dropdown-menu {
