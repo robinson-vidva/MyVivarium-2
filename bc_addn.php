@@ -117,16 +117,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pi_id = !empty($_POST['pi_name']) ? $_POST['pi_name'] : null;
     $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
     $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-    $cross = !empty($_POST['cross']) ? $_POST['cross'] : null;
+    $cross = !empty($_POST['cross']) ? trim($_POST['cross']) : null;
     $iacuc_ids = $_POST['iacuc'] ?? [];
     $user_ids = $_POST['user'] ?? [];
-    $male_id = !empty($_POST['male_id']) ? $_POST['male_id'] : null;
-    $female_id = !empty($_POST['female_id']) ? $_POST['female_id'] : null;
-    $male_dob = !empty($_POST['male_dob']) ? $_POST['male_dob'] : null;
-    $female_dob = !empty($_POST['female_dob']) ? $_POST['female_dob'] : null;
+    $male_id = !empty($_POST['male_id']) ? trim($_POST['male_id']) : null;
+    $female_id = !empty($_POST['female_id']) ? trim($_POST['female_id']) : null;
+    $male_dob = !empty($_POST['male_dob']) ? trim($_POST['male_dob']) : null;
+    $female_dob = !empty($_POST['female_dob']) ? trim($_POST['female_dob']) : null;
     $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
+    $male_parent_cage = !empty($_POST['male_parent_cage']) ? trim($_POST['male_parent_cage']) : null;
     $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
-    $remarks = $_POST['remarks'];
+    $female_parent_cage = !empty($_POST['female_parent_cage']) ? trim($_POST['female_parent_cage']) : null;
+    $remarks = trim($_POST['remarks'] ?? '');
 
     // Check if the cage_id already exists in the cages table
     $check_query = $con->prepare("SELECT * FROM cages WHERE cage_id = ?");
@@ -143,8 +145,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $insert_cage_query->bind_param("sssss", $cage_id, $pi_id, $remarks, $room, $rack);
 
         // Insert into the breeding table
-        $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`, `male_genotype`, `female_genotype`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $insert_breeding_query->bind_param("ssssssss", $cage_id, $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $female_genotype);
+        $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`, `male_genotype`, `male_parent_cage`, `female_genotype`, `female_parent_cage`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $insert_breeding_query->bind_param("ssssssssss", $cage_id, $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $male_parent_cage, $female_genotype, $female_parent_cage);
 
         // Execute the statements and check if they were successful
         if ($insert_cage_query->execute() && $insert_breeding_query->execute()) {
@@ -172,8 +174,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Process litter data insertion if provided
             if (isset($_POST['dom'])) {
-                $dom = $_POST['dom'];
-                $litter_dob = $_POST['litter_dob'];
+                $dom = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['dom']);
+                $litter_dob = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['litter_dob']);
                 $pups_alive = array_map(function ($value) {
                     return !empty($value) ? intval($value) : 0;
                 }, $_POST['pups_alive']);
@@ -234,8 +236,7 @@ require 'header.php';
 <head>
     <title>Add New Breeding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
-    <!-- Include Select2 CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
 
     <!-- Include Select2 JavaScript -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
@@ -258,8 +259,7 @@ require 'header.php';
         }
 
         .warning-text {
-            color: #dc3545;
-            font-size: 14px;
+            color: var(--bs-danger);
         }
 
         .select2-container .select2-selection--single {
@@ -681,6 +681,11 @@ require 'header.php';
             </div>
 
             <div class="mb-3">
+                <label for="male_parent_cage" class="form-label">Male Source / Parent Cage</label>
+                <input type="text" class="form-control" id="male_parent_cage" name="male_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($cloneData['male_parent_cage'] ?? ''); ?>">
+            </div>
+
+            <div class="mb-3">
                 <label for="female_genotype" class="form-label">Female Genotype</label>
                 <input type="text" class="form-control" id="female_genotype" name="female_genotype" value="<?= htmlspecialchars($cloneData['female_genotype'] ?? ''); ?>">
             </div>
@@ -688,6 +693,11 @@ require 'header.php';
             <div class="mb-3">
                 <label for="female_dob" class="form-label">Female DOB <span class="badge bg-secondary">Useful</span></label>
                 <input type="date" class="form-control" id="female_dob" name="female_dob" min="1900-01-01" data-field-type="useful" value="<?= htmlspecialchars($cloneData['female_dob'] ?? ''); ?>">
+            </div>
+
+            <div class="mb-3">
+                <label for="female_parent_cage" class="form-label">Female Source / Parent Cage</label>
+                <input type="text" class="form-control" id="female_parent_cage" name="female_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($cloneData['female_parent_cage'] ?? ''); ?>">
             </div>
 
             <div class="mb-3">

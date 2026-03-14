@@ -48,14 +48,12 @@ if ($row = mysqli_fetch_assoc($labResult)) {
             margin-top: 50px;
             margin-bottom: 50px;
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             border-radius: 5px;
             background-color: var(--bs-tertiary-bg);
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
+
 
         .btn {
             display: block;
@@ -71,7 +69,7 @@ if ($row = mysqli_fetch_assoc($labResult)) {
         }
 
         .note {
-            color: #888;
+            color: var(--bs-secondary-color);
             font-size: 12px;
         }
 
@@ -80,8 +78,8 @@ if ($row = mysqli_fetch_assoc($labResult)) {
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            background-color: #343a40;
-            color: white;
+            background-color: var(--bs-dark);
+            color: var(--bs-white);
             padding: 1rem;
             text-align: center;
             margin: 0;
@@ -123,7 +121,7 @@ if ($row = mysqli_fetch_assoc($labResult)) {
                 max-width: 500px;
                 margin: 0 auto;
                 padding: 20px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--bs-border-color);
                 border-radius: 5px;
                 background-color: var(--bs-tertiary-bg);
             }

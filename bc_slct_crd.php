@@ -42,8 +42,7 @@ require 'header.php';
 <head>
     <title>Select Breeding Cages for Printing</title>
 
-    <!-- Select2 CSS for enhanced dropdowns -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
 
     <!-- jQuery (required for Select2) -->
     <!-- jQuery loaded via header.php -->
@@ -61,7 +60,7 @@ require 'header.php';
             background-color: var(--bs-tertiary-bg);
             padding: 20px;
             border-radius: 8px;
-            margin: 50px auto;
+            margin: 20px auto;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
 
@@ -117,16 +116,12 @@ require 'header.php';
 </head>
 
 <body>
-    <br>
-    <br>
     <div class="content">
-        <br>
-        <br>
         <div class="container">
             <h4>Select Breeding Cages for Printing</h4>
             <br>
             <form>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="cageIds" class="form-label">Select Cage IDs (up to 4):</label>
                     <br>
                     <select id="cageIds" name="id[]" class="form-select" multiple size="10">

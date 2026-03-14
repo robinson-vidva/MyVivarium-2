@@ -81,7 +81,7 @@ require 'header.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cage Maintenance</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
     <!-- jQuery loaded via header.php -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
     <!-- Bootstrap 5.3 loaded via header.php -->
@@ -136,7 +136,7 @@ require 'header.php';
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4>Add Cage Maintenance Record</h4>
+                        <h1 class="mb-0">Add Cage Maintenance Record</h1>
                         <div class="action-buttons">
                             <!-- Button to go back to the previous page -->
                             <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">

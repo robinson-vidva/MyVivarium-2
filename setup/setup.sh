@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # === Variables - Set your repository and application directory ===
-REPO_URL="https://github.com/myvivarium/MyVivarium.git"
+REPO_URL="https://github.com/robinson-vidva/MyVivarium-2.git"
 APP_DIR="/var/www/html"
 DB_NAME="myvivarium"
 DB_USER="myvivarium"

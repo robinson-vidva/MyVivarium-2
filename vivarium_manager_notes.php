@@ -143,7 +143,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
 }
 
 // Pagination settings
-$records_per_page = 50;
+$allowed_per_page = [10, 25, 50, 100];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
@@ -267,26 +271,10 @@ require 'header.php';
             min-height: 80vh;
         }
 
-        .header-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .search-box {
-            flex: 1;
-            max-width: 400px;
-        }
-
-        /* Action button styles handled by unified styles in header.php */
+        /* header-actions, search-box, filter-row, filter-group, pagination-info loaded via header.php */
 
         .timestamp {
-            font-size: 0.9em;
-            color: #666;
+            color: var(--bs-secondary-color);
         }
 
         .comments-cell {
@@ -294,14 +282,9 @@ require 'header.php';
             word-wrap: break-word;
         }
 
-        .pagination-info {
-            margin: 15px 0;
-            color: #666;
-        }
-
         .modal-header {
-            background-color: #343a40;
-            color: white;
+            background-color: var(--bs-dark);
+            color: var(--bs-white);
         }
 
         .table td {
@@ -330,19 +313,6 @@ require 'header.php';
 
         .print-header {
             display: none;
-        }
-
-        @media (max-width: 768px) {
-            .header-actions {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .search-box {
-                max-width: 100%;
-            }
-
-            /* Action button styles handled by unified styles in header.php */
         }
     </style>
 </head>
@@ -428,8 +398,46 @@ require 'header.php';
                             </div>
                         </div>
                     </div>
-                </form>
-            </div>
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                        <i class="fas fa-plus"></i> Add Note
+                    </button>
+                </div>
+
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="per_page">Show</label>
+                        <select class="form-select" id="per_page" name="per_page" onchange="this.form.submit()">
+                            <?php foreach ($allowed_per_page as $pp): ?>
+                                <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="date_from">Date From</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from"
+                               value="<?php echo htmlspecialchars($date_from); ?>">
+                    </div>
+                    <div class="filter-group">
+                        <label for="date_to">Date To</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to"
+                               value="<?php echo htmlspecialchars($date_to); ?>">
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Apply
+                        </button>
+                    </div>
+                    <?php if (!empty($search) || !empty($date_from) || !empty($date_to)): ?>
+                        <div class="filter-group">
+                            <label>&nbsp;</label>
+                            <a href="?view=<?php echo htmlspecialchars($filter_view); ?>" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Clear All
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </form>
 
             <!-- Pagination Info -->
             <div class="pagination-info">
@@ -465,22 +473,22 @@ require 'header.php';
                     <?php else: ?>
                         <?php foreach ($maintenance_notes as $note): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($note['id']); ?></td>
-                                <td><strong><?php echo htmlspecialchars($note['cage_id']); ?></strong></td>
-                                <td class="timestamp">
+                                <td data-label="ID"><?php echo htmlspecialchars($note['id']); ?></td>
+                                <td data-label="Cage ID"><strong><?php echo htmlspecialchars($note['cage_id']); ?></strong></td>
+                                <td data-label="Date/Time" class="timestamp">
                                     <?php echo date('Y-m-d', strtotime($note['timestamp'])); ?><br>
                                     <small><?php echo date('H:i:s', strtotime($note['timestamp'])); ?></small>
                                 </td>
-                                <td>
+                                <td data-label="Added By">
                                     <?php echo htmlspecialchars($note['user_name'] ?? 'Unknown'); ?>
                                     <?php if (!empty($note['initials'])): ?>
                                         <br><small class="text-muted">(<?php echo htmlspecialchars($note['initials']); ?>)</small>
                                     <?php endif; ?>
                                 </td>
-                                <td class="comments-cell">
+                                <td data-label="Comments" class="comments-cell">
                                     <?php echo htmlspecialchars($note['comments'] ?? 'No comments'); ?>
                                 </td>
-                                <td class="no-print">
+                                <td data-label="Actions" class="no-print">
                                     <button class="btn btn-sm btn-primary"
                                             onclick="editNote(<?php echo $note['id']; ?>)"
                                             title="Edit Note">
@@ -505,7 +513,7 @@ require 'header.php';
                 <ul class="pagination justify-content-center">
                     <?php if ($current_page > 1): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page - 1); ?>&view=<?php echo $filter_view; ?>&per_page=<?php echo $records_per_page; ?><?php echo $extraParams; ?>">
                                 Previous
                             </a>
                         </li>
@@ -513,7 +521,7 @@ require 'header.php';
 
                     <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
                         <li class="page-item <?php echo $i == $current_page ? 'active' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $i; ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
+                            <a class="page-link" href="?page=<?php echo $i; ?>&view=<?php echo $filter_view; ?>&per_page=<?php echo $records_per_page; ?><?php echo $extraParams; ?>">
                                 <?php echo $i; ?>
                             </a>
                         </li>
@@ -521,7 +529,7 @@ require 'header.php';
 
                     <?php if ($current_page < $total_pages): ?>
                         <li class="page-item">
-                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?>&view=<?php echo $filter_view; ?><?php echo $extraParams; ?>">
+                            <a class="page-link" href="?page=<?php echo ($current_page + 1); ?>&view=<?php echo $filter_view; ?>&per_page=<?php echo $records_per_page; ?><?php echo $extraParams; ?>">
                                 Next
                             </a>
                         </li>

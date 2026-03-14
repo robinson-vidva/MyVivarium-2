@@ -40,10 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Add new strain - prepared statements handle SQL safety
         $strainId = trim($_POST['strain_id']);
         $strainName = trim($_POST['strain_name']);
-        $strainAka = trim($_POST['strain_aka']);
-        $strainUrl = trim($_POST['strain_url']);
-        $strainRrid = trim($_POST['strain_rrid']);
-        $strainNotes = trim($_POST['strain_notes']);
+        $strainAka = !empty($_POST['strain_aka']) ? trim($_POST['strain_aka']) : null;
+        $strainUrl = !empty($_POST['strain_url']) ? trim($_POST['strain_url']) : null;
+        $strainRrid = !empty($_POST['strain_rrid']) ? trim($_POST['strain_rrid']) : null;
+        $strainNotes = !empty($_POST['strain_notes']) ? trim($_POST['strain_notes']) : null;
 
         // Check if strain ID already exists
         $checkStmt = $con->prepare("SELECT COUNT(*) FROM strains WHERE str_id = ?");
@@ -69,10 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Update existing strain - prepared statements handle SQL safety
         $strainId = trim($_POST['strain_id']);
         $strainName = trim($_POST['strain_name']);
-        $strainAka = trim($_POST['strain_aka']);
-        $strainUrl = trim($_POST['strain_url']);
-        $strainRrid = trim($_POST['strain_rrid']);
-        $strainNotes = trim($_POST['strain_notes']);
+        $strainAka = !empty($_POST['strain_aka']) ? trim($_POST['strain_aka']) : null;
+        $strainUrl = !empty($_POST['strain_url']) ? trim($_POST['strain_url']) : null;
+        $strainRrid = !empty($_POST['strain_rrid']) ? trim($_POST['strain_rrid']) : null;
+        $strainNotes = !empty($_POST['strain_notes']) ? trim($_POST['strain_notes']) : null;
         $stmt = $con->prepare("UPDATE strains SET str_name = ?, str_aka = ?, str_url = ?, str_rrid = ?, str_notes = ? WHERE str_id = ?");
         $stmt->bind_param("ssssss", $strainName, $strainAka, $strainUrl, $strainRrid, $strainNotes, $strainId);
         if ($stmt->execute()) {
@@ -95,9 +95,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Fetch all strains for display
-$strainQuery = "SELECT * FROM strains";
-$strainResult = $con->query($strainQuery);
+// Pagination settings
+$allowed_per_page = [10, 25, 50];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
+$current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset = ($current_page - 1) * $records_per_page;
+
+// Search parameter
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+// Get total count
+if (!empty($search)) {
+    $search_pattern = '%' . $search . '%';
+    $count_stmt = $con->prepare("SELECT COUNT(*) as total FROM strains WHERE str_id LIKE ? OR str_name LIKE ? OR str_aka LIKE ? OR str_rrid LIKE ?");
+    $count_stmt->bind_param("ssss", $search_pattern, $search_pattern, $search_pattern, $search_pattern);
+    $count_stmt->execute();
+    $total_records = $count_stmt->get_result()->fetch_assoc()['total'];
+    $count_stmt->close();
+
+    $strainStmt = $con->prepare("SELECT * FROM strains WHERE str_id LIKE ? OR str_name LIKE ? OR str_aka LIKE ? OR str_rrid LIKE ? ORDER BY str_id ASC LIMIT ? OFFSET ?");
+    $strainStmt->bind_param("ssssii", $search_pattern, $search_pattern, $search_pattern, $search_pattern, $records_per_page, $offset);
+    $strainStmt->execute();
+    $strainResult = $strainStmt->get_result();
+    $strainStmt->close();
+} else {
+    $total_records = $con->query("SELECT COUNT(*) as total FROM strains")->fetch_assoc()['total'];
+    $strainStmt = $con->prepare("SELECT * FROM strains ORDER BY str_id ASC LIMIT ? OFFSET ?");
+    $strainStmt->bind_param("ii", $records_per_page, $offset);
+    $strainStmt->execute();
+    $strainResult = $strainStmt->get_result();
+    $strainStmt->close();
+}
+$total_pages = ceil($total_records / $records_per_page);
+
+// Helper to build query string for pagination
+function buildStrainQueryString($overrides = []) {
+    $params = [
+        'search' => $_GET['search'] ?? '',
+        'per_page' => $_GET['per_page'] ?? 10,
+        'page' => $_GET['page'] ?? 1,
+    ];
+    $params = array_merge($params, $overrides);
+    return http_build_query($params);
+}
 ?>
 
 <!DOCTYPE html>
@@ -120,9 +163,12 @@ $strainResult = $con->query($strainQuery);
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 2px solid #000;
+            border: 1px solid var(--bs-border-color);
             z-index: 1000;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            max-height: 90vh;
+            overflow-y: auto;
             width: 80%;
             max-width: 800px;
         }
@@ -163,7 +209,6 @@ $strainResult = $con->query($strainQuery);
         .table td:nth-child(3) {
             width: 160px;
             white-space: nowrap;
-            font-size: 0.85rem;
         }
 
         /* Actions column */
@@ -207,34 +252,7 @@ $strainResult = $con->query($strainQuery);
             }
         }
 
-        @media (max-width: 576px) {
-            .table thead {
-                display: none;
-            }
-
-            .table tr {
-                display: flex;
-                flex-direction: column;
-                margin-bottom: 20px;
-            }
-
-            .table td {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                border: 1px solid #dee2e6;
-            }
-
-            .table td::before {
-                content: attr(data-label);
-                font-weight: bold;
-                text-transform: uppercase;
-                margin-bottom: 5px;
-                display: block;
-            }
-
-            /* Action button styles handled by unified styles in header.php */
-        }
+        /* Mobile table card layout handled by unified styles in header.php */
     </style>
 </head>
 
@@ -248,9 +266,42 @@ $strainResult = $con->query($strainQuery);
             </div>
         <?php endif; ?>
 
-        <!-- Button to open the popup form -->
-        <div class="add-button">
-            <button onclick="openForm()" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Strain</button>
+        <!-- Search and Action Bar -->
+        <form method="GET" action="">
+            <div class="header-actions">
+                <div class="search-box">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search"
+                               placeholder="Search strains..."
+                               value="<?php echo htmlspecialchars($search); ?>">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label for="per_page" class="form-label mb-0 text-nowrap">Show</label>
+                    <select class="form-select form-select-sm" id="per_page" name="per_page" style="width: auto;" onchange="this.form.submit()">
+                        <?php foreach ($allowed_per_page as $pp): ?>
+                            <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <button type="button" onclick="openForm()" class="btn btn-success"><i class="fas fa-plus"></i> Add New Strain</button>
+            </div>
+        </form>
+        <?php if (!empty($search)): ?>
+            <div class="mb-2">
+                <a href="manage_strain.php" class="btn btn-secondary btn-sm"><i class="fas fa-times"></i> Clear Search</a>
+            </div>
+        <?php endif; ?>
+        <div class="pagination-info">
+            <?php if ($total_records > 0): ?>
+                Showing <?= $offset + 1; ?> - <?= min($offset + $records_per_page, $total_records); ?>
+                of <?= $total_records; ?> strains
+            <?php else: ?>
+                No strains found
+            <?php endif; ?>
         </div>
 
         <!-- Popup form for adding and editing strains -->
@@ -259,27 +310,27 @@ $strainResult = $con->query($strainQuery);
             <h4 id="formTitle">Add New Strain</h4>
             <form action="manage_strain.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_id">Strain ID <span class="required-asterisk">*</span></label>
                     <input type="text" name="strain_id" id="strain_id" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_name">Strain Name <span class="required-asterisk">*</span></label>
                     <input type="text" name="strain_name" id="strain_name" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_aka">Common Names (comma separated)</label>
                     <input type="text" name="strain_aka" id="strain_aka" class="form-control">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_url">Strain URL</label>
                     <input type="url" name="strain_url" id="strain_url" class="form-control">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_rrid">Strain RRID</label>
                     <input type="text" name="strain_rrid" id="strain_rrid" class="form-control">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="strain_notes">Notes</label>
                     <textarea name="strain_notes" id="strain_notes" class="form-control" rows="3"></textarea>
                 </div>
@@ -295,27 +346,27 @@ $strainResult = $con->query($strainQuery);
         <div class="popup-overlay" id="viewPopupOverlay"></div>
         <div class="view-popup-form" id="viewPopupForm">
             <h4 id="viewFormTitle">View Strain</h4>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_id">Strain ID:</strong>
                 <p id="view_strain_id"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_name">Strain Name:</strong>
                 <p id="view_strain_name"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_aka">Common Names:</strong>
                 <p id="view_strain_aka"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_url">Strain URL:</strong>
                 <p><a href="#" id="view_strain_url" target="_blank"></a></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_rrid">Strain RRID:</strong>
                 <p id="view_strain_rrid"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <strong for="view_strain_notes">Notes:</strong>
                 <p id="view_strain_notes"></p>
             </div>
@@ -357,6 +408,31 @@ $strainResult = $con->query($strainQuery);
             </tbody>
         </table>
     </div>
+
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+            <nav aria-label="Strain pagination" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    <?php if ($current_page > 1): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?<?= buildStrainQueryString(['page' => $current_page - 1]); ?>">Previous</a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
+                        <li class="page-item <?= $i == $current_page ? 'active' : ''; ?>">
+                            <a class="page-link" href="?<?= buildStrainQueryString(['page' => $i]); ?>"><?= $i; ?></a>
+                        </li>
+                    <?php endfor; ?>
+
+                    <?php if ($current_page < $total_pages): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?<?= buildStrainQueryString(['page' => $current_page + 1]); ?>">Next</a>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+        <?php endif; ?>
 
     <script>
         // Function to open the popup form

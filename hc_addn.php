@@ -161,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $iacuc = isset($_POST['iacuc']) ? trim(implode(',', $_POST['iacuc'])) : '';
     $user = isset($_POST['user']) ? implode(',', array_map('trim', $_POST['user'])) : '';
     $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
-    $sex = !empty($_POST['sex']) ? trim($_POST['sex']) : null;
+    $sex = !empty($_POST['sex']) ? strtolower(trim($_POST['sex'])) : null;
     $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
     $remarks = trim($_POST['remarks']);
     $mouse_data = [];
@@ -281,8 +281,7 @@ require 'header.php';
     <!-- Include Bootstrap CSS -->
     <!-- Bootstrap 5.3 loaded via header.php -->
 
-    <!-- Include Select2 CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet">
+    <!-- Select2 CSS loaded via header.php -->
 
     <!-- Include Select2 JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
@@ -305,8 +304,7 @@ require 'header.php';
         }
 
         .warning-text {
-            color: #dc3545;
-            font-size: 14px;
+            color: var(--bs-danger);
         }
 
         .select2-container .select2-selection--single {
@@ -719,8 +717,8 @@ require 'header.php';
                 <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
                 <select class="form-control" id="sex" name="sex" data-field-type="critical">
                     <option value="">Select Sex</option>
-                    <option value="Male" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'Male') ? 'selected' : '' ?>>Male</option>
-                    <option value="Female" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'Female') ? 'selected' : '' ?>>Female</option>
+                    <option value="male" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'male') ? 'selected' : '' ?>>Male</option>
+                    <option value="female" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'female') ? 'selected' : '' ?>>Female</option>
                 </select>
             </div>
 

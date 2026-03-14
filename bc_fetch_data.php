@@ -110,12 +110,14 @@ while ($row = mysqli_fetch_assoc($result)) {
     while ($breedingcage = mysqli_fetch_assoc($cageResult)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
-            $tableRows .= '<td>' . htmlspecialchars($breedingcage['cage_id']) . '</td>'; // Display cage ID only once per group
+            $tableRows .= '<td data-label="Cage ID">' . htmlspecialchars($breedingcage['cage_id']) . '</td>';
+            $tableRows .= '<td data-label="Cross">' . htmlspecialchars($breedingcage['cross'] ?? '') . '</td>';
+            $tableRows .= '<td data-label="Male / Female">' . htmlspecialchars($breedingcage['male_id'] ?? '') . ' / ' . htmlspecialchars($breedingcage['female_id'] ?? '') . '</td>';
             $firstRow = false;
         }
-        $tableRows .= '<td class="action-icons" style="white-space: nowrap;">
-                        <a href="bc_view.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View Cage"><i class="fas fa-eye"></i></a>
-                        <a href="manage_tasks.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks"><i class="fas fa-tasks"></i></a>';
+        $tableRows .= '<td data-label="Action" class="action-icons">
+                        <a href="bc_view.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="View"><i class="fas fa-eye"></i></a>
+                        <a href="manage_tasks.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Tasks"><i class="fas fa-tasks"></i></a>';
 
         // Check if the user is an admin or assigned to this cage via cage_users table
         $assignedCheck = $con->prepare("SELECT 1 FROM cage_users WHERE cage_id = ? AND user_id = ?");
@@ -124,8 +126,15 @@ while ($row = mysqli_fetch_assoc($result)) {
         $isAssigned = $assignedCheck->get_result()->num_rows > 0;
         $assignedCheck->close();
         if ($userRole === 'admin' || $isAssigned) {
-            $tableRows .= '<a href="bc_edit.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage"><i class="fas fa-edit"></i></a>
-                           <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($breedingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete Cage"><i class="fas fa-trash"></i></a>';
+            if ($showArchived) {
+                // Archived view: show Restore and Permanently Delete buttons
+                $tableRows .= '<a href="#" onclick="confirmRestore(\'' . htmlspecialchars($breedingcage['cage_id']) . '\')" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Restore"><i class="fas fa-undo"></i></a>
+                               <a href="#" onclick="confirmPermanentDelete(\'' . htmlspecialchars($breedingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete Forever"><i class="fas fa-trash"></i></a>';
+            } else {
+                // Active view: show Edit and Archive buttons
+                $tableRows .= '<a href="bc_edit.php?id=' . rawurlencode($breedingcage['cage_id']) . '&page=' . $page . '&search=' . urlencode($searchQuery) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit"><i class="fas fa-edit"></i></a>
+                               <a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($breedingcage['cage_id']) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Archive"><i class="fas fa-archive"></i></a>';
+            }
         }
         $tableRows .= '</td></tr>';
     }

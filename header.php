@@ -81,7 +81,22 @@ if (isset($settings['r2_pres'])) {
     <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16x16.png">
     <link rel="icon" sizes="192x192" href="./icons/android-chrome-192x192.png">
     <link rel="icon" sizes="512x512" href="./icons/android-chrome-512x512.png">
+
+    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- Apple PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="MyVivarium">
+
+    <!-- Microsoft Tile -->
+    <meta name="msapplication-TileImage" content="./icons/android-chrome-192x192.png">
+    <meta name="msapplication-TileColor" content="#0d6efd">
 
     <!-- Bootstrap 5.3 CSS (supports dark mode via data-bs-theme) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
@@ -124,7 +139,7 @@ if (isset($settings['r2_pres'])) {
             margin-left: 15px;
             margin-bottom: 0;
             margin-top: 12px;
-            font-size: 3.5rem;
+            font-size: clamp(1.4rem, 5vw, 3.5rem);
             white-space: nowrap;
             font-family: 'Poppins', sans-serif;
             font-weight: 500;
@@ -132,13 +147,17 @@ if (isset($settings['r2_pres'])) {
 
         /* Responsive styling for smaller screens */
         @media (max-width: 576px) {
+            .header {
+                padding: 0.5rem;
+            }
+
             .header h2 {
-                font-size: 1.8rem;
-                margin-bottom: 5px;
+                margin-left: 8px;
+                margin-top: 5px;
             }
 
             .header img.header-logo {
-                width: 150px;
+                width: 120px;
             }
         }
 
@@ -152,10 +171,126 @@ if (isset($settings['r2_pres'])) {
 
         .nav .btn {
             margin: 0 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 40px;
+            padding: 0 14px;
+            font-size: 0.9rem;
+        }
+
+        /* Icon-only buttons: square, same height */
+        #darkModeToggle {
+            width: 40px;
+            padding: 0;
+        }
+
+        .nav .btn-danger {
+            width: 40px;
+            padding: 0;
         }
 
         .dropdown-menu {
             min-width: auto;
+        }
+
+        /* Desktop nav: horizontal layout with labels */
+        @media (min-width: 577px) {
+            .nav-collapsible {
+                display: flex !important;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+            }
+        }
+
+        /* Mobile nav: icon-only bar */
+        @media (max-width: 576px) {
+            .header {
+                flex-direction: column;
+                align-items: center;
+            }
+            .header h2 {
+                margin-left: 0;
+                margin-top: 6px;
+                text-align: center;
+            }
+            .nav-container {
+                padding: 8px 0 12px 0;
+            }
+            .nav-collapsible {
+                display: flex !important;
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+                width: auto;
+                padding: 0;
+            }
+            /* Hide text labels on mobile */
+            .nav-collapsible .nav-label {
+                display: none;
+            }
+            /* Replace default caret with a small dot indicator on mobile */
+            .nav-collapsible .dropdown-toggle::after {
+                content: '';
+                display: block;
+                position: absolute;
+                bottom: 4px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 5px;
+                height: 5px;
+                border: none;
+                border-radius: 50%;
+                background-color: rgba(255, 255, 255, 0.6);
+                margin: 0;
+                vertical-align: unset;
+            }
+            /* Compact icon-only buttons */
+            .nav-collapsible > .btn,
+            .nav-collapsible > .dropdown > .btn,
+            .nav-collapsible > #darkModeToggle {
+                width: 44px;
+                height: 44px;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.1rem;
+                margin: 0;
+                border-radius: 8px;
+                position: relative;
+            }
+        }
+
+        /* Scroll-to-top floating button */
+        .scroll-to-top-btn {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 1050;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            align-items: center;
+            justify-content: center;
+        }
+        .scroll-to-top-btn.visible {
+            display: inline-flex;
+        }
+        .scroll-to-top-btn:hover {
+            background-color: #0b5ed7;
+            transform: translateY(-2px);
         }
     </style>
 </head>
@@ -174,68 +309,91 @@ if (isset($settings['r2_pres'])) {
 
     <!-- Navigation Menu Section -->
     <div class="nav-container">
-        <nav class="nav justify-content-center">
-            <a href="home.php" class="btn btn-primary">
-                <i class="fas fa-home"></i> Home
-            </a>
+        <nav class="nav justify-content-center flex-column align-items-center">
+            <div class="nav-collapsible" id="navCollapsible">
+                <a href="home.php" class="btn btn-primary" aria-label="Home">
+                    <i class="fas fa-home"></i> <span class="nav-label">Home</span>
+                </a>
 
-            <!-- Dropdown for Dashboard -->
-            <div class="dropdown">
-                <button class="btn btn-primary dropdown-toggle" type="button" id="dashboardMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-tachometer-alt"></i> Dashboards
+                <!-- Dropdown for Dashboard -->
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="dashboardMenuButton" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Dashboards">
+                        <i class="fas fa-tachometer-alt"></i> <span class="nav-label">Dashboards</span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dashboardMenuButton">
+                        <li><a class="dropdown-item" href="hc_dash.php">Holding Cage</a></li>
+                        <li><a class="dropdown-item" href="bc_dash.php">Breeding Cage</a></li>
+                        <?php
+                        if (!empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres) || !empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres)) {
+                            echo '<li><a class="dropdown-item" href="iot_sensors.php">IOT Sensors</a></li>';
+                        }
+                        ?>
+                        <li><a class="dropdown-item" href="cage_lineage.php">Cage Lineage</a></li>
+                    </ul>
+                </div>
+
+                <!-- Dropdown for Calendar -->
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="calendarMenuButton" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Calendar">
+                        <i class="fas fa-calendar-alt"></i> <span class="nav-label">Calendar</span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="calendarMenuButton">
+                        <li><a class="dropdown-item" href="calendar.php">Calendar</a></li>
+                        <li><a class="dropdown-item" href="manage_tasks.php">Tasks</a></li>
+                        <li><a class="dropdown-item" href="manage_reminder.php">Reminders</a></li>
+                    </ul>
+                </div>
+
+                <!-- Dropdown for Settings -->
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="settingsMenuButton" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Settings">
+                        <i class="fas fa-cog"></i> <span class="nav-label">Settings</span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="settingsMenuButton">
+                        <li><a class="dropdown-item" href="user_profile.php">User Profile</a></li>
+                        <?php
+                        // Display Vivarium Manager menu for vivarium_manager and admin roles
+                        if (isset($_SESSION['role']) &&
+                            ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'vivarium_manager')) {
+                            echo '<li><hr class="dropdown-divider"></li>';
+                            echo '<li class="dropdown-header">Vivarium Management</li>';
+                            echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php">Maintenance Notes</a></li>';
+                        }
+
+                        // Display admin options if the user is an admin
+                        if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+                            echo '<li><hr class="dropdown-divider"></li>';
+                            echo '<li class="dropdown-header">Administration</li>';
+                            echo '<li><a class="dropdown-item" href="activity_log.php">Activity Log</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_users.php">Manage Users</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_iacuc.php">Manage IACUC</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_strain.php">Manage Strain</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_lab.php">Manage Lab</a></li>';
+                            echo '<li><a class="dropdown-item" href="export_data.php">Export CSV</a></li>';
+                            echo '<li><hr class="dropdown-divider"></li>';
+                        }
+                        ?>
+                        <li><a class="dropdown-item" href="logout.php">Logout</a></li>
+                    </ul>
+                </div>
+
+                <!-- Dark Mode Toggle -->
+                <button id="darkModeToggle" class="btn btn-outline-light" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
                 </button>
-                <ul class="dropdown-menu" aria-labelledby="dashboardMenuButton">
-                    <li><a class="dropdown-item" href="hc_dash.php">Holding Cage</a></li>
-                    <li><a class="dropdown-item" href="bc_dash.php">Breeding Cage</a></li>
-                    <?php
-                    if (!empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres) || !empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres)) {
-                        echo '<li><a class="dropdown-item" href="iot_sensors.php">IOT Sensors</a></li>';
-                    }
-                    ?>
-                    <li><a class="dropdown-item" href="cage_lineage.php">Cage Lineage</a></li>
-                </ul>
+
+                <!-- Logout Button -->
+                <a href="logout.php" class="btn btn-danger" aria-label="Logout" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
             </div>
-
-            <!-- Dropdown for Settings -->
-            <div class="dropdown">
-                <button class="btn btn-primary dropdown-toggle" type="button" id="settingsMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-cog"></i> Settings
-                </button>
-                <ul class="dropdown-menu" aria-labelledby="settingsMenuButton">
-                    <li><a class="dropdown-item" href="user_profile.php">User Profile</a></li>
-                    <li><a class="dropdown-item" href="manage_tasks.php">Tasks &amp; Reminders</a></li>
-                    <?php
-                    // Display Vivarium Manager menu for vivarium_manager and admin roles
-                    if (isset($_SESSION['role']) &&
-                        ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'vivarium_manager')) {
-                        echo '<li><hr class="dropdown-divider"></li>';
-                        echo '<li class="dropdown-header">Vivarium Management</li>';
-                        echo '<li><a class="dropdown-item" href="vivarium_manager_notes.php"><i class="fas fa-clipboard-list"></i> Maintenance Notes</a></li>';
-                        echo '<li><a class="dropdown-item" href="activity_log.php"><i class="fas fa-history"></i> Activity Log</a></li>';
-                    }
-
-                    // Display admin options if the user is an admin
-                    if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-                        echo '<li><hr class="dropdown-divider"></li>';
-                        echo '<li class="dropdown-header">Administration</li>';
-                        echo '<li><a class="dropdown-item" href="manage_users.php">Manage Users</a></li>';
-                        echo '<li><a class="dropdown-item" href="manage_iacuc.php">Manage IACUC</a></li>';
-                        echo '<li><a class="dropdown-item" href="manage_strain.php">Manage Strain</a></li>';
-                        echo '<li><a class="dropdown-item" href="manage_lab.php">Manage Lab</a></li>';
-                        echo '<li><a class="dropdown-item" href="export_data.php">Export CSV</a></li>';
-                        echo '<li><hr class="dropdown-divider"></li>';
-                    }
-                    ?>
-                    <li><a class="dropdown-item" href="logout.php">Logout</a></li>
-                </ul>
-            </div>
-
-            <!-- Dark Mode Toggle -->
-            <button id="darkModeToggle" class="btn btn-outline-light" style="margin-left: 5px;">
-                <i class="fas fa-moon"></i>
-            </button>
         </nav>
     </div>
+
+    <!-- Scroll to Top Button -->
+    <button id="scrollToTopBtn" class="scroll-to-top-btn" aria-label="Scroll to top" title="Back to top">
+        <i class="fas fa-chevron-up"></i>
+    </button>
 
     <!-- Bootstrap and jQuery JS -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -276,14 +434,311 @@ if (isset($settings['r2_pres'])) {
     })();
     </script>
 
+    <!-- Select2 Dark Mode & Scroll-to-Top -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Scroll-to-top button
+        var scrollBtn = document.getElementById('scrollToTopBtn');
+        if (scrollBtn) {
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 300) {
+                    scrollBtn.classList.add('visible');
+                } else {
+                    scrollBtn.classList.remove('visible');
+                }
+            }, { passive: true });
+            scrollBtn.addEventListener('click', function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+        // Inject Select2 dark mode styles after all CSS has loaded
+        var s2style = document.createElement('style');
+        s2style.textContent =
+            '[data-bs-theme="dark"] .select2-dropdown { background-color: #454d55 !important; border-color: #565e66 !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-results__option { color: #dee2e6 !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-results__option[aria-selected=true] { background-color: #565e66 !important; color: #adb5bd !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-results__option--selected { background-color: #565e66 !important; color: #adb5bd !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-results__option--highlighted { background-color: #0d6efd !important; color: #fff !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-results__option--highlighted[aria-selected] { background-color: #0d6efd !important; color: #fff !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-selection--single { background-color: #454d55 !important; border-color: #565e66 !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__rendered { color: #dee2e6 !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__arrow b { border-color: #dee2e6 transparent transparent transparent !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__placeholder { color: #6c757d !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-selection--multiple { background-color: #454d55 !important; border-color: #565e66 !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice { background-color: #565e66 !important; border-color: #6c757d !important; color: #dee2e6 !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice__remove { color: #adb5bd !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-search--dropdown .select2-search__field { background-color: #3d444d !important; border-color: #565e66 !important; color: #dee2e6 !important; }' +
+            '[data-bs-theme="dark"] .select2-container--default .select2-search--inline .select2-search__field { color: #dee2e6 !important; }';
+        document.head.appendChild(s2style);
+    });
+    </script>
+
     <!-- Dark Mode Overrides -->
     <style>
-    [data-bs-theme="dark"] .header { background-color: #1a1d21; }
-    [data-bs-theme="dark"] .nav-container { background-color: #1a1d21; }
-    [data-bs-theme="dark"] .container { background-color: #212529; }
-    [data-bs-theme="dark"] .note-app-container { background-color: #2b3035; }
-    [data-bs-theme="dark"] .popup-form { background-color: #212529; border-color: #495057; color: #dee2e6; }
-    [data-bs-theme="dark"] .modal-header { background-color: #1a1d21; }
+    [data-bs-theme="dark"] { --bs-body-bg: #3d444d; --bs-tertiary-bg: #454d55; }
+    [data-bs-theme="dark"] .header { background-color: #343a40; }
+    [data-bs-theme="dark"] .nav-container { background-color: #343a40; }
+    [data-bs-theme="dark"] .container { background-color: #3d444d; }
+    [data-bs-theme="dark"] .note-app-container { background-color: #454d55; }
+    [data-bs-theme="dark"] .popup-form { background-color: #3d444d; border-color: #565e66; color: #dee2e6; }
+    [data-bs-theme="dark"] .modal-header { background-color: #343a40; }
+    [data-bs-theme="dark"] .card { background-color: #454d55; border-color: #565e66; }
+    [data-bs-theme="dark"] .card-header { background-color: #3d444d; border-color: #565e66; color: #dee2e6; }
+    [data-bs-theme="dark"] .card-body { background-color: #454d55; color: #dee2e6; }
+
+    /* Popup close button */
+    .popup-close-btn {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        line-height: 1;
+        color: var(--bs-body-color);
+        cursor: pointer;
+        opacity: 0.6;
+        padding: 0;
+        z-index: 1;
+    }
+    .popup-close-btn:hover { opacity: 1; }
+    .popup-form, .view-popup-form { position: relative; }
+
+    /* Make Select2 full width inside forms */
+    .popup-form .select2-container,
+    .modal .select2-container { width: 100% !important; }
+
+    /* Select2 Dark Mode */
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--single,
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--multiple {
+        background-color: #454d55 !important;
+        border-color: #565e66 !important;
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__rendered,
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__arrow b {
+        border-color: #dee2e6 transparent transparent transparent !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__placeholder {
+        color: #6c757d !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: #565e66 !important;
+        border-color: #6c757d !important;
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        color: #adb5bd !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+        color: #fff !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-search--inline .select2-search__field {
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .select2-dropdown {
+        background-color: #454d55 !important;
+        border-color: #565e66 !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-search--dropdown .select2-search__field {
+        background-color: #3d444d !important;
+        border-color: #565e66 !important;
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-results__option {
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: #0d6efd !important;
+        color: #fff !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-results__option[aria-selected="true"] {
+        background-color: #565e66 !important;
+        color: #adb5bd !important;
+    }
+    [data-bs-theme="dark"] .select2-results__option[aria-selected="true"] {
+        background-color: #565e66 !important;
+        color: #adb5bd !important;
+    }
+    [data-bs-theme="dark"] .select2-container--default .select2-results__option--disabled {
+        color: #6c757d !important;
+    }
+
+    /* Form controls dark mode */
+    [data-bs-theme="dark"] .form-control,
+    [data-bs-theme="dark"] .form-select {
+        background-color: #454d55 !important;
+        border-color: #565e66 !important;
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .form-control::placeholder {
+        color: #6c757d !important;
+    }
+    [data-bs-theme="dark"] .form-control:focus,
+    [data-bs-theme="dark"] .form-select:focus {
+        background-color: #454d55 !important;
+        border-color: #86b7fe !important;
+        color: #dee2e6 !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    [data-bs-theme="dark"] option {
+        background-color: #454d55;
+        color: #dee2e6;
+    }
+    [data-bs-theme="dark"] .form-control:disabled,
+    [data-bs-theme="dark"] .form-control[readonly] {
+        background-color: #3d444d !important;
+        color: #adb5bd !important;
+    }
+
+    /* Alert dark mode */
+    [data-bs-theme="dark"] .alert-warning {
+        background-color: #664d03 !important;
+        border-color: #997404 !important;
+        color: #fff3cd !important;
+    }
+    [data-bs-theme="dark"] .alert-info {
+        background-color: #055160 !important;
+        border-color: #087990 !important;
+        color: #cff4fc !important;
+    }
+
+    /* Modal form inputs dark mode */
+    [data-bs-theme="dark"] .modal-content {
+        background-color: #3d444d;
+        border-color: #565e66;
+        color: #dee2e6;
+    }
+    [data-bs-theme="dark"] .modal-body .form-control,
+    [data-bs-theme="dark"] .modal-body .form-select,
+    [data-bs-theme="dark"] .popup-form .form-control,
+    [data-bs-theme="dark"] .popup-form .form-select,
+    [data-bs-theme="dark"] .popup-form input[type="text"],
+    [data-bs-theme="dark"] .popup-form input[type="date"],
+    [data-bs-theme="dark"] .popup-form textarea,
+    [data-bs-theme="dark"] .popup-form select {
+        background-color: #454d55 !important;
+        border-color: #565e66 !important;
+        color: #dee2e6 !important;
+    }
+    [data-bs-theme="dark"] .popup-form label,
+    [data-bs-theme="dark"] .view-popup-form label {
+        color: #dee2e6;
+    }
+
+    /* Nav tab / btn-group outline dark mode */
+    [data-bs-theme="dark"] .btn-outline-primary {
+        color: #6ea8fe;
+        border-color: #6ea8fe;
+    }
+    [data-bs-theme="dark"] .btn-outline-primary:hover {
+        background-color: #0d6efd;
+        color: #fff;
+    }
+
+    /* Home page card borders in dark mode */
+    [data-bs-theme="dark"] .card {
+        border-color: #565e66;
+    }
+
+    /* Session timeout warning modal */
+    #sessionTimeoutModal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+    #sessionTimeoutModal.show { display: flex; }
+    #sessionTimeoutModal .timeout-box {
+        background: var(--bs-body-bg, #fff);
+        color: var(--bs-body-color, #212529);
+        border-radius: 8px;
+        padding: 30px;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    </style>
+
+    <!-- Global Typography Scale -->
+    <style>
+    .content h1 { font-size: 1.55rem; font-weight: 600; }
+    .content h2 { font-size: 1.35rem; font-weight: 600; }
+    .content h3 { font-size: 1.2rem; font-weight: 600; }
+    .content h4 { font-size: 1.1rem; font-weight: 600; }
+    .content h5 { font-size: 1.0rem; font-weight: 600; }
+    .content h6 { font-size: 0.9rem; font-weight: 600; }
+    .content label { font-size: 0.9rem; }
+    .content .form-text { font-size: 0.8rem; }
+    .content .details-table th,
+    .content .details-table td { font-size: 0.92rem; }
+    .content .section-header h5 { font-size: 1.0rem; }
+    .content .section-header > i { font-size: 1.05rem; }
+    .content .badge { font-size: 0.8rem; }
+    .content .timestamp { font-size: 0.85rem; }
+    .content .warning-text { font-size: 0.85rem; }
+    .content .note, .content .note1 { font-size: 0.82rem; color: var(--bs-secondary-color); }
+    .content .char-count { font-size: 0.8rem; }
+    .content .filter-group label { font-size: 0.85rem; }
+    </style>
+
+    <!-- Unified Search/Filter Bar Styles -->
+    <style>
+    .header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .search-box {
+        flex: 1;
+        max-width: 400px;
+    }
+    .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 15px;
+        align-items: flex-end;
+    }
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .filter-group label {
+        font-weight: bold;
+        color: var(--bs-secondary-color);
+    }
+    .pagination-info {
+        margin: 15px 0;
+        color: var(--bs-secondary-color);
+    }
+    @media (max-width: 768px) {
+        .header-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .header-actions .btn:not(.input-group .btn) {
+            align-self: flex-start;
+        }
+        .search-box {
+            max-width: 100%;
+        }
+        .filter-row {
+            flex-direction: column;
+        }
+    }
     </style>
 
     <!-- Unified Table Styles -->
@@ -333,17 +788,19 @@ if (isset($settings['r2_pres'])) {
 
     /* Dark mode table overrides */
     [data-bs-theme="dark"] .table-wrapper table,
-    [data-bs-theme="dark"] .table { border-color: #374151; }
+    [data-bs-theme="dark"] .table { border-color: #565e66; }
     [data-bs-theme="dark"] .table-wrapper th,
     [data-bs-theme="dark"] .table-wrapper td,
     [data-bs-theme="dark"] .table th,
-    [data-bs-theme="dark"] .table td { border-color: #374151; }
+    [data-bs-theme="dark"] .table td { border-color: #565e66; }
+    [data-bs-theme="dark"] .details-table th,
+    [data-bs-theme="dark"] .details-table td { border-bottom-color: #565e66; }
     [data-bs-theme="dark"] .table-wrapper thead,
-    [data-bs-theme="dark"] .table thead { background-color: #1e293b; }
+    [data-bs-theme="dark"] .table thead { background-color: #343a40; }
     [data-bs-theme="dark"] .table-wrapper thead th,
-    [data-bs-theme="dark"] .table thead th { color: #94a3b8; border-bottom-color: #475569; }
+    [data-bs-theme="dark"] .table thead th { color: #adb5bd; border-bottom-color: #565e66; }
     [data-bs-theme="dark"] .table-wrapper tbody tr:hover,
-    [data-bs-theme="dark"] .table tbody tr:hover { background-color: rgba(255, 255, 255, 0.04); }
+    [data-bs-theme="dark"] .table tbody tr:hover { background-color: rgba(255, 255, 255, 0.05); }
 
     /* Unified Action Button Styles */
     .table-actions,
@@ -387,6 +844,83 @@ if (isset($settings['r2_pres'])) {
     .table-actions form,
     .action-icons form {
         display: contents;
+    }
+
+    /* Mobile Table Card Layout — only for tables with data-label cells */
+    @media (max-width: 576px) {
+        /* Disable table-responsive overflow on mobile so cards aren't clipped */
+        .table-responsive:has(td[data-label]) {
+            overflow: visible;
+        }
+        .table:has(td[data-label]) {
+            display: block;
+            width: 100%;
+        }
+        .table:has(td[data-label]) thead {
+            display: none;
+        }
+        .table:has(td[data-label]) tbody {
+            display: block;
+            width: 100%;
+        }
+        .table:has(td[data-label]) tbody tr {
+            display: block;
+            margin-bottom: 15px;
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .table td[data-label] {
+            display: block;
+            width: 100% !important;
+            padding: 4px 14px;
+            border: none;
+            border-bottom: 1px solid var(--bs-border-color);
+            text-align: left;
+            overflow-wrap: normal;
+            word-wrap: normal;
+            padding-top: 4px;
+            padding-bottom: 10px;
+            color: var(--bs-body-color);
+        }
+        .table td[data-label]:last-child {
+            border-bottom: none;
+        }
+        .table td[data-label]::before {
+            content: attr(data-label);
+            display: block;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            color: var(--bs-secondary-color);
+            margin-top: 6px;
+            margin-bottom: 2px;
+        }
+        .table td[data-label="Actions"],
+        .table td[data-label="Action"] {
+            padding-left: 10px;
+        }
+        .table td[data-label="Actions"]::before,
+        .table td[data-label="Action"]::before {
+            display: none;
+        }
+        /* Restore flex layout for action cells (overrides display:block from td[data-label]) */
+        .table td[data-label="Actions"].action-icons,
+        .table td[data-label="Action"].action-icons,
+        .table td[data-label="Actions"].action-buttons,
+        .table td[data-label="Actions"].table-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .table td[data-label="Actions"] .action-buttons,
+        .table td[data-label="Actions"] .table-actions,
+        .table td[data-label="Action"] .action-buttons,
+        .table td[data-label="Action"] .table-actions {
+            justify-content: flex-end;
+        }
     }
     </style>
     <!-- Flatpickr Custom Styles -->

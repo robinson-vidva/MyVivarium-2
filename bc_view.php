@@ -292,11 +292,6 @@ require 'header.php';
     </script>
 
     <style>
-        body {
-            background: none !important;
-            background-color: transparent !important;
-        }
-
         .container {
             max-width: 900px;
             padding: 20px 15px;
@@ -322,7 +317,6 @@ require 'header.php';
         }
 
         .section-header > i {
-            font-size: 1.1rem;
             color: var(--bs-primary);
             width: 22px;
             text-align: center;
@@ -330,12 +324,56 @@ require 'header.php';
 
         .section-header h5 {
             margin: 0;
-            font-weight: 600;
-            font-size: 1.05rem;
         }
 
         .section-header .action-buttons {
             margin-left: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        /* Mobile layout for view pages */
+        @media (max-width: 576px) {
+            /* Stack title and buttons */
+            .section-header {
+                flex-wrap: wrap;
+            }
+            .section-header h5 {
+                flex: 1 1 100%;
+                margin-bottom: 8px;
+            }
+            .section-header .action-buttons {
+                margin-left: 0;
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            /* Make details-table match the card style of data-label tables */
+            .details-table th,
+            .details-table td {
+                display: block;
+                width: 100% !important;
+                padding: 4px 14px;
+                border-bottom: none;
+            }
+            .details-table th {
+                padding-top: 10px;
+                padding-bottom: 0;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--bs-secondary-color);
+                font-weight: 700;
+            }
+            .details-table td {
+                padding-bottom: 10px;
+                border-bottom: 1px solid var(--bs-border-color);
+                color: var(--bs-body-color);
+            }
+            .details-table tr:last-child td {
+                border-bottom: none;
+            }
         }
 
         /* Details Table (key-value pairs) */
@@ -349,14 +387,13 @@ require 'header.php';
             padding: 10px 14px;
             border-bottom: 1px solid var(--bs-border-color);
             vertical-align: middle;
-            font-size: 0.92rem;
         }
 
         .details-table th {
             width: 35%;
             font-weight: 600;
             color: var(--bs-body-color);
-            background-color: transparent;
+            background-color: var(--bs-tertiary-bg);
             text-transform: none;
             letter-spacing: 0;
             text-align: left;
@@ -499,6 +536,10 @@ require 'header.php';
                     <td id="male-dob-data" data-value="<?= !empty($breedingcage['male_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
                 </tr>
                 <tr>
+                    <th>Male Source / Parent Cage</th>
+                    <td><?= htmlspecialchars($breedingcage['male_parent_cage'] ?? ''); ?></td>
+                </tr>
+                <tr>
                     <th>Female ID</th>
                     <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></td>
                 </tr>
@@ -509,6 +550,10 @@ require 'header.php';
                 <tr>
                     <th>Female DOB</th>
                     <td id="female-dob-data" data-value="<?= !empty($breedingcage['female_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_dob']); ?></td>
+                </tr>
+                <tr>
+                    <th>Female Source / Parent Cage</th>
+                    <td><?= htmlspecialchars($breedingcage['female_parent_cage'] ?? ''); ?></td>
                 </tr>
                 <tr>
                     <th>Remarks</th>
@@ -538,8 +583,8 @@ require 'header.php';
                             $hasFiles = true;
                         ?>
                             <tr>
-                                <td><?= htmlspecialchars($file['file_name']); ?></td>
-                                <td><div class="action-buttons"><a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-primary" title="Download"><i class="fas fa-cloud-download-alt"></i></a></div></td>
+                                <td data-label="File Name"><?= htmlspecialchars($file['file_name']); ?></td>
+                                <td data-label="Actions"><div class="action-buttons"><a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-primary" title="Download"><i class="fas fa-cloud-download-alt"></i></a></div></td>
                             </tr>
                         <?php endwhile; ?>
                         <?php if (!$hasFiles) : ?>
@@ -556,7 +601,11 @@ require 'header.php';
                 <i class="fas fa-paw"></i>
                 <h5>Litter Details</h5>
             </div>
-            <?php while ($litter = mysqli_fetch_assoc($litters)) : ?>
+            <?php
+            $hasLitters = false;
+            while ($litter = mysqli_fetch_assoc($litters)) :
+                $hasLitters = true;
+            ?>
                 <table class="details-table" style="margin-bottom: 16px;">
                     <tbody>
                         <tr>
@@ -590,6 +639,9 @@ require 'header.php';
                     </tbody>
                 </table>
             <?php endwhile; ?>
+            <?php if (!$hasLitters) : ?>
+                <p class="text-muted mb-0">No litter records found for this cage.</p>
+            <?php endif; ?>
         </div>
 
         <!-- Maintenance Log Section -->
@@ -619,9 +671,9 @@ require 'header.php';
                         <tbody>
                             <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                    <td><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                    <td><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
+                                    <td data-label="Date"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                    <td data-label="User"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                    <td data-label="Comment"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></td>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>

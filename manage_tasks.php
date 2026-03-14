@@ -219,7 +219,11 @@ $cageIdFilter = $_GET['id'] ?? '';
 $filter = $_GET['filter'] ?? '';
 
 // Pagination settings
-$records_per_page = 10;
+$allowed_per_page = [10, 25, 50];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
 $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
@@ -294,6 +298,7 @@ function buildTaskQueryString($overrides = []) {
         'search' => $_GET['search'] ?? '',
         'filter' => $_GET['filter'] ?? '',
         'id' => $_GET['id'] ?? '',
+        'per_page' => $_GET['per_page'] ?? 10,
         'page' => $_GET['page'] ?? 1,
     ];
     $params = array_merge($params, $overrides);
@@ -314,7 +319,7 @@ ob_end_flush(); // Flush the output buffer
     <title>Manage Tasks</title>
     <!-- Bootstrap 5.3 loaded via header.php -->
     <!-- Font Awesome loaded via header.php -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
     <style>
         /* Popup and Overlay Styles */
         .popup-form,
@@ -326,9 +331,10 @@ ob_end_flush(); // Flush the output buffer
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
             width: 80%;
             max-width: 800px;
             overflow-y: auto;
@@ -387,7 +393,7 @@ ob_end_flush(); // Flush the output buffer
         }
 
         .form-control[readonly] {
-            background-color: #e9ecef;
+            background-color: var(--bs-tertiary-bg);
             cursor: not-allowed;
         }
 
@@ -410,65 +416,23 @@ ob_end_flush(); // Flush the output buffer
 
         /* Status Colors - applied to status cell only */
         .status-pending td:nth-child(4) {
-            color: #842029;
+            color: var(--bs-danger);
             font-weight: 500;
         }
 
         .status-in-progress td:nth-child(4) {
-            color: #664d03;
+            color: var(--bs-warning);
             font-weight: 500;
         }
 
         .status-completed td:nth-child(4) {
-            color: #0f5132;
+            color: var(--bs-success);
             font-weight: 500;
         }
 
         /* Action button styles handled by unified styles in header.php */
 
-        @media (max-width: 576px) {
-            .table thead {
-                display: none;
-            }
-
-            .table tbody {
-                display: block;
-                width: 100%;
-            }
-
-            .table tbody tr {
-                display: block;
-                margin-bottom: 15px;
-                border-bottom: 1px solid #dee2e6;
-                padding-bottom: 15px;
-            }
-
-            .table tbody tr td {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                border: none;
-                position: relative;
-                padding-left: 40%;
-                text-align: left;
-            }
-
-            .table tbody tr td:before {
-                content: attr(data-label);
-                font-weight: bold;
-                text-transform: uppercase;
-                position: absolute;
-                left: 10px;
-                width: 45%;
-                padding-right: 10px;
-                white-space: nowrap;
-                font-weight: bold;
-                color: #343a40;
-                text-align: left;
-            }
-
-            /* Mobile action button styles handled by unified styles in header.php */
-        }
+        /* Mobile table card layout handled by unified styles in header.php */
 
         .pr-0 {
             padding-right: 0 !important;
@@ -478,15 +442,7 @@ ob_end_flush(); // Flush the output buffer
             padding-left: 0 !important;
         }
 
-        .form-control {
-            border-top-right-radius: 0;
-            border-bottom-right-radius: 0;
-        }
-
-        .btn-primary {
-            border-top-left-radius: 0;
-            border-bottom-left-radius: 0;
-        }
+        /* Search row uses g-2 grid - no border radius overrides needed */
     </style>
 </head>
 
@@ -512,57 +468,65 @@ ob_end_flush(); // Flush the output buffer
             <?php if (isset($_GET['id']) && !empty($_GET['id'])) : ?>
                 <a href="manage_tasks.php" class="btn btn-secondary ml-2">Show All Tasks</a>
             <?php endif; ?>
-            <?php if ($isAdmin) : ?>
-                <a href="manage_reminder.php" class="btn btn-warning ml-2">
-                    <i class="fas fa-bell"></i> Add New Reminder
-                </a>
-            <?php endif; ?>
         </div>
 
         <!-- Search form -->
         <form method="GET" class="mb-4">
-            <div class="row">
-                <div class="col-10 pr-0">
-                    <input type="text" name="search" class="form-control" placeholder="Search tasks..." value="<?= htmlspecialchars($search); ?>">
-                </div>
-                <div class="col-2 pl-0">
-                    <button type="submit" class="btn btn-primary w-100">Search</button>
-                </div>
+            <?php if ($cageIdFilter): ?>
+                <input type="hidden" name="id" value="<?= htmlspecialchars($cageIdFilter); ?>">
+            <?php endif; ?>
+            <div class="d-flex gap-2 align-items-center">
+                <input type="text" name="search" class="form-control" placeholder="Search tasks..." value="<?= htmlspecialchars($search); ?>">
+                <button type="submit" class="btn btn-primary text-nowrap"><i class="fas fa-search"></i> Search</button>
+                <?php if ($search || $filter): ?>
+                    <a href="manage_tasks.php<?= $cageIdFilter ? '?id=' . urlencode($cageIdFilter) : ''; ?>" class="btn btn-secondary text-nowrap"><i class="fas fa-times"></i> Clear</a>
+                <?php endif; ?>
             </div>
-            <div class="form-check form-check-inline mt-2">
-                <input class="form-check-input" type="radio" name="filter" id="assignedByMe" value="assigned_by_me" <?= $filter == 'assigned_by_me' ? 'checked' : ''; ?>>
-                <label class="form-check-label" for="assignedByMe">Assigned by Me</label>
+            <div class="d-flex align-items-center gap-1 mt-2">
+                <label for="per_page" class="form-label mb-0 text-nowrap">Show</label>
+                <select class="form-select form-select-sm" id="per_page" name="per_page" style="width: auto;" onchange="this.form.submit()">
+                    <?php foreach ($allowed_per_page as $pp): ?>
+                        <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
-            <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="filter" id="assignedToMe" value="assigned_to_me" <?= $filter == 'assigned_to_me' ? 'checked' : ''; ?>>
-                <label class="form-check-label" for="assignedToMe">Assigned to Me</label>
+            <div class="mt-2">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="filter" id="assignedByMe" value="assigned_by_me" <?= $filter == 'assigned_by_me' ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="assignedByMe">Assigned by Me</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="filter" id="assignedToMe" value="assigned_to_me" <?= $filter == 'assigned_to_me' ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="assignedToMe">Assigned to Me</label>
+                </div>
             </div>
         </form>
 
         <!-- Popup form for adding and editing tasks -->
         <div class="popup-overlay" id="popupOverlay"></div>
         <div class="popup-form" id="popupForm">
+            <button type="button" class="popup-close-btn" id="closePopupBtn" aria-label="Close">&times;</button>
             <h4 id="formTitle">Add New Task</h4>
             <form id="taskForm" action="manage_tasks.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <input type="hidden" name="id" id="id">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="title">Title <span class="required-asterisk">*</span></label>
                     <input type="text" name="title" id="title" class="form-control" maxlength="100" required>
                     <small id="titleCounter" class="form-text text-muted">0/100 characters used</small>
                 </div>
 
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="description">Description/Update <span class="required-asterisk">*</span></label>
                     <textarea name="description" id="description" class="form-control" rows="3" maxlength="500" required></textarea>
                     <small id="descriptionCounter" class="form-text text-muted">0/500 characters used</small>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="assigned_by">Assigned By <span class="required-asterisk">*</span></label>
                     <input type="text" name="assigned_by" id="assigned_by" class="form-control" readonly>
                     <input type="hidden" name="assigned_by_id" id="assigned_by_id">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="assigned_to">Assigned To <span class="required-asterisk">*</span></label>
                     <select name="assigned_to[]" id="assigned_to" class="form-control" multiple required>
                         <?php foreach ($users as $userId => $name) : ?>
@@ -570,7 +534,7 @@ ob_end_flush(); // Flush the output buffer
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label>Status <span class="required-asterisk">*</span></label>
                     <div class="radio-group">
                         <label><input type="radio" name="status" value="Pending" required> Pending</label>
@@ -578,11 +542,11 @@ ob_end_flush(); // Flush the output buffer
                         <label><input type="radio" name="status" value="Completed"> Completed</label>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="completion_date">Completion Date</label>
                     <input type="date" name="completion_date" id="completion_date" class="form-control" data-no-max-date>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="cage_id">Cage ID</label>
                     <select name="cage_id" id="cage_id" class="form-control">
                         <option value="">Select Cage</option>
@@ -602,6 +566,7 @@ ob_end_flush(); // Flush the output buffer
         <!-- Popup form for viewing tasks -->
         <div class="popup-overlay" id="viewPopupOverlay"></div>
         <div class="view-popup-form" id="viewPopupForm">
+            <button type="button" class="popup-close-btn" id="closeViewPopupBtn" aria-label="Close">&times;</button>
             <h4 id="viewFormTitle">View Task Details</h4>
             <div id="viewTaskDetails"></div>
             <button type="button" class="btn btn-secondary mt-3" id="closeViewFormButton">Close</button>
@@ -701,7 +666,8 @@ ob_end_flush(); // Flush the output buffer
         $(document).ready(function() {
             $('#assigned_to').select2({
                 placeholder: "Select users",
-                allowClear: true
+                allowClear: true,
+                dropdownParent: $('#popupForm')
             });
 
             // Ensure the form closes when clicking outside
@@ -722,15 +688,13 @@ ob_end_flush(); // Flush the output buffer
                 openForm();
             });
 
-            // Attach click event to the cancel button
-            $('#cancelButton').on('click', function() {
-                console.log('Cancel button clicked');
+            // Attach click event to the cancel and close buttons
+            $('#cancelButton, #closePopupBtn').on('click', function() {
                 closeForm();
             });
 
             // Attach click event to the close view form button
-            $('#closeViewFormButton').on('click', function() {
-                console.log('Close view form button clicked');
+            $('#closeViewFormButton, #closeViewPopupBtn').on('click', function() {
                 closeViewForm();
             });
 
@@ -851,14 +815,12 @@ ob_end_flush(); // Flush the output buffer
                         document.getElementById('cage_id').value = response.cage_id;
 
                     } else if (action === 'view') {
-                        const assignedToUsers = response.assigned_to.split(',').map(userId => users[userId] || userId).join(', ');
-
                         const taskDetails = `
                             <p><strong>ID:</strong> ${response.id}</p>
                             <p><strong>Title:</strong> ${response.title}</p>
                             <p><strong>Description/Update:</strong> ${response.description}</p>
-                            <p><strong>Assigned By:</strong> ${users[response.assigned_by] || response.assigned_by}</p>
-                            <p><strong>Assigned To:</strong> ${assignedToUsers}</p>
+                            <p><strong>Assigned By:</strong> ${response.assigned_by_name || users[response.assigned_by] || response.assigned_by}</p>
+                            <p><strong>Assigned To:</strong> ${response.assigned_to_names || response.assigned_to}</p>
                             <p><strong>Status:</strong> ${response.status}</p>
                             <p><strong>Completion Date:</strong> ${response.completion_date}</p>
                             <p><strong>Creation Date:</strong> ${response.creation_date}</p>

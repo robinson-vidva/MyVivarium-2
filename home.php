@@ -118,22 +118,21 @@ require 'header.php';
         <br>
         <div class="row align-items-center">
             <!-- Welcome message with user information -->
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h2>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?>
-                    <span style="font-size: smaller; color: var(--bs-secondary-color); border-bottom: 2px solid var(--bs-border-color); padding: 0 5px;">
-                        [<?php echo htmlspecialchars($_SESSION['position']); ?>]
-                    </span>
-                </h2>
+            <div class="pt-3 pb-2 mb-3 border-bottom">
+                <h2 class="mb-1">Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h2>
+                <span class="text-body-secondary" style="font-size: 0.9rem; opacity: 0.85;">
+                    <?php echo htmlspecialchars($_SESSION['position']); ?>
+                </span>
             </div>
 
             <!-- Display stats for Holding Cage and Breeding Cage -->
             <h2 class="mt-4">Cages Summary</h2>
             <div class="card">
                 <div class="card-body">
-                    <div class="row mt-4">
+                    <div class="row g-2">
                         <!-- Holding Cage Stats -->
-                        <div class="col-md-6">
-                            <div class="card text-center">
+                        <div class="col-6">
+                            <div class="card text-center h-100">
                                 <div class="card-header bg-primary text-white">
                                     <a href="hc_dash.php" style="color: white; text-decoration: none;">Holding Cage</a>
                                 </div>
@@ -147,8 +146,8 @@ require 'header.php';
                             </div>
                         </div>
                         <!-- Breeding Cage Stats -->
-                        <div class="col-md-6">
-                            <div class="card text-center">
+                        <div class="col-6">
+                            <div class="card text-center h-100">
                                 <div class="card-header bg-primary text-white">
                                     <a href="bc_dash.php" style="color: white; text-decoration: none;">Breeding Cage</a>
                                 </div>
@@ -167,12 +166,12 @@ require 'header.php';
 
             <!-- Display Task Stats for Logged-in User -->
             <h2 class="mt-4">Summary of Your Tasks</h2>
-            <div class="card" style="margin-top: 20px;">
+            <div class="card mt-3">
                 <div class="card-body">
-                    <div class="row mt-4">
+                    <div class="row g-2">
                         <!-- Total Tasks -->
-                        <div class="col-md-3">
-                            <div class="card text-center">
+                        <div class="col-6 col-md-3">
+                            <div class="card text-center h-100">
                                 <div class="card-header bg-info text-white">
                                     <a href="manage_tasks.php?filter=assigned_to_me" style="color: white; text-decoration: none;">Total Tasks</a>
                                 </div>
@@ -183,8 +182,8 @@ require 'header.php';
                             </div>
                         </div>
                         <!-- Completed Tasks -->
-                        <div class="col-md-3">
-                            <div class="card text-center">
+                        <div class="col-6 col-md-3">
+                            <div class="card text-center h-100">
                                 <div class="card-header bg-success text-white">
                                     <a href="manage_tasks.php?search=completed&filter=assigned_to_me" style="color: white; text-decoration: none;">Completed</a>
                                 </div>
@@ -195,8 +194,8 @@ require 'header.php';
                             </div>
                         </div>
                         <!-- In Progress Tasks -->
-                        <div class="col-md-3">
-                            <div class="card text-center">
+                        <div class="col-6 col-md-3">
+                            <div class="card text-center h-100">
                                 <div class="card-header bg-warning text-white">
                                     <a href="manage_tasks.php?search=in+progress&filter=assigned_to_me" style="color: white; text-decoration: none;">In Progress</a>
                                 </div>
@@ -207,8 +206,8 @@ require 'header.php';
                             </div>
                         </div>
                         <!-- Pending Tasks -->
-                        <div class="col-md-3">
-                            <div class="card text-center">
+                        <div class="col-6 col-md-3">
+                            <div class="card text-center h-100">
                                 <div class="card-header bg-danger text-white">
                                     <a href="manage_tasks.php?search=pending&filter=assigned_to_me" style="color: white; text-decoration: none;">Pending</a>
                                 </div>

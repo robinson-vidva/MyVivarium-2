@@ -132,9 +132,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Fetch all IACUC records for display
-$iacucQuery = "SELECT * FROM iacuc";
-$iacucResult = $con->query($iacucQuery);
+// Pagination settings
+$allowed_per_page = [10, 25, 50];
+$records_per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($records_per_page, $allowed_per_page)) {
+    $records_per_page = 10;
+}
+$current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset = ($current_page - 1) * $records_per_page;
+
+// Search parameter
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+// Get total count and fetch records
+if (!empty($search)) {
+    $search_pattern = '%' . $search . '%';
+    $count_stmt = $con->prepare("SELECT COUNT(*) as total FROM iacuc WHERE iacuc_id LIKE ? OR iacuc_title LIKE ?");
+    $count_stmt->bind_param("ss", $search_pattern, $search_pattern);
+    $count_stmt->execute();
+    $total_records = $count_stmt->get_result()->fetch_assoc()['total'];
+    $count_stmt->close();
+
+    $iacucStmt = $con->prepare("SELECT * FROM iacuc WHERE iacuc_id LIKE ? OR iacuc_title LIKE ? ORDER BY iacuc_id ASC LIMIT ? OFFSET ?");
+    $iacucStmt->bind_param("ssii", $search_pattern, $search_pattern, $records_per_page, $offset);
+    $iacucStmt->execute();
+    $iacucResult = $iacucStmt->get_result();
+    $iacucStmt->close();
+} else {
+    $total_records = $con->query("SELECT COUNT(*) as total FROM iacuc")->fetch_assoc()['total'];
+    $iacucStmt = $con->prepare("SELECT * FROM iacuc ORDER BY iacuc_id ASC LIMIT ? OFFSET ?");
+    $iacucStmt->bind_param("ii", $records_per_page, $offset);
+    $iacucStmt->execute();
+    $iacucResult = $iacucStmt->get_result();
+    $iacucStmt->close();
+}
+$total_pages = ceil($total_records / $records_per_page);
+
+// Helper to build query string for pagination
+function buildIacucQueryString($overrides = []) {
+    $params = [
+        'search' => $_GET['search'] ?? '',
+        'per_page' => $_GET['per_page'] ?? 10,
+        'page' => $_GET['page'] ?? 1,
+    ];
+    $params = array_merge($params, $overrides);
+    return http_build_query($params);
+}
 ?>
 
 <!DOCTYPE html>
@@ -156,9 +199,12 @@ $iacucResult = $con->query($iacucQuery);
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 2px solid #000;
+            border: 1px solid var(--bs-border-color);
             z-index: 1000;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            max-height: 90vh;
+            overflow-y: auto;
             width: 80%;
             max-width: 800px;
         }
@@ -214,34 +260,7 @@ $iacucResult = $con->query($iacucQuery);
             }
         }
 
-        @media (max-width: 576px) {
-            .table thead {
-                display: none;
-            }
-
-            .table tr {
-                display: flex;
-                flex-direction: column;
-                margin-bottom: 20px;
-            }
-
-            .table td {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                border: 1px solid #dee2e6;
-            }
-
-            .table td::before {
-                content: attr(data-label);
-                font-weight: bold;
-                text-transform: uppercase;
-                margin-bottom: 5px;
-                display: block;
-            }
-
-            /* Mobile action button styles handled by unified styles in header.php */
-        }
+        /* Mobile table card layout handled by unified styles in header.php */
 
         .table {
             width: 100%;
@@ -280,9 +299,42 @@ $iacucResult = $con->query($iacucQuery);
             </div>
         <?php endif; ?>
 
-        <!-- Button to open the popup form -->
-        <div class="add-button">
-            <button onclick="openForm()" class="btn btn-primary"><i class="fas fa-plus"></i> Add New IACUC</button>
+        <!-- Search and Action Bar -->
+        <form method="GET" action="">
+            <div class="header-actions">
+                <div class="search-box">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search"
+                               placeholder="Search IACUC records..."
+                               value="<?php echo htmlspecialchars($search); ?>">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label for="per_page" class="form-label mb-0 text-nowrap">Show</label>
+                    <select class="form-select form-select-sm" id="per_page" name="per_page" style="width: auto;" onchange="this.form.submit()">
+                        <?php foreach ($allowed_per_page as $pp): ?>
+                            <option value="<?= $pp; ?>" <?= $records_per_page == $pp ? 'selected' : ''; ?>><?= $pp; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <button type="button" onclick="openForm()" class="btn btn-success"><i class="fas fa-plus"></i> Add New IACUC</button>
+            </div>
+        </form>
+        <?php if (!empty($search)): ?>
+            <div class="mb-2">
+                <a href="manage_iacuc.php" class="btn btn-secondary btn-sm"><i class="fas fa-times"></i> Clear Search</a>
+            </div>
+        <?php endif; ?>
+        <div class="pagination-info">
+            <?php if ($total_records > 0): ?>
+                Showing <?= $offset + 1; ?> - <?= min($offset + $records_per_page, $total_records); ?>
+                of <?= $total_records; ?> records
+            <?php else: ?>
+                No records found
+            <?php endif; ?>
         </div>
 
         <!-- Popup form for adding and editing IACUC records -->
@@ -291,15 +343,15 @@ $iacucResult = $con->query($iacucQuery);
             <h4 id="formTitle">Add New IACUC</h4>
             <form action="manage_iacuc.php" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="iacuc_id">IACUC ID <span class="required-asterisk">*</span></label>
                     <input type="text" name="iacuc_id" id="iacuc_id" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="iacuc_title">Title <span class="required-asterisk">*</span></label>
                     <input type="text" name="iacuc_title" id="iacuc_title" class="form-control" required>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="iacuc_file">Upload File</label>
                     <input type="file" name="iacuc_file" id="iacuc_file" class="form-control">
                     <div id="existingFile" style="margin-top: 10px;"></div>
@@ -351,6 +403,31 @@ $iacucResult = $con->query($iacucQuery);
             </tbody>
         </table>
     </div>
+
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+            <nav aria-label="IACUC pagination" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    <?php if ($current_page > 1): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?<?= buildIacucQueryString(['page' => $current_page - 1]); ?>">Previous</a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
+                        <li class="page-item <?= $i == $current_page ? 'active' : ''; ?>">
+                            <a class="page-link" href="?<?= buildIacucQueryString(['page' => $i]); ?>"><?= $i; ?></a>
+                        </li>
+                    <?php endfor; ?>
+
+                    <?php if ($current_page < $total_pages): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="?<?= buildIacucQueryString(['page' => $current_page + 1]); ?>">Next</a>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </nav>
+        <?php endif; ?>
 
     <script>
         // Function to open the popup form

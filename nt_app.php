@@ -91,15 +91,14 @@ $result = $stmt->get_result();
         .timestamp,
         .userid {
             display: block;
-            font-size: 12px;
         }
 
         .timestamp {
-            color: #666;
+            color: var(--bs-secondary-color);
         }
 
         .userid {
-            color: blue;
+            color: var(--bs-primary);
         }
 
         .close-btn,
@@ -194,7 +193,6 @@ $result = $stmt->get_result();
         }
 
         .char-count {
-            font-size: 12px;
             color: var(--bs-secondary-color);
             margin-bottom: 10px;
             text-align: right;
@@ -229,6 +227,26 @@ $result = $stmt->get_result();
         [data-bs-theme="dark"] #edit_note_text {
             background-color: #3a3520;
             color: #dee2e6;
+        }
+
+        /* Mobile popup sizing */
+        @media (max-width: 576px) {
+            .popup,
+            .edit-popup {
+                width: 90vw;
+                max-width: 90vw;
+                max-height: 80vh;
+                padding: 16px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                box-sizing: border-box;
+                overflow-y: auto;
+            }
+            #addNoteForm,
+            #editNoteForm {
+                width: 100%;
+            }
         }
     </style>
     <!-- jQuery loaded via header.php -->

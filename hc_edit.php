@@ -160,19 +160,19 @@ if (isset($_GET['id'])) {
             // Retrieve and sanitize form data
             $cage_id = trim($_POST['cage_id']);
             $new_cage_id = trim($_POST['new_cage_id']);
-            $pi_name = trim($_POST['pi_name']);
+            $pi_name = !empty($_POST['pi_name']) ? (int)$_POST['pi_name'] : null;
             $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
             $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-            $strain = trim($_POST['strain']);
+            $strain = !empty($_POST['strain']) ? trim($_POST['strain']) : null;
             if ($strain === 'custom') {
                 $strain = !empty($_POST['custom_strain']) ? trim($_POST['custom_strain']) : null;
             }
             $cage_genotype = !empty($_POST['cage_genotype']) ? trim($_POST['cage_genotype']) : null;
             $iacuc = isset($_POST['iacuc']) ? array_map('trim', $_POST['iacuc']) : [];
             $users = isset($_POST['user']) ? array_map('trim', $_POST['user']) : [];
-            $dob = trim($_POST['dob']);
-            $sex = trim($_POST['sex']);
-            $parent_cg = trim($_POST['parent_cg']);
+            $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
+            $sex = !empty($_POST['sex']) ? strtolower(trim($_POST['sex'])) : null;
+            $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
             $remarks = trim($_POST['remarks']);
 
             // Handle cage ID change if new_cage_id differs from current cage_id
@@ -227,7 +227,7 @@ if (isset($_GET['id'])) {
                                  WHERE `cage_id` = ?";
 
             $stmtCages = $con->prepare($updateQueryCages);
-            $stmtCages->bind_param("issss", $pi_name, $remarks, $room, $rack, $cage_id);
+            $stmtCages->bind_param("sssss", $pi_name, $remarks, $room, $rack, $cage_id);
             $resultCages = $stmtCages->execute();
             $stmtCages->close();
 
@@ -462,8 +462,7 @@ require 'header.php';
     <!-- Include Bootstrap CSS -->
     <!-- Bootstrap 5.3 loaded via header.php -->
 
-    <!-- Include Select2 CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet">
+    <!-- Select2 CSS loaded via header.php -->
 
     <!-- Include Select2 JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
@@ -518,7 +517,6 @@ require 'header.php';
         }
 
         .btn-icon i {
-            font-size: 16px;
             margin: 0;
         }
 
@@ -537,8 +535,7 @@ require 'header.php';
         }
 
         .warning-text {
-            color: #dc3545;
-            font-size: 14px;
+            color: var(--bs-danger);
         }
 
         .select2-container .select2-selection--single {
@@ -1030,8 +1027,8 @@ require 'header.php';
                                 <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
                                 <select class="form-control" id="sex" name="sex" data-field-type="critical">
                                     <option value="">Select Sex</option>
-                                    <option value="Male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
-                                    <option value="Female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
+                                    <option value="male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
+                                    <option value="female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
                                 </select>
                             </div>
 
@@ -1051,7 +1048,7 @@ require 'header.php';
                             </div>
 
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
                             <!-- HTML Form Section for Mouse Fields -->
                             <div id="mouse_fields_container">
@@ -1091,7 +1088,7 @@ require 'header.php';
                             </div>
 
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
                             <!-- Display Files Section -->
                             <div class="card mt-4">
@@ -1115,8 +1112,8 @@ require 'header.php';
                                                     $file_id = intval($file['id']);
 
                                                     echo "<tr>";
-                                                    echo "<td>$file_name</td>";
-                                                    echo "<td>
+                                                    echo "<td data-label='File Name'>$file_name</td>";
+                                                    echo "<td data-label='Actions'>
                                                     <a href='$file_path' download='$file_name' class='btn btn-sm btn-outline-primary'><i class='fas fa-cloud-download-alt fa-sm'></i></a>
                                                     <a href='delete_file.php?url=hc_edit&id=$file_id' class='btn-sm' onclick='return confirm(\"Are you sure you want to delete this file?\");' aria-label='Delete $file_name'><i class='fas fa-trash fa-sm' style='color:red'></i></a>
                                                     </td>";
@@ -1143,7 +1140,7 @@ require 'header.php';
 
                             <br>
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
 
                             <div class="card-body">
@@ -1185,13 +1182,13 @@ require 'header.php';
                                             <tbody>
                                                 <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                                     <tr id="log-row-<?= $log['id']; ?>">
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                                        <td style="width: 40%;">
+                                                        <td data-label="Date" style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                                        <td data-label="User" style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                                        <td data-label="Comment" style="width: 40%;">
                                                             <input type="hidden" name="log_ids[]" value="<?= htmlspecialchars($log['id']); ?>">
                                                             <textarea name="log_comments[]" class="form-control"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></textarea>
                                                         </td>
-                                                        <td style="width: 10%;">
+                                                        <td data-label="Action" style="width: 10%;">
                                                             <button type="button" class="btn btn-danger btn-icon" onclick="markLogForDeletion(<?= $log['id']; ?>)">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>

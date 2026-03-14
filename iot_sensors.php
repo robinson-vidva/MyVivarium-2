@@ -100,11 +100,12 @@ require 'header.php';
 
 <body>
     <div class="container mt-4 content" style="max-width: 900px;">
+        <h1 class="text-center">IOT Sensors</h1>
         <!-- Section for Room 1 IOT Sensors -->
         <?php if (!empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres)) : ?>
             <div class="row mb-4">
                 <div class="col-12">
-                    <h2><?php echo htmlspecialchars($labName); ?> - Room 1 IOT Sensors</h2>
+                    <h3><?php echo htmlspecialchars($labName); ?> - Room 1 IOT Sensors</h3>
                 </div>
 
                 <div class="col-md-6 mb-4">
@@ -126,7 +127,7 @@ require 'header.php';
         <?php if (!empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres)) : ?>
             <div class="row">
                 <div class="col-12">
-                    <h2><?php echo htmlspecialchars($labName); ?> - Room 2 IOT Sensors</h2>
+                    <h3><?php echo htmlspecialchars($labName); ?> - Room 2 IOT Sensors</h3>
                 </div>
 
                 <div class="col-md-6 mb-4">
@@ -147,6 +148,37 @@ require 'header.php';
 
     <!-- Include the footer file -->
     <?php include 'footer.php'; ?>
+
+    <!-- Toggle Grafana iframe theme with dark mode -->
+    <script>
+    (function() {
+        function updateIframeThemes() {
+            var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+            document.querySelectorAll('iframe.iframe').forEach(function(iframe) {
+                var src = iframe.getAttribute('src');
+                if (src) {
+                    var newSrc = isDark
+                        ? src.replace('theme=light', 'theme=dark')
+                        : src.replace('theme=dark', 'theme=light');
+                    if (newSrc !== src) {
+                        iframe.setAttribute('src', newSrc);
+                    }
+                }
+            });
+        }
+
+        // Watch for dark mode toggle
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                if (m.attributeName === 'data-bs-theme') updateIframeThemes();
+            });
+        });
+        observer.observe(document.documentElement, { attributes: true });
+
+        // Initial check
+        document.addEventListener('DOMContentLoaded', updateIframeThemes);
+    })();
+    </script>
 </body>
 
 </html>

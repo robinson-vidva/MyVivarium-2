@@ -45,19 +45,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die('CSRF token validation failed');
     }
 
-    $title = trim($_POST['title']);
-    $description = trim($_POST['description']);
-    $assignedBy = $currentUserId;
-    $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
-    $recurrenceType = trim($_POST['recurrence_type']);
-    $dayOfWeek = !empty($_POST['day_of_week']) ? trim($_POST['day_of_week']) : null;
-    $dayOfMonth = !empty($_POST['day_of_month']) ? (int)$_POST['day_of_month'] : null;
-    $timeOfDay = trim($_POST['time_of_day']);
-    $status = trim($_POST['status']);
-    $cageId = empty($_POST['cage_id']) ? NULL : trim($_POST['cage_id']);
-    $reminder_id = null;
+    // Determine the action to perform
+    if (isset($_POST['add']) || isset($_POST['edit'])) {
+        // Only read form fields for add/edit actions
+        $title = trim($_POST['title']);
+        $description = trim($_POST['description']);
+        $assignedBy = $currentUserId;
+        $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
+        $recurrenceType = trim($_POST['recurrence_type']);
+        $dayOfWeek = !empty($_POST['day_of_week']) ? trim($_POST['day_of_week']) : null;
+        $dayOfMonth = !empty($_POST['day_of_month']) ? (int)$_POST['day_of_month'] : null;
+        $timeOfDay = trim($_POST['time_of_day']);
+        $status = trim($_POST['status']);
+        $cageId = empty($_POST['cage_id']) ? NULL : trim($_POST['cage_id']);
+    }
 
-    // Determine the action to perform (add, edit, or delete)
     if (isset($_POST['add'])) {
         $stmt = $con->prepare("INSERT INTO reminders (cage_id, title, description, assigned_by, assigned_to, recurrence_type, day_of_week, day_of_month, time_of_day, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("sssissssss", $cageId, $title, $description, $assignedBy, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status);
@@ -77,14 +79,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             redirectToPage("Error: " . $stmt->error);
         }
         $stmt->close();
+    } elseif (isset($_POST['archive'])) {
+        $id = (int)$_POST['id'];
+        $stmt = $con->prepare("UPDATE reminders SET status = 'inactive' WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        if ($stmt->execute()) {
+            redirectToPage("Reminder archived successfully.");
+        } else {
+            redirectToPage("Error: " . $stmt->error);
+        }
+        $stmt->close();
+    } elseif (isset($_POST['restore'])) {
+        $id = (int)$_POST['id'];
+        $stmt = $con->prepare("UPDATE reminders SET status = 'active' WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        if ($stmt->execute()) {
+            $_SESSION['message'] = "Reminder restored successfully.";
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
+        } else {
+            $_SESSION['message'] = "Error: " . $stmt->error;
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
+        }
+        $stmt->close();
     } elseif (isset($_POST['delete'])) {
         $id = (int)$_POST['id'];
         $stmt = $con->prepare("DELETE FROM reminders WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
-            redirectToPage("Reminder deleted successfully.");
+            $_SESSION['message'] = "Reminder deleted permanently.";
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
         } else {
-            redirectToPage("Error: " . $stmt->error);
+            $_SESSION['message'] = "Error: " . $stmt->error;
+            header('Location: manage_reminder.php?show_archived=1');
+            exit();
         }
         $stmt->close();
     }
@@ -95,9 +125,15 @@ $userQuery = "SELECT id, name FROM users";
 $userResult = $con->query($userQuery);
 $users = $userResult ? array_column($userResult->fetch_all(MYSQLI_ASSOC), 'name', 'id') : [];
 
-// Fetch reminders for display
-$reminderQuery = "SELECT * FROM reminders";
-$reminderResult = $con->query($reminderQuery);
+// Determine if showing archived or active reminders
+$showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
+$reminderStatus = $showArchived ? 'inactive' : 'active';
+
+// Fetch reminders for display (filtered by status)
+$reminderStmt = $con->prepare("SELECT * FROM reminders WHERE status = ?");
+$reminderStmt->bind_param("s", $reminderStatus);
+$reminderStmt->execute();
+$reminderResult = $reminderStmt->get_result();
 
 // Fetch cages for the dropdown
 $cageQuery = "SELECT cage_id FROM cages";
@@ -117,7 +153,7 @@ ob_end_flush(); // Flush the output buffer
     <!-- Include necessary styles and scripts -->
     <!-- Bootstrap 5.3 loaded via header.php -->
     <!-- Font Awesome loaded via header.php -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
     <style>
         /* Popup and Overlay Styles */
         .popup-form,
@@ -129,7 +165,8 @@ ob_end_flush(); // Flush the output buffer
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
+            border-radius: 10px;
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             width: 80%;
@@ -190,7 +227,7 @@ ob_end_flush(); // Flush the output buffer
         }
 
         .form-control[readonly] {
-            background-color: #e9ecef;
+            background-color: var(--bs-tertiary-bg);
             cursor: not-allowed;
         }
 
@@ -213,49 +250,7 @@ ob_end_flush(); // Flush the output buffer
 
         /* Action button styles handled by unified styles in header.php */
 
-        @media (max-width: 576px) {
-            .table thead {
-                display: none;
-            }
-
-            .table tbody {
-                display: block;
-                width: 100%;
-            }
-
-            .table tbody tr {
-                display: block;
-                margin-bottom: 15px;
-                border-bottom: 1px solid #dee2e6;
-                padding-bottom: 15px;
-            }
-
-            .table tbody tr td {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                border: none;
-                position: relative;
-                padding-left: 40%;
-                text-align: left;
-            }
-
-            .table tbody tr td:before {
-                content: attr(data-label);
-                font-weight: bold;
-                text-transform: uppercase;
-                position: absolute;
-                left: 10px;
-                width: 45%;
-                padding-right: 10px;
-                white-space: nowrap;
-                font-weight: bold;
-                color: #343a40;
-                text-align: left;
-            }
-
-            /* Mobile action button styles handled by unified styles in header.php */
-        }
+        /* Mobile table card layout handled by unified styles in header.php */
 
         .pr-0 {
             padding-right: 0 !important;
@@ -295,7 +290,8 @@ ob_end_flush(); // Flush the output buffer
             transform: translate(-50%, -50%);
             background-color: var(--bs-body-bg);
             padding: 20px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--bs-border-color);
+            border-radius: 10px;
             z-index: 1001;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             width: 80%;
@@ -304,7 +300,7 @@ ob_end_flush(); // Flush the output buffer
             max-height: 90vh;
         }
 
-        #viewPopupForm .form-group {
+        #viewPopupForm .mb-3 {
             margin-bottom: 15px;
         }
 
@@ -316,6 +312,15 @@ ob_end_flush(); // Flush the output buffer
             background-color: var(--bs-tertiary-bg);
             padding: 10px;
             border-radius: 5px;
+        }
+
+        /* Archived reminder rows */
+        tr.reminder-archived {
+            opacity: 0.6;
+        }
+        tr.reminder-archived td[data-label="Status"] {
+            color: var(--bs-secondary-color);
+            font-style: italic;
         }
     </style>
 </head>
@@ -331,29 +336,37 @@ ob_end_flush(); // Flush the output buffer
             </div>
         <?php endif; ?>
 
-        <!-- Button to add a new reminder -->
+        <!-- Button row: Add New + Archive Toggle -->
         <div class="add-button">
-            <button id="addNewReminderButton" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Reminder</button>
+            <?php if (!$showArchived): ?>
+                <button id="addNewReminderButton" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Reminder</button>
+            <?php endif; ?>
+            <a href="manage_reminder.php<?= $showArchived ? '' : '?show_archived=1'; ?>"
+               class="btn <?= $showArchived ? 'btn-outline-warning' : 'btn-outline-secondary'; ?>">
+                <i class="fas <?= $showArchived ? 'fa-box-open' : 'fa-archive'; ?> me-1"></i>
+                <?= $showArchived ? 'Show Active' : 'Show Archived'; ?>
+            </a>
         </div>
 
         <!-- Popup form for adding and editing reminders -->
         <div class="popup-overlay" id="popupOverlay"></div>
         <div class="popup-form" id="popupForm">
+            <button type="button" class="popup-close-btn" id="closePopupBtn" aria-label="Close">&times;</button>
             <h4 id="formTitle">Add New Reminder</h4>
             <form id="reminderForm" action="manage_reminder.php" method="post">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <input type="hidden" name="id" id="id">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="title">Title <span class="required-asterisk">*</span></label>
                     <input type="text" name="title" id="title" class="form-control" maxlength="100" required>
                     <small id="titleCounter" class="form-text text-muted">0/100 characters used</small>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="description">Description <span class="required-asterisk">*</span></label>
                     <textarea name="description" id="description" class="form-control" rows="3" maxlength="500" required></textarea>
                     <small id="descriptionCounter" class="form-text text-muted">0/500 characters used</small>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="assigned_to">Assigned To <span class="required-asterisk">*</span></label>
                     <select name="assigned_to[]" id="assigned_to" class="form-control" multiple required>
                         <?php foreach ($users as $userId => $name) : ?>
@@ -361,7 +374,7 @@ ob_end_flush(); // Flush the output buffer
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label>Recurrence Type <span class="required-asterisk">*</span></label>
                     <select name="recurrence_type" id="recurrence_type" class="form-control" required>
                         <option value="daily">Daily</option>
@@ -369,7 +382,7 @@ ob_end_flush(); // Flush the output buffer
                         <option value="monthly">Monthly</option>
                     </select>
                 </div>
-                <div class="form-group" id="weeklyOptions" style="display: none;">
+                <div class="mb-3" id="weeklyOptions" style="display: none;">
                     <label for="day_of_week">Day of the Week <span class="required-asterisk">*</span></label>
                     <select name="day_of_week" id="day_of_week" class="form-control">
                         <option value="">Select Day</option>
@@ -382,22 +395,17 @@ ob_end_flush(); // Flush the output buffer
                         <option value="Sunday">Sunday</option>
                     </select>
                 </div>
-                <div class="form-group" id="monthlyOptions" style="display: none;">
+                <div class="mb-3" id="monthlyOptions" style="display: none;">
                     <label for="day_of_month">Day of the Month (1-28) <span class="required-asterisk">*</span></label>
                     <input type="number" name="day_of_month" id="day_of_month" class="form-control" min="1" max="28">
                 </div>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="time_of_day">Time of Day <span class="required-asterisk">*</span></label>
                     <input type="time" name="time_of_day" id="time_of_day" class="form-control" required>
                 </div>
-                <div class="form-group">
-                    <label>Status <span class="required-asterisk">*</span></label>
-                    <select name="status" id="status" class="form-control" required>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
-                <div class="form-group">
+                <!-- Status is managed via archive/restore buttons -->
+                <input type="hidden" name="status" id="status" value="active">
+                <div class="mb-3">
                     <label for="cage_id">Cage ID</label>
                     <select name="cage_id" id="cage_id" class="form-control">
                         <option value="">Select Cage</option>
@@ -417,32 +425,33 @@ ob_end_flush(); // Flush the output buffer
         <!-- Popup form for viewing reminders -->
         <div class="popup-overlay" id="viewPopupOverlay"></div>
         <div class="popup-form" id="viewPopupForm">
+            <button type="button" class="popup-close-btn" id="closeViewPopupBtn" aria-label="Close">&times;</button>
             <h4>View Reminder Details</h4>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Title:</label>
                 <p id="viewTitle"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Description:</label>
                 <p id="viewDescription"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Assigned To:</label>
                 <p id="viewAssignedTo"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Recurrence Type:</label>
                 <p id="viewRecurrenceType"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Time of Day:</label>
                 <p id="viewTimeOfDay"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Status:</label>
                 <p id="viewStatus"></p>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Cage ID:</label>
                 <p id="viewCageId"></p>
             </div>
@@ -452,7 +461,7 @@ ob_end_flush(); // Flush the output buffer
         </div>
 
         <!-- Table for displaying reminders -->
-        <h3>Existing Reminders</h3>
+        <h3><?= $showArchived ? 'Archived Reminders' : 'Active Reminders'; ?></h3>
         <div class="table-responsive">
             <table class="table">
                 <thead>
@@ -465,8 +474,21 @@ ob_end_flush(); // Flush the output buffer
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($row = $reminderResult->fetch_assoc()) : ?>
+                    <?php if ($reminderResult->num_rows === 0): ?>
                         <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <?php if ($showArchived): ?>
+                                    <i class="fas fa-archive fa-3x text-muted d-block mb-2"></i>
+                                    <p class="text-muted mb-0">No archived reminders found.</p>
+                                <?php else: ?>
+                                    <i class="fas fa-bell-slash fa-3x text-muted d-block mb-2"></i>
+                                    <p class="text-muted mb-0">No reminders found. Click "Add New Reminder" to create one.</p>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                    <?php while ($row = $reminderResult->fetch_assoc()) : ?>
+                        <tr class="<?= $showArchived ? 'reminder-archived' : ''; ?>">
                             <td data-label="ID"><?= htmlspecialchars($row['id']); ?></td>
                             <td data-label="Title"><?= htmlspecialchars($row['title']); ?></td>
                             <td data-label="Recurrence">
@@ -481,22 +503,43 @@ ob_end_flush(); // Flush the output buffer
                             <td data-label="Status"><?= htmlspecialchars(ucfirst($row['status'])); ?></td>
                             <td data-label="Actions" class="table-actions">
                                 <div class="action-buttons">
-                                    <!-- Add the View button here -->
+                                    <!-- View button (always visible) -->
                                     <button class="btn btn-info btn-sm viewButton" data-id="<?= $row['id']; ?>">
                                         <i class="fas fa-eye"></i>
                                     </button>
 
-                                    <!-- Existing Edit and Delete buttons -->
-                                    <button class="btn btn-warning btn-sm editButton" data-id="<?= $row['id']; ?>">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <form action="manage_reminder.php" method="post" style="display:inline-block;">
-                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                                        <input type="hidden" name="id" value="<?= $row['id']; ?>">
-                                        <button type="submit" name="delete" class="btn btn-danger btn-sm" title="Delete" onclick="return confirm('Are you sure you want to delete this reminder?');">
-                                            <i class="fas fa-trash-alt"></i>
+                                    <?php if ($showArchived): ?>
+                                        <!-- Archived view: Restore + Delete Forever -->
+                                        <form action="manage_reminder.php" method="post" style="display:inline-block;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                            <input type="hidden" name="id" value="<?= $row['id']; ?>">
+                                            <button type="submit" name="restore" class="btn btn-success btn-sm" title="Restore"
+                                                onclick="return confirm('Restore this reminder back to active?');">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        </form>
+                                        <form action="manage_reminder.php" method="post" style="display:inline-block;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                            <input type="hidden" name="id" value="<?= $row['id']; ?>">
+                                            <button type="submit" name="delete" class="btn btn-danger btn-sm" title="Delete Forever"
+                                                onclick="return confirm('PERMANENTLY delete this reminder?\n\nThis action CANNOT be undone.') && confirm('Are you absolutely sure?');">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    <?php else: ?>
+                                        <!-- Active view: Edit + Archive -->
+                                        <button class="btn btn-warning btn-sm editButton" data-id="<?= $row['id']; ?>">
+                                            <i class="fas fa-edit"></i>
                                         </button>
-                                    </form>
+                                        <form action="manage_reminder.php" method="post" style="display:inline-block;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                            <input type="hidden" name="id" value="<?= $row['id']; ?>">
+                                            <button type="submit" name="archive" class="btn btn-secondary btn-sm" title="Archive"
+                                                onclick="return confirm('Archive this reminder?');">
+                                                <i class="fas fa-archive"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
@@ -518,7 +561,8 @@ ob_end_flush(); // Flush the output buffer
         $(document).ready(function() {
             $('#assigned_to').select2({
                 placeholder: "Select users",
-                allowClear: true
+                allowClear: true,
+                dropdownParent: $('#popupForm')
             });
 
             // Show/hide recurrence options based on selected recurrence type
@@ -551,9 +595,15 @@ ob_end_flush(); // Flush the output buffer
             });
 
             // Close the form
-            $('#cancelButton').on('click', function() {
+            $('#cancelButton, #closePopupBtn').on('click', function() {
                 $('#popupOverlay').hide();
                 $('#popupForm').hide();
+            });
+
+            // Close view popup
+            $('#closeViewPopupBtn').on('click', function() {
+                $('#viewPopupOverlay').hide();
+                $('#viewPopupForm').hide();
             });
 
             // Close the form when clicking outside

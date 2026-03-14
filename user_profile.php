@@ -243,16 +243,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             background-color: var(--bs-tertiary-bg);
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
+
 
         .btn-profile {
             display: block;
             width: 100%;
             padding: 10px;
             border-radius: 6px;
-            font-size: 1rem;
             font-weight: 500;
         }
 
@@ -265,7 +262,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
         }
 
         .note {
-            font-size: 0.9em;
             color: var(--bs-secondary-color);
             text-align: center;
             margin-top: 10px;
@@ -273,7 +269,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
 
         .note1 {
             color: var(--bs-secondary-color);
-            font-size: 12px;
         }
     </style>
 </head>
@@ -283,17 +278,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
         <h1 class="text-center">User Profile</h1>
         <form method="POST" action="">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="name">Name</label>
                 <input type="text" class="form-control" id="name" name="name" value="<?php echo htmlspecialchars($user['name']); ?>" required>
             </div>
             <br>
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="initials">Initials <span class="note1">(Your Initials will be displayed in Cage Card)</span></label>
                 <input type="text" class="form-control" id="initials" name="initials" value="<?php echo htmlspecialchars($user['initials']); ?>" maxlength="3" required>
             </div>
             <br>
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="position">Position</label>
                 <select class="form-control" id="position" name="position">
                     <option value="" disabled>Select Position</option>
@@ -312,7 +307,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             </div>
             <br>
             <?php if ($demo !== "yes") : ?>
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="username">Email Address</label>
                     <input type="email" class="form-control" id="username" name="username" value="<?php echo htmlspecialchars($user['username']); ?>" required>
                 </div>

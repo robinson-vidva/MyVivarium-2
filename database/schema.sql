@@ -93,7 +93,9 @@ CREATE TABLE `breeding` (
   `male_dob` date DEFAULT NULL,
   `female_dob` date DEFAULT NULL,
   `male_genotype` varchar(255) DEFAULT NULL,
+  `male_parent_cage` varchar(255) DEFAULT NULL,
   `female_genotype` varchar(255) DEFAULT NULL,
+  `female_parent_cage` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE
 );

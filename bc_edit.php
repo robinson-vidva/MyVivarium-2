@@ -136,18 +136,20 @@ if (isset($_GET['id'])) {
             /// Retrieve and sanitize form data
             $cage_id = trim($_POST['cage_id']);
             $new_cage_id = trim($_POST['new_cage_id']);
-            $pi_name = trim($_POST['pi_name']);
+            $pi_name = !empty($_POST['pi_name']) ? (int)$_POST['pi_name'] : null;
             $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
             $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-            $cross = trim($_POST['cross']);
+            $cross = !empty($_POST['cross']) ? trim($_POST['cross']) : null;
             $iacuc = isset($_POST['iacuc']) ? $_POST['iacuc'] : []; // Array of selected IACUC values
             $users = isset($_POST['user']) ? $_POST['user'] : []; // Array of selected users
-            $male_id = trim($_POST['male_id']);
-            $female_id = trim($_POST['female_id']);
-            $male_dob = trim($_POST['male_dob']);
-            $female_dob = trim($_POST['female_dob']);
+            $male_id = !empty($_POST['male_id']) ? trim($_POST['male_id']) : null;
+            $female_id = !empty($_POST['female_id']) ? trim($_POST['female_id']) : null;
+            $male_dob = !empty($_POST['male_dob']) ? trim($_POST['male_dob']) : null;
+            $female_dob = !empty($_POST['female_dob']) ? trim($_POST['female_dob']) : null;
             $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
+            $male_parent_cage = !empty($_POST['male_parent_cage']) ? trim($_POST['male_parent_cage']) : null;
             $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
+            $female_parent_cage = !empty($_POST['female_parent_cage']) ? trim($_POST['female_parent_cage']) : null;
             $remarks = trim($_POST['remarks']);
 
             // Begin transaction
@@ -198,9 +200,11 @@ if (isset($_GET['id'])) {
                                     male_dob = ?,
                                     female_dob = ?,
                                     male_genotype = ?,
-                                    female_genotype = ?
+                                    male_parent_cage = ?,
+                                    female_genotype = ?,
+                                    female_parent_cage = ?
                                     WHERE cage_id = ?");
-                $updateBreedingQuery->bind_param("ssssssss", $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $female_genotype, $cage_id);
+                $updateBreedingQuery->bind_param("ssssssssss", $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $male_parent_cage, $female_genotype, $female_parent_cage, $cage_id);
                 $updateBreedingQuery->execute();
                 $updateBreedingQuery->close();
 
@@ -344,8 +348,8 @@ if (isset($_GET['id'])) {
             if (isset($_POST['dom']) && isset($_POST['litter_dob'])) {
                 // Iterate over each new litter entry
                 for ($i = 0; $i < count($_POST['dom']); $i++) {
-                    $dom_i = trim($_POST['dom'][$i]);
-                    $litter_dob_i = trim($_POST['litter_dob'][$i]);
+                    $dom_i = !empty($_POST['dom'][$i]) ? trim($_POST['dom'][$i]) : null;
+                    $litter_dob_i = !empty($_POST['litter_dob'][$i]) ? trim($_POST['litter_dob'][$i]) : null;
                     $pups_alive_i = !empty($_POST['pups_alive'][$i]) ? intval($_POST['pups_alive'][$i]) : 0;
                     $pups_dead_i = !empty($_POST['pups_dead'][$i]) ? intval($_POST['pups_dead'][$i]) : 0;
                     $pups_male_i = !empty($_POST['pups_male'][$i]) ? intval($_POST['pups_male'][$i]) : 0;
@@ -751,8 +755,7 @@ require 'header.php';
 
     <title>Edit Breeding Cage | <?php echo htmlspecialchars($labName); ?></title>
 
-    <!-- Include Select2 CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 CSS loaded via header.php -->
 
     <!-- Include Select2 JavaScript -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
@@ -801,7 +804,6 @@ require 'header.php';
         }
 
         .btn-icon i {
-            font-size: 16px;
             margin: 0;
         }
 
@@ -820,8 +822,7 @@ require 'header.php';
         }
 
         .warning-text {
-            color: #dc3545;
-            font-size: 14px;
+            color: var(--bs-danger);
         }
 
         .select2-container .select2-selection--single {
@@ -991,6 +992,11 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
+                                <label for="male_parent_cage" class="form-label">Male Source / Parent Cage</label>
+                                <input type="text" class="form-control" id="male_parent_cage" name="male_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($breedingcage['male_parent_cage'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
                                 <label for="female_genotype" class="form-label">Female Genotype</label>
                                 <input type="text" class="form-control" id="female_genotype" name="female_genotype" value="<?= htmlspecialchars($breedingcage['female_genotype'] ?? ''); ?>">
                             </div>
@@ -1001,12 +1007,17 @@ require 'header.php';
                             </div>
 
                             <div class="mb-3">
+                                <label for="female_parent_cage" class="form-label">Female Source / Parent Cage</label>
+                                <input type="text" class="form-control" id="female_parent_cage" name="female_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($breedingcage['female_parent_cage'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
                                 <label for="remarks" class="form-label">Remarks</label>
                                 <textarea class="form-control" id="remarks" name="remarks" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($breedingcage['remarks']); ?></textarea>
                             </div>
 
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
 
                             <!-- Display Files Section -->
                             <div class="card mt-4">
@@ -1025,8 +1036,8 @@ require 'header.php';
                                             <tbody>
                                                 <?php while ($file = $files->fetch_assoc()) : ?>
                                                     <tr>
-                                                        <td><?= htmlspecialchars($file['file_name']); ?></td>
-                                                        <td>
+                                                        <td data-label="File Name"><?= htmlspecialchars($file['file_name']); ?></td>
+                                                        <td data-label="Actions">
                                                             <a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-outline-primary">
                                                                 <i class="fas fa-cloud-download-alt fa-sm"></i>
                                                             </a>
@@ -1069,7 +1080,7 @@ require 'header.php';
                                 <div class="card-body" id="litterEntries">
                                     <?php while ($litter = mysqli_fetch_assoc($litters)) : ?>
                                         <div class="litter-entry">
-                                            <hr class="mt-4 mb-4" style="border-top: 3px solid #000;">
+                                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
                                             <div class="mb-3">
                                                 <label for="dom[]" class="form-label">DOM <span class="required-asterisk">*</span></label>
                                                 <input type="date" class="form-control" name="dom[]" value="<?= htmlspecialchars($litter['dom']); ?>" required min="1900-01-01">
@@ -1149,13 +1160,13 @@ require 'header.php';
                                             <tbody>
                                                 <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
                                                     <tr id="log-row-<?= $log['id']; ?>">
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                                        <td style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                                        <td style="width: 40%;">
+                                                        <td data-label="Date" style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
+                                                        <td data-label="User" style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
+                                                        <td data-label="Comment" style="width: 40%;">
                                                             <input type="hidden" name="log_ids[]" value="<?= htmlspecialchars($log['id']); ?>">
                                                             <textarea name="log_comments[]" class="form-control"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></textarea>
                                                         </td>
-                                                        <td style="width: 10%;">
+                                                        <td data-label="Action" style="width: 10%;">
                                                             <button type="button" class="btn btn-danger btn-icon" onclick="markLogForDeletion(<?= $log['id']; ?>)">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>

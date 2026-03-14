@@ -53,9 +53,28 @@ require 'header.php';
 
         // Confirm archive function with a dialog
         function confirmDeletion(id) {
-            var confirmArchive = confirm("Are you sure you want to archive cage - '" + id + "' and related mouse data?");
-            if (confirmArchive) {
+            var confirmAction = confirm("Are you sure you want to archive cage '" + id + "'?");
+            if (confirmAction) {
                 window.location.href = "bc_drop.php?id=" + id + "&action=archive&confirm=true";
+            }
+        }
+
+        // Confirm restore function
+        function confirmRestore(id) {
+            var confirmAction = confirm("Restore cage '" + id + "' back to active?");
+            if (confirmAction) {
+                window.location.href = "bc_drop.php?id=" + id + "&action=restore&confirm=true";
+            }
+        }
+
+        // Confirm permanent delete function
+        function confirmPermanentDelete(id) {
+            var confirmAction = confirm("PERMANENTLY delete cage '" + id + "' and ALL related data?\n\nThis action CANNOT be undone.");
+            if (confirmAction) {
+                var doubleConfirm = confirm("Are you absolutely sure? This will permanently remove all data for cage '" + id + "'.");
+                if (doubleConfirm) {
+                    window.location.href = "bc_drop.php?id=" + id + "&action=permanent_delete&confirm=true";
+                }
             }
         }
 
@@ -76,6 +95,11 @@ require 'header.php';
                             document.getElementById('tableBody').innerHTML = response.tableRows;
                             document.getElementById('paginationLinks').innerHTML = response.paginationLinks;
                             document.getElementById('searchInput').value = search;
+
+                            // Re-initialize tooltips on dynamically loaded content
+                            document.querySelectorAll('#tableBody [data-bs-toggle="tooltip"]').forEach(function(el) {
+                                new bootstrap.Tooltip(el);
+                            });
 
                             // Update the URL with all current parameters
                             const newUrl = new URL(window.location.href);
@@ -224,7 +248,7 @@ require 'header.php';
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-center">
-                        <h4>Breeding Cage Dashboard</h4>
+                        <h1 class="mb-0">Breeding Cage Dashboard</h1>
                         <div class="action-icons mt-3 mt-md-0">
                             <!-- Add new cage button with tooltip -->
                             <a href="bc_addn.php" class="btn btn-primary btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add New Cage">
@@ -246,7 +270,7 @@ require 'header.php';
                         <!-- Breeding Cage Search Box -->
                         <div class="input-group mb-3">
                             <input type="text" id="searchInput" class="form-control" placeholder="Enter Cage ID" onkeyup="searchCages()">
-                            <button class="btn btn-primary" type="button" onclick="searchCages()">Search</button>
+                            <button class="btn btn-primary" type="button" onclick="searchCages()"><i class="fas fa-search"></i> Search</button>
                         </div>
 
                         <!-- Controls row: page size, sort toggle, archive toggle -->
@@ -273,6 +297,8 @@ require 'header.php';
                                 <thead>
                                     <tr>
                                         <th>Cage ID</th>
+                                        <th>Cross</th>
+                                        <th>Male / Female</th>
                                         <th style="width: 220px;">Action</th>
                                     </tr>
                                 </thead>
