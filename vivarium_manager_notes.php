@@ -403,11 +403,11 @@ require 'header.php';
                         </div>
                         <div class="col-md-2">
                             <label class="form-label small mb-0">From</label>
-                            <input type="date" class="form-control form-control-sm" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>">
+                            <input type="date" class="form-control form-control-sm" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>" data-no-max-date>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label small mb-0">To</label>
-                            <input type="date" class="form-control form-control-sm" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>">
+                            <input type="date" class="form-control form-control-sm" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>" data-no-max-date>
                         </div>
                         <div class="col-md-4">
                             <div class="d-flex gap-2">
@@ -728,6 +728,7 @@ require 'header.php';
             });
         }
     </script>
+    <script>document.addEventListener('DOMContentLoaded', function() { initDatePickers(); });</script>
 
     <?php include 'footer.php'; ?>
 </body>
