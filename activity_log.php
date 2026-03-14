@@ -335,13 +335,13 @@ require 'header.php';
                     <div class="filter-group">
                         <label for="date_from">Date From</label>
                         <input type="date" class="form-control" id="date_from" name="date_from"
-                               value="<?php echo htmlspecialchars($date_from); ?>">
+                               value="<?php echo htmlspecialchars($date_from); ?>" data-no-max-date>
                     </div>
 
                     <div class="filter-group">
                         <label for="date_to">Date To</label>
                         <input type="date" class="form-control" id="date_to" name="date_to"
-                               value="<?php echo htmlspecialchars($date_to); ?>">
+                               value="<?php echo htmlspecialchars($date_to); ?>" data-no-max-date>
                     </div>
 
                     <div class="filter-group">
@@ -517,6 +517,7 @@ require 'header.php';
         <?php endif; ?>
     </div>
 
+    <script>document.addEventListener('DOMContentLoaded', function() { initDatePickers(); });</script>
     <?php include 'footer.php'; ?>
 
     <script>

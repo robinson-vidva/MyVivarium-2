@@ -358,22 +358,44 @@ require 'header.php';
             </div>
 
             <!-- Search and Action Bar -->
-            <form method="GET" action="">
-                <input type="hidden" name="view" value="<?php echo htmlspecialchars($filter_view); ?>">
-                <div class="header-actions">
-                    <div class="search-box">
-                        <div class="input-group">
-                            <input type="text"
-                                   class="form-control"
-                                   name="search"
-                                   placeholder="Search cage ID, comments, or user..."
-                                   value="<?php echo htmlspecialchars($search); ?>">
-                            <button class="btn btn-primary" type="submit">
-                                <i class="fas fa-search"></i> Search
-                            </button>
-                            <button type="button" class="btn btn-info" onclick="window.print()">
-                                <i class="fas fa-print"></i>
-                            </button>
+            <div class="header-actions">
+                <form method="GET" action="" class="w-100">
+                    <input type="hidden" name="view" value="<?php echo htmlspecialchars($filter_view); ?>">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <div class="input-group">
+                                <input type="text"
+                                       class="form-control"
+                                       name="search"
+                                       placeholder="Search cage ID, comments, or user..."
+                                       value="<?php echo htmlspecialchars($search); ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-0">From</label>
+                            <input type="date" class="form-control form-control-sm" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>" data-no-max-date>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-0">To</label>
+                            <input type="date" class="form-control form-control-sm" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>" data-no-max-date>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-search"></i> Search
+                                </button>
+                                <?php if (!empty($search) || !empty($date_from) || !empty($date_to)): ?>
+                                    <a href="?view=<?php echo htmlspecialchars($filter_view); ?>" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> Clear
+                                    </a>
+                                <?php endif; ?>
+                                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                                    <i class="fas fa-plus"></i> Add Note
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="window.print()">
+                                    <i class="fas fa-print"></i> Print
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addNoteModal">
@@ -714,6 +736,7 @@ require 'header.php';
             });
         }
     </script>
+    <script>document.addEventListener('DOMContentLoaded', function() { initDatePickers(); });</script>
 
     <?php include 'footer.php'; ?>
 </body>

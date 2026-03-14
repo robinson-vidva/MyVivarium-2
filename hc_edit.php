@@ -574,25 +574,8 @@ require 'header.php';
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Function to get today's date in YYYY-MM-DD format
-            function getCurrentDate() {
-                const today = new Date();
-                const yyyy = today.getFullYear();
-                const mm = String(today.getMonth() + 1).padStart(2, '0');
-                const dd = String(today.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-            }
-
-            // Function to set the max date to today for all date input fields
-            function setMaxDate() {
-                const currentDate = getCurrentDate();
-                const dateFields = document.querySelectorAll('input[type="date"]');
-                dateFields.forEach(field => {
-                    field.setAttribute('max', currentDate);
-                });
-            }
-
-            // Initial call to set max date on page load
-            setMaxDate();
+            // Initialize flatpickr on all date inputs
+            initDatePickers();
         });
 
         // Function to go back to the previous page

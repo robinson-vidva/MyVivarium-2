@@ -107,8 +107,8 @@ if (isset($settings['r2_pres'])) {
     <!-- Google Font: Poppins -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
 
-    <!-- Select2 CSS (loaded here so dark mode overrides below take effect) -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Flatpickr Date Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
         .header {
@@ -398,6 +398,9 @@ if (isset($settings['r2_pres'])) {
     <!-- Bootstrap and jQuery JS -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <!-- Flatpickr Date Picker JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <!-- Dark Mode Toggle Script -->
     <script>
@@ -920,90 +923,110 @@ if (isset($settings['r2_pres'])) {
         }
     }
     </style>
-    <!-- Session Timeout Warning -->
-    <div id="sessionTimeoutModal">
-        <div class="timeout-box">
-            <h5><i class="fas fa-clock"></i> Session Expiring</h5>
-            <p>Your session will expire in <strong id="timeoutCountdown">2:00</strong> minutes due to inactivity.</p>
-            <button class="btn btn-primary" id="stayLoggedIn">Stay Logged In</button>
-        </div>
-    </div>
+    <!-- Flatpickr Custom Styles -->
+    <style>
+    /* Neutral date styling: only today and selected date stand out */
+    .flatpickr-day.today:not(.selected) {
+        border-color: #6c757d;
+        background: transparent;
+        color: inherit;
+    }
+    .flatpickr-day.today:not(.selected):hover {
+        background: #e2e6ea;
+        border-color: #6c757d;
+    }
+    .flatpickr-day.selected,
+    .flatpickr-day.selected:hover {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+    /* Remove any range highlighting */
+    .flatpickr-day.inRange {
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+    }
+
+    /* Dark mode flatpickr overrides */
+    [data-bs-theme="dark"] .flatpickr-calendar {
+        background: #1a1d21;
+        border-color: #374151;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    [data-bs-theme="dark"] .flatpickr-months,
+    [data-bs-theme="dark"] .flatpickr-weekdays,
+    [data-bs-theme="dark"] .flatpickr-month {
+        background: #1a1d21;
+        color: #dee2e6;
+    }
+    [data-bs-theme="dark"] .flatpickr-weekday {
+        color: #94a3b8;
+        background: #1a1d21;
+    }
+    [data-bs-theme="dark"] .flatpickr-day {
+        color: #dee2e6;
+    }
+    [data-bs-theme="dark"] .flatpickr-day:hover {
+        background: #374151;
+        border-color: #374151;
+    }
+    [data-bs-theme="dark"] .flatpickr-day.today:not(.selected) {
+        border-color: #94a3b8;
+        color: #dee2e6;
+    }
+    [data-bs-theme="dark"] .flatpickr-day.today:not(.selected):hover {
+        background: #374151;
+    }
+    [data-bs-theme="dark"] .flatpickr-day.disabled,
+    [data-bs-theme="dark"] .flatpickr-day.disabled:hover {
+        color: #4b5563;
+    }
+    [data-bs-theme="dark"] .flatpickr-day.prevMonthDay,
+    [data-bs-theme="dark"] .flatpickr-day.nextMonthDay {
+        color: #4b5563;
+    }
+    [data-bs-theme="dark"] .flatpickr-months .flatpickr-prev-month,
+    [data-bs-theme="dark"] .flatpickr-months .flatpickr-next-month {
+        color: #dee2e6;
+        fill: #dee2e6;
+    }
+    [data-bs-theme="dark"] .flatpickr-current-month .flatpickr-monthDropdown-months,
+    [data-bs-theme="dark"] .flatpickr-current-month input.cur-year {
+        color: #dee2e6;
+        background: #1a1d21;
+    }
+    [data-bs-theme="dark"] .flatpickr-monthDropdown-months option {
+        background: #1a1d21;
+        color: #dee2e6;
+    }
+    </style>
+
+    <!-- Global date picker initialization -->
     <script>
-    (function() {
-        var SESSION_TIMEOUT = 30 * 60 * 1000;  // 30 min
-        var WARNING_BEFORE = 2 * 60 * 1000;    // Warn 2 min before
-        var warnTimer, logoutTimer, countdownInterval;
-
-        function resetTimers() {
-            clearTimeout(warnTimer);
-            clearTimeout(logoutTimer);
-            clearInterval(countdownInterval);
-            var modal = document.getElementById('sessionTimeoutModal');
-            if (modal) modal.classList.remove('show');
-
-            warnTimer = setTimeout(showWarning, SESSION_TIMEOUT - WARNING_BEFORE);
-            logoutTimer = setTimeout(function() {
-                window.location.href = 'logout.php';
-            }, SESSION_TIMEOUT);
-        }
-
-        function showWarning() {
-            var modal = document.getElementById('sessionTimeoutModal');
-            if (!modal) return;
-            modal.classList.add('show');
-            var remaining = WARNING_BEFORE / 1000;
-            var cd = document.getElementById('timeoutCountdown');
-            countdownInterval = setInterval(function() {
-                remaining--;
-                if (remaining <= 0) { clearInterval(countdownInterval); return; }
-                var m = Math.floor(remaining / 60);
-                var s = remaining % 60;
-                if (cd) cd.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-            }, 1000);
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            var stayBtn = document.getElementById('stayLoggedIn');
-            if (stayBtn) {
-                stayBtn.addEventListener('click', function() {
-                    // Ping server to reset session
-                    fetch(window.location.href, { method: 'HEAD', credentials: 'same-origin' });
-                    resetTimers();
-                });
+    /**
+     * Initialize flatpickr on date inputs that haven't been initialized yet.
+     * @param {Object} options - Optional flatpickr config overrides
+     * @param {Element} container - Optional container to scope the search (default: document)
+     */
+    function initDatePickers(options, container) {
+        const scope = container || document;
+        const inputs = scope.querySelectorAll('input[type="date"]:not(.flatpickr-input)');
+        const defaults = {
+            dateFormat: "Y-m-d",
+            maxDate: "today",
+            minDate: "1900-01-01",
+            allowInput: true,
+            disableMobile: true
+        };
+        const config = Object.assign({}, defaults, options || {});
+        inputs.forEach(function(input) {
+            // Respect per-element overrides via data attributes
+            var elConfig = Object.assign({}, config);
+            if (input.dataset.noMaxDate !== undefined) {
+                delete elConfig.maxDate;
             }
-            // Reset on user activity
-            ['click', 'keypress', 'scroll', 'mousemove'].forEach(function(evt) {
-                document.addEventListener(evt, function() {
-                    var modal = document.getElementById('sessionTimeoutModal');
-                    if (modal && !modal.classList.contains('show')) {
-                        resetTimers();
-                    }
-                }, { passive: true });
-            });
-            resetTimers();
-        });
-    })();
-    </script>
-
-    <!-- Service Worker Registration -->
-    <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-            navigator.serviceWorker.register('/sw.js', { scope: '/' })
-                .then(function(registration) {
-                    // Check for updates periodically
-                    registration.addEventListener('updatefound', function() {
-                        var newWorker = registration.installing;
-                        newWorker.addEventListener('statechange', function() {
-                            if (newWorker.state === 'activated') {
-                                console.log('MyVivarium PWA updated.');
-                            }
-                        });
-                    });
-                })
-                .catch(function(error) {
-                    console.log('SW registration failed:', error);
-                });
+            flatpickr(input, elConfig);
         });
     }
     </script>
