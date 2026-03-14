@@ -107,6 +107,9 @@ if (isset($settings['r2_pres'])) {
     <!-- Google Font: Poppins -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
 
+    <!-- Select2 CSS (loaded here so dark mode overrides below take effect) -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
     <!-- Flatpickr Date Picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
@@ -1027,6 +1030,94 @@ if (isset($settings['r2_pres'])) {
                 delete elConfig.maxDate;
             }
             flatpickr(input, elConfig);
+        });
+    }
+    </script>
+
+    <!-- Session Timeout Warning -->
+    <div id="sessionTimeoutModal">
+        <div class="timeout-box">
+            <h5><i class="fas fa-clock"></i> Session Expiring</h5>
+            <p>Your session will expire in <strong id="timeoutCountdown">2:00</strong> minutes due to inactivity.</p>
+            <button class="btn btn-primary" id="stayLoggedIn">Stay Logged In</button>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var SESSION_TIMEOUT = 30 * 60 * 1000;  // 30 min
+        var WARNING_BEFORE = 2 * 60 * 1000;    // Warn 2 min before
+        var warnTimer, logoutTimer, countdownInterval;
+
+        function resetTimers() {
+            clearTimeout(warnTimer);
+            clearTimeout(logoutTimer);
+            clearInterval(countdownInterval);
+            var modal = document.getElementById('sessionTimeoutModal');
+            if (modal) modal.classList.remove('show');
+
+            warnTimer = setTimeout(showWarning, SESSION_TIMEOUT - WARNING_BEFORE);
+            logoutTimer = setTimeout(function() {
+                window.location.href = 'logout.php';
+            }, SESSION_TIMEOUT);
+        }
+
+        function showWarning() {
+            var modal = document.getElementById('sessionTimeoutModal');
+            if (!modal) return;
+            modal.classList.add('show');
+            var remaining = WARNING_BEFORE / 1000;
+            var cd = document.getElementById('timeoutCountdown');
+            countdownInterval = setInterval(function() {
+                remaining--;
+                if (remaining <= 0) { clearInterval(countdownInterval); return; }
+                var m = Math.floor(remaining / 60);
+                var s = remaining % 60;
+                if (cd) cd.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+            }, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var stayBtn = document.getElementById('stayLoggedIn');
+            if (stayBtn) {
+                stayBtn.addEventListener('click', function() {
+                    // Ping server to reset session
+                    fetch(window.location.href, { method: 'HEAD', credentials: 'same-origin' });
+                    resetTimers();
+                });
+            }
+            // Reset on user activity
+            ['click', 'keypress', 'scroll', 'mousemove'].forEach(function(evt) {
+                document.addEventListener(evt, function() {
+                    var modal = document.getElementById('sessionTimeoutModal');
+                    if (modal && !modal.classList.contains('show')) {
+                        resetTimers();
+                    }
+                }, { passive: true });
+            });
+            resetTimers();
+        });
+    })();
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then(function(registration) {
+                    // Check for updates periodically
+                    registration.addEventListener('updatefound', function() {
+                        var newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'activated') {
+                                console.log('MyVivarium PWA updated.');
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('SW registration failed:', error);
+                });
         });
     }
     </script>
