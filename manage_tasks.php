@@ -99,13 +99,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Determine the action to perform (add, edit, or delete)
     if (isset($_POST['add'])) {
+        // Multi-cage: create one task per selected cage (or one with NULL if none selected)
+        $cageIds = $_POST['cage_ids'] ?? [];
+        if (empty($cageIds)) {
+            $cageIds = [null];
+        }
         $stmt = $con->prepare("INSERT INTO tasks (title, description, assigned_by, assigned_to, status, completion_date, cage_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssss", $title, $description, $assignedBy, $assignedTo, $status, $completionDate, $cageId);
-        if ($stmt->execute()) {
-            $task_id = $stmt->insert_id; // Get the last inserted task ID
-            $taskAction = 'added';
+        $insertCount = 0;
+        $lastError = '';
+        foreach ($cageIds as $singleCageId) {
+            $singleCageId = !empty($singleCageId) ? trim($singleCageId) : null;
+            $stmt->bind_param("sssssss", $title, $description, $assignedBy, $assignedTo, $status, $completionDate, $singleCageId);
+            if ($stmt->execute()) {
+                $task_id = $stmt->insert_id;
+                $insertCount++;
+            } else {
+                $lastError = $stmt->error;
+            }
+        }
+        $stmt->close();
+        if ($insertCount > 0) {
+            $taskAction = $insertCount > 1 ? "added ($insertCount tasks created)" : 'added';
+            $cageId = $insertCount > 1 ? null : ($cageIds[0] ?? null); // For email context
         } else {
-            redirectToPage("Error: " . $stmt->error);
+            redirectToPage("Error: " . $lastError);
         }
     } elseif (isset($_POST['edit'])) {
         $id = intval($_POST['id']);
@@ -136,6 +153,72 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $taskAction = 'deleted';
         } else {
             redirectToPage("Error: " . $stmt->error);
+        }
+    }
+
+    // --- In-app notifications for all task events ---
+    $assignedToArray_notif = array_filter(array_map('intval', explode(',', $assignedTo)));
+    $assignedByName_notif = isset($users[$assignedBy]) ? $users[$assignedBy] : 'Someone';
+
+    if ($taskAction === 'added' || strpos($taskAction, 'added') === 0) {
+        // Notify all assigned-to users about the new task
+        foreach ($assignedToArray_notif as $uid) {
+            if ($uid > 0) {
+                $nTitle = "New Task: $title";
+                $nMessage = "$assignedByName_notif assigned you a new task" . ($cageId ? " (Cage $cageId)" : "");
+                $nLink = "manage_tasks.php";
+                $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+                $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                $nStmt->execute();
+                $nStmt->close();
+            }
+        }
+    } elseif ($taskAction === 'updated') {
+        // Notify all assigned-to users about the update
+        foreach ($assignedToArray_notif as $uid) {
+            if ($uid > 0) {
+                $nTitle = "Task Updated: $title";
+                $nMessage = "$assignedByName_notif updated the task" . ($status === 'Completed' ? " — marked as Completed" : "") . ($cageId ? " (Cage $cageId)" : "");
+                $nLink = "manage_tasks.php";
+                $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+                $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                $nStmt->execute();
+                $nStmt->close();
+            }
+        }
+        // Also notify the original assigner if current user is not the assigner
+        if ($assignedBy != $currentUserId) {
+            $currentUserNameNotif = $currentUserName;
+            $nTitle = "Task Updated: $title";
+            $nMessage = "$currentUserNameNotif updated your task" . ($status === 'Completed' ? " — marked as Completed" : "");
+            $nLink = "manage_tasks.php";
+            $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+            $nStmt->bind_param("isss", $assignedBy, $nTitle, $nMessage, $nLink);
+            $nStmt->execute();
+            $nStmt->close();
+        }
+    } elseif ($taskAction === 'deleted') {
+        // Notify all assigned-to users about the deletion
+        foreach ($assignedToArray_notif as $uid) {
+            if ($uid > 0) {
+                $nTitle = "Task Deleted: $title";
+                $nMessage = "$currentUserName deleted the task" . ($cageId ? " (Cage $cageId)" : "");
+                $nLink = "manage_tasks.php";
+                $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+                $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                $nStmt->execute();
+                $nStmt->close();
+            }
+        }
+        // Also notify the original assigner if current user is not the assigner
+        if ($assignedBy != $currentUserId) {
+            $nTitle = "Task Deleted: $title";
+            $nMessage = "$currentUserName deleted your task";
+            $nLink = "manage_tasks.php";
+            $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+            $nStmt->bind_param("isss", $assignedBy, $nTitle, $nMessage, $nLink);
+            $nStmt->execute();
+            $nStmt->close();
         }
     }
 
@@ -547,13 +630,13 @@ ob_end_flush(); // Flush the output buffer
                     <input type="date" name="completion_date" id="completion_date" class="form-control" data-no-max-date>
                 </div>
                 <div class="mb-3">
-                    <label for="cage_id">Cage ID</label>
-                    <select name="cage_id" id="cage_id" class="form-control">
-                        <option value="">Select Cage</option>
+                    <label for="cage_id" id="cageIdLabel">Cage ID</label>
+                    <select name="cage_ids[]" id="cage_id" class="form-control" multiple>
                         <?php foreach ($cages as $cageId) : ?>
                             <option value="<?= htmlspecialchars($cageId); ?>"><?= htmlspecialchars($cageId); ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <small class="form-text text-muted" id="cageIdHint">Select multiple cages to create a separate task for each.</small>
                 </div>
                 <div class="form-buttons">
                     <button type="submit" name="add" id="addButton" class="btn btn-primary" onclick="disableButton(this);"><i class="fas fa-plus"></i> Add Task</button>
@@ -670,6 +753,9 @@ ob_end_flush(); // Flush the output buffer
                 dropdownParent: $('#popupForm')
             });
 
+            // Initialize cage_id Select2 in multi-select mode by default
+            setCageMode('add');
+
             // Ensure the form closes when clicking outside
             $('#popupOverlay, #viewPopupOverlay').on('click', function() {
                 console.log('Overlay clicked - closing form');
@@ -743,6 +829,7 @@ ob_end_flush(); // Flush the output buffer
             document.getElementById('formTitle').innerText = 'Add New Task';
             document.getElementById('addButton').style.display = 'block';
             document.getElementById('editButton').style.display = 'none';
+            setCageMode('add');
             resetForm(prefillDate);
         }
 
@@ -763,6 +850,38 @@ ob_end_flush(); // Flush the output buffer
         }
 
         /**
+         * Toggle cage_id between multi-select (add) and single-select (edit)
+         */
+        function setCageMode(mode) {
+            var $cage = $('#cage_id');
+            // Destroy existing Select2
+            if ($cage.hasClass('select2-hidden-accessible')) {
+                $cage.select2('destroy');
+            }
+            $cage.val(null);
+
+            if (mode === 'add') {
+                $cage.attr('multiple', true).attr('name', 'cage_ids[]');
+                $('#cageIdLabel').text('Cage IDs');
+                $('#cageIdHint').show();
+                $cage.select2({
+                    placeholder: "Select Cages",
+                    allowClear: true,
+                    dropdownParent: $('#popupForm')
+                });
+            } else {
+                $cage.removeAttr('multiple').attr('name', 'cage_id');
+                $('#cageIdLabel').text('Cage ID');
+                $('#cageIdHint').hide();
+                $cage.select2({
+                    placeholder: "Select Cage",
+                    allowClear: true,
+                    dropdownParent: $('#popupForm')
+                });
+            }
+        }
+
+        /**
          * Reset the task form to its default state
          * @param {string} [prefillDate] Optional date to pre-fill in completion_date
          */
@@ -776,11 +895,11 @@ ob_end_flush(); // Flush the output buffer
             document.querySelector('input[name="status"][value="Pending"]').checked = true;
             document.getElementById('completion_date').value = prefillDate || '';
 
-            // Set the cage_id dropdown to the cageIdFilter value if it exists
+            // Set the cage_id Select2 to the cageIdFilter value if it exists
             if (cageIdFilter) {
-                document.getElementById('cage_id').value = cageIdFilter;
+                $('#cage_id').val([cageIdFilter]).trigger('change');
             } else {
-                document.getElementById('cage_id').value = '';
+                $('#cage_id').val(null).trigger('change');
             }
         }
 
@@ -804,10 +923,16 @@ ob_end_flush(); // Flush the output buffer
                         return;
                     }
                     if (action === 'edit') {
-                        openForm();
+                        // Open form first, then switch to edit mode
+                        document.getElementById('popupOverlay').style.display = 'block';
+                        document.getElementById('popupForm').style.display = 'block';
                         document.getElementById('formTitle').innerText = 'Edit Task';
                         document.getElementById('addButton').style.display = 'none';
                         document.getElementById('editButton').style.display = 'block';
+
+                        // Switch cage to single-select mode for editing
+                        setCageMode('edit');
+
                         document.getElementById('id').value = response.id;
                         document.getElementById('title').value = response.title;
                         document.getElementById('description').value = response.description;
@@ -820,7 +945,7 @@ ob_end_flush(); // Flush the output buffer
 
                         document.querySelector(`input[name="status"][value="${response.status}"]`).checked = true;
                         document.getElementById('completion_date').value = response.completion_date;
-                        document.getElementById('cage_id').value = response.cage_id;
+                        $('#cage_id').val(response.cage_id).trigger('change');
 
                     } else if (action === 'view') {
                         const taskDetails = `

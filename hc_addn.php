@@ -242,6 +242,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt5->bind_param("si", $cage_id, $user_id);
                     $stmt5->execute();
                 }
+
+                // Notify all assigned users about the new cage
+                $creatorName = $_SESSION['name'] ?? 'Someone';
+                foreach ($user_ids as $uid) {
+                    $uid = intval($uid);
+                    if ($uid > 0) {
+                        $nTitle = "Added to Cage: $cage_id";
+                        $nMessage = "$creatorName added you to holding cage $cage_id";
+                        $nLink = "hc_view.php?id=" . urlencode($cage_id);
+                        $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                        $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                        $nStmt->execute();
+                        $nStmt->close();
+                    }
+                }
             }
 
             // Commit the transaction

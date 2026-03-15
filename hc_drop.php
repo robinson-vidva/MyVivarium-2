@@ -124,6 +124,21 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
             // Log the activity
             log_activity($con, 'delete', 'cage', $id, 'Cage permanently deleted');
 
+            // Notify cage users about permanent deletion
+            $actorName = $_SESSION['name'] ?? 'Someone';
+            foreach ($cageUsers as $uid) {
+                $uid = intval($uid);
+                if ($uid > 0 && $uid != $currentUserId) {
+                    $nTitle = "Cage Deleted: $id";
+                    $nMessage = "$actorName permanently deleted holding cage $id";
+                    $nLink = "hc_dash.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
+
             // Set a success message in the session
             $_SESSION['message'] = 'Cage ' . $id . ' and related data permanently deleted.';
 
@@ -146,6 +161,21 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
             // Log the activity
             log_activity($con, 'restore', 'cage', $id, 'Cage restored');
 
+            // Notify cage users about restoration
+            $actorName = $_SESSION['name'] ?? 'Someone';
+            foreach ($cageUsers as $uid) {
+                $uid = intval($uid);
+                if ($uid > 0 && $uid != $currentUserId) {
+                    $nTitle = "Cage Restored: $id";
+                    $nMessage = "$actorName restored holding cage $id";
+                    $nLink = "hc_view.php?id=" . urlencode($id);
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
+
             // Set a success message in the session
             $_SESSION['message'] = 'Cage ' . $id . ' has been restored.';
 
@@ -167,6 +197,21 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
 
             // Log the activity
             log_activity($con, 'archive', 'cage', $id, 'Cage archived');
+
+            // Notify cage users about archival
+            $actorName = $_SESSION['name'] ?? 'Someone';
+            foreach ($cageUsers as $uid) {
+                $uid = intval($uid);
+                if ($uid > 0 && $uid != $currentUserId) {
+                    $nTitle = "Cage Archived: $id";
+                    $nMessage = "$actorName archived holding cage $id";
+                    $nLink = "hc_dash.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
 
             // Set a success message in the session
             $_SESSION['message'] = 'Cage ' . $id . ' has been archived.';
