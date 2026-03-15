@@ -224,7 +224,9 @@ foreach ($ids as $id) {
     </style>
 </head>
 
+<?php $isPdfMode = isset($_GET['action']) && $_GET['action'] === 'pdf'; ?>
 <body>
+    <div id="printArea">
     <?php
     $totalCages = count($cages);
     $totalPages = ceil($totalCages / 4);
@@ -448,6 +450,64 @@ foreach ($ids as $id) {
     </table>
     </div>
     <?php endfor; ?>
+    </div>
+
+    <?php if ($isPdfMode) : ?>
+    <div id="pdfStatus" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); display:flex; align-items:center; justify-content:center; z-index:9999; font-family:Arial,sans-serif;">
+        <div style="text-align:center;">
+            <div style="font-size:24px; margin-bottom:10px;">&#x23F3;</div>
+            <p style="font-size:16px; color:#333;" id="pdfMsg">Generating PDF...</p>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        window.addEventListener('load', function() {
+            // Wait for QR code images to load
+            var images = document.querySelectorAll('#printArea img');
+            var loaded = 0;
+            var total = images.length;
+
+            function generate() {
+                var element = document.getElementById('printArea');
+                var opt = {
+                    margin: 0,
+                    filename: 'cage_cards.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
+                    pagebreak: { mode: ['css'] }
+                };
+                html2pdf().set(opt).from(element).save().then(function() {
+                    document.getElementById('pdfMsg').textContent = 'PDF downloaded! You can close this tab.';
+                    document.querySelector('#pdfStatus div div').textContent = '\u2705';
+                }).catch(function() {
+                    document.getElementById('pdfMsg').textContent = 'Error generating PDF. Please try again.';
+                    document.querySelector('#pdfStatus div div').textContent = '\u274C';
+                });
+            }
+
+            if (total === 0) {
+                generate();
+            } else {
+                images.forEach(function(img) {
+                    if (img.complete) {
+                        loaded++;
+                        if (loaded >= total) generate();
+                    } else {
+                        img.addEventListener('load', function() {
+                            loaded++;
+                            if (loaded >= total) generate();
+                        });
+                        img.addEventListener('error', function() {
+                            loaded++;
+                            if (loaded >= total) generate();
+                        });
+                    }
+                });
+            }
+        });
+    </script>
+    <?php endif; ?>
 </body>
 
 </html>
