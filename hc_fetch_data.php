@@ -73,10 +73,10 @@ if (isset($_GET['search'])) {
 // JOIN with cages table to filter by status
 if (!empty($searchQuery)) {
     $searchPattern = '%' . $searchQuery . '%';
-    // Query with search filter
-    $totalQuery = "SELECT DISTINCT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? AND h.`cage_id` LIKE ?";
+    // Query with search filter — search across cage_id, strain, and sex
+    $totalQuery = "SELECT DISTINCT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? AND (h.`cage_id` LIKE ? OR h.`strain` LIKE ? OR h.`sex` LIKE ?)";
     $stmtTotal = $con->prepare($totalQuery);
-    $stmtTotal->bind_param("ss", $cageStatus, $searchPattern);
+    $stmtTotal->bind_param("ssss", $cageStatus, $searchPattern, $searchPattern, $searchPattern);
     $stmtTotal->execute();
     $totalResult = $stmtTotal->get_result();
     $totalRecords = $totalResult->num_rows;
@@ -84,9 +84,9 @@ if (!empty($searchQuery)) {
     $stmtTotal->close();
 
     // Query with pagination and sort
-    $query = "SELECT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? AND h.`cage_id` LIKE ? GROUP BY h.`cage_id` ORDER BY $orderBy LIMIT ? OFFSET ?";
+    $query = "SELECT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? AND (h.`cage_id` LIKE ? OR h.`strain` LIKE ? OR h.`sex` LIKE ?) GROUP BY h.`cage_id` ORDER BY $orderBy LIMIT ? OFFSET ?";
     $stmt = $con->prepare($query);
-    $stmt->bind_param("ssii", $cageStatus, $searchPattern, $limit, $offset);
+    $stmt->bind_param("ssssii", $cageStatus, $searchPattern, $searchPattern, $searchPattern, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
 } else {
@@ -109,6 +109,13 @@ if (!empty($searchQuery)) {
 
 // Generate the table rows
 $tableRows = '';
+if ($totalRecords == 0 && !empty($searchQuery)) {
+    $colCount = 2 + count($visibleColumns); // cage_id + visible columns + action
+    $tableRows .= '<tr><td colspan="' . $colCount . '" class="text-center py-4">';
+    $tableRows .= '<p class="text-muted mb-1"><i class="fas fa-search"></i> No cages found matching "<strong>' . htmlspecialchars($searchQuery) . '</strong>"</p>';
+    $tableRows .= '<small class="text-muted">Try a different search term or check your spelling.</small>';
+    $tableRows .= '</td></tr>';
+}
 while ($row = mysqli_fetch_assoc($result)) {
     $cageID = $row['cage_id']; // Get the cage ID
     // Use prepared statement to fetch records for the current cage ID
@@ -189,7 +196,8 @@ ob_end_clean();
 header('Content-Type: application/json');
 echo json_encode([
     'tableRows' => $tableRows,
-    'paginationLinks' => $paginationLinks
+    'paginationLinks' => $paginationLinks,
+    'totalRecords' => $totalRecords
 ]);
 
 ?>
