@@ -280,8 +280,26 @@ require 'header.php';
     </style>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize flatpickr on all date inputs
-            initDatePickers();
+            // Function to get today's date in YYYY-MM-DD format
+            function getCurrentDate() {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            }
+
+            // Function to set the max date to today for all date input fields
+            function setMaxDate() {
+                const currentDate = getCurrentDate();
+                const dateFields = document.querySelectorAll('input[type="date"]');
+                dateFields.forEach(field => {
+                    field.setAttribute('max', currentDate);
+                });
+            }
+
+            // Initial call to set max date on page load
+            setMaxDate();
 
             // Function to dynamically add new litter entry
             function addLitter() {
@@ -323,8 +341,8 @@ require 'header.php';
 
                 document.getElementById('litterEntries').appendChild(litterDiv);
 
-                // Initialize flatpickr on new date fields
-                initDatePickers(null, litterDiv);
+                // Apply max date to new date fields
+                setMaxDate();
             }
 
             // Function to adjust the height of the textarea dynamically
@@ -369,7 +387,7 @@ require 'header.php';
 
             // Function to attach event listeners to date fields
             function attachDateValidation() {
-                const dateFields = document.querySelectorAll('input.flatpickr-input, input[type="date"]');
+                const dateFields = document.querySelectorAll('input[type="date"]');
                 dateFields.forEach(field => {
                     if (!field.dataset.validated) { // Check if already validated
                         const warningText = document.createElement('span');
@@ -413,7 +431,7 @@ require 'header.php';
             // Prevent form submission if dates are invalid
             form.addEventListener('submit', function(event) {
                 let isValid = true;
-                const dateFields = document.querySelectorAll('input.flatpickr-input, input[type="date"]');
+                const dateFields = document.querySelectorAll('input[type="date"]');
                 dateFields.forEach(field => {
                     const dateValue = field.value;
                     const warningText = field.nextElementSibling;

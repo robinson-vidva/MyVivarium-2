@@ -837,9 +837,7 @@ ob_end_flush(); // Flush the output buffer
             });
         }
 
-        // Initialize flatpickr on date inputs
         document.addEventListener('DOMContentLoaded', function() {
-            initDatePickers();
             // Function to validate date
             function validateDate(dateString) {
                 const regex = /^\d{4}-\d{2}-\d{2}$/;
@@ -855,7 +853,7 @@ ob_end_flush(); // Flush the output buffer
 
             // Function to attach event listeners to date fields
             function attachDateValidation() {
-                const dateFields = document.querySelectorAll('input.flatpickr-input, input[type="date"]');
+                const dateFields = document.querySelectorAll('input[type="date"]');
                 dateFields.forEach(field => {
                     if (!field.dataset.validated) { // Check if already validated
                         const warningText = document.createElement('span');
