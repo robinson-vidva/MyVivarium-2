@@ -21,6 +21,13 @@ if (!isset($_SESSION['username'])) {
 $currentUserId = $_SESSION['user_id'];
 $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
 
+// View mode: 'all' shows everything (admin only), 'mine' filters to current user
+$viewMode = $_GET['view'] ?? ($isAdmin ? 'all' : 'mine');
+if (!$isAdmin) {
+    $viewMode = 'mine'; // Non-admins always see only their own
+}
+$showAll = ($viewMode === 'all');
+
 // Parse date range from FullCalendar
 $start = $_GET['start'] ?? date('Y-m-01');
 $end = $_GET['end'] ?? date('Y-m-t');
@@ -57,7 +64,7 @@ $textColorMap = [
 // ============================================================
 // FETCH TASKS WITH completion_date IN RANGE
 // ============================================================
-if ($isAdmin) {
+if ($showAll) {
     $taskSQL = "SELECT * FROM tasks
                 WHERE completion_date IS NOT NULL
                 AND completion_date BETWEEN ? AND ?
@@ -84,7 +91,7 @@ $stmt->close();
 // ============================================================
 // FETCH TASKS WITHOUT completion_date (show on creation_date)
 // ============================================================
-if ($isAdmin) {
+if ($showAll) {
     $taskSQL2 = "SELECT * FROM tasks
                  WHERE completion_date IS NULL
                  AND DATE(creation_date) BETWEEN ? AND ?
@@ -112,7 +119,7 @@ $stmt2->close();
 // ============================================================
 // FETCH AND EXPAND REMINDERS
 // ============================================================
-if ($isAdmin) {
+if ($showAll) {
     $reminderSQL = "SELECT * FROM reminders WHERE status = 'active'";
     $rStmt = $con->prepare($reminderSQL);
 } else {
