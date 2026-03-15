@@ -166,7 +166,6 @@ foreach ($ids as $id) {
 <head>
     <meta charset="utf-8">
     <title>Printable 2x2 Card Table</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         @page {
             size: letter landscape;
@@ -182,10 +181,6 @@ foreach ($ids as $id) {
 
             .page-break {
                 page-break-after: always;
-            }
-
-            .no-print {
-                display: none !important;
             }
         }
 
@@ -455,37 +450,6 @@ foreach ($ids as $id) {
     </div>
     <?php endfor; ?>
     </div>
-
-    <!-- Toolbar: Download PDF and Print buttons (hidden when printing) -->
-    <div class="no-print" style="position: fixed; top: 10px; right: 10px; z-index: 9999; display: flex; gap: 8px;">
-        <button onclick="downloadPDF()" style="padding: 8px 16px; background: #0d6efd; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-            &#x2B07; Download PDF
-        </button>
-        <button onclick="window.print()" style="padding: 8px 16px; background: #198754; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-            &#x1F5A8; Print
-        </button>
-    </div>
-
-    <script>
-        function downloadPDF() {
-            var btn = document.querySelector('.no-print');
-            btn.style.display = 'none';
-
-            var element = document.getElementById('printArea');
-            var opt = {
-                margin: 0,
-                filename: 'cage_cards.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
-                pagebreak: { mode: ['css'] }
-            };
-
-            html2pdf().set(opt).from(element).save().then(function() {
-                btn.style.display = 'flex';
-            });
-        }
-    </script>
 </body>
 
 </html>
