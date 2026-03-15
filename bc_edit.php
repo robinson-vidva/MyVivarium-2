@@ -52,7 +52,7 @@ if (isset($_GET['id'])) {
     $id = mysqli_real_escape_string($con, $_GET['id']);
 
     // Fetch the breeding cage record with the specified ID including PI name details
-    $query = "SELECT b.*, c.remarks AS remarks, c.pi_name AS pi_name, c.room, c.rack
+    $query = "SELECT b.*, c.remarks AS remarks, c.pi_name AS pi_name, c.room, c.rack, c.created_at
           FROM breeding b
           LEFT JOIN cages c ON b.cage_id = c.cage_id
           WHERE b.cage_id = ?";
@@ -151,6 +151,7 @@ if (isset($_GET['id'])) {
             $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
             $female_parent_cage = !empty($_POST['female_parent_cage']) ? trim($_POST['female_parent_cage']) : null;
             $remarks = trim($_POST['remarks']);
+            $created_at = !empty($_POST['created_at']) ? trim($_POST['created_at']) : null;
 
             // Begin transaction
             $con->begin_transaction();
@@ -186,9 +187,10 @@ if (isset($_GET['id'])) {
                                 pi_name = ?,
                                 remarks = ?,
                                 room = ?,
-                                rack = ?
+                                rack = ?,
+                                created_at = ?
                                 WHERE cage_id = ?");
-                $updateCageQuery->bind_param("sssss", $pi_name, $remarks, $room, $rack, $cage_id);
+                $updateCageQuery->bind_param("ssssss", $pi_name, $remarks, $room, $rack, $created_at, $cage_id);
                 $updateCageQuery->execute();
                 $updateCageQuery->close();
 
@@ -914,6 +916,12 @@ require 'header.php';
                                 <label for="new_cage_id" class="form-label">New Cage ID <span class="required-asterisk">*</span></label>
                                 <input type="text" class="form-control" id="new_cage_id" name="new_cage_id" value="<?= htmlspecialchars($breedingcage['cage_id']); ?>" required style="border: 2px solid #0d6efd;">
                                 <small class="form-text text-muted">Change the cage ID if needed.</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="created_at" class="form-label">Date Added</label>
+                                <input type="date" class="form-control" id="created_at" name="created_at" value="<?= htmlspecialchars(!empty($breedingcage['created_at']) ? date('Y-m-d', strtotime($breedingcage['created_at'])) : ''); ?>" data-no-max-date>
+                                <small class="form-text text-muted">When this cage was added to the system.</small>
                             </div>
 
                             <div class="mb-3">

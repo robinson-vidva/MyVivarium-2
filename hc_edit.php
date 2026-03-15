@@ -83,7 +83,7 @@ if (isset($_GET['id'])) {
     $id = $_GET['id'];
 
     // Fetch the holding cage record with the specified ID including PI name details
-    $query = "SELECT h.*, c.pi_name AS pi_name, c.quantity, c.remarks, c.room, c.rack
+    $query = "SELECT h.*, c.pi_name AS pi_name, c.quantity, c.remarks, c.room, c.rack, c.created_at
               FROM holding h
               LEFT JOIN cages c ON h.cage_id = c.cage_id
               WHERE h.cage_id = ?";
@@ -174,6 +174,7 @@ if (isset($_GET['id'])) {
             $sex = !empty($_POST['sex']) ? strtolower(trim($_POST['sex'])) : null;
             $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
             $remarks = trim($_POST['remarks']);
+            $created_at = !empty($_POST['created_at']) ? trim($_POST['created_at']) : null;
 
             // Handle cage ID change if new_cage_id differs from current cage_id
             $cageIdChanged = false;
@@ -223,11 +224,12 @@ if (isset($_GET['id'])) {
                                  `pi_name` = ?,
                                  `remarks` = ?,
                                  `room` = ?,
-                                 `rack` = ?
+                                 `rack` = ?,
+                                 `created_at` = ?
                                  WHERE `cage_id` = ?";
 
             $stmtCages = $con->prepare($updateQueryCages);
-            $stmtCages->bind_param("sssss", $pi_name, $remarks, $room, $rack, $cage_id);
+            $stmtCages->bind_param("ssssss", $pi_name, $remarks, $room, $rack, $created_at, $cage_id);
             $resultCages = $stmtCages->execute();
             $stmtCages->close();
 
@@ -959,6 +961,12 @@ require 'header.php';
                             <div class="mb-3">
                                 <label for="rack" class="form-label">Rack</label>
                                 <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($holdingcage['rack'] ?? ''); ?>">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="created_at" class="form-label">Date Added</label>
+                                <input type="date" class="form-control" id="created_at" name="created_at" value="<?= htmlspecialchars(!empty($holdingcage['created_at']) ? date('Y-m-d', strtotime($holdingcage['created_at'])) : ''); ?>" data-no-max-date>
+                                <small class="form-text text-muted">When this cage was added to the system.</small>
                             </div>
 
                             <div class="mb-3">
