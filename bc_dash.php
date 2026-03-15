@@ -95,7 +95,7 @@ require 'header.php';
                 if (xhr.status === 200) {
                     try {
                         var response = JSON.parse(xhr.responseText);
-                        if (response.tableRows && response.paginationLinks) {
+                        if (response.tableRows !== undefined && response.paginationLinks !== undefined) {
                             document.getElementById('tableBody').innerHTML = response.tableRows;
                             document.getElementById('paginationLinks').innerHTML = response.paginationLinks;
                             document.getElementById('searchInput').value = search;
