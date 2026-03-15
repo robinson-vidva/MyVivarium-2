@@ -223,11 +223,17 @@ foreach ($ids as $id) {
         table.cageB tr:first-child td {
             border-top: none;
         }
+
+        /* Wrapper is invisible to layout in normal mode */
+        #printArea {
+            display: contents;
+        }
     </style>
 </head>
 
 <?php $isPdfMode = isset($_GET['action']) && $_GET['action'] === 'pdf'; ?>
 <body>
+    <div id="printArea">
     <?php
     $totalCages = count($cages);
     $totalPages = ceil($totalCages / 4);
@@ -452,6 +458,7 @@ foreach ($ids as $id) {
         <div class="page-break"></div>
     <?php endif; ?>
     <?php endfor; ?>
+    </div>
 
     <?php if ($isPdfMode) : ?>
     <div id="pdfStatus" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); display:flex; align-items:center; justify-content:center; z-index:9999; font-family:Arial,sans-serif;">
@@ -471,7 +478,21 @@ foreach ($ids as $id) {
             function generate() {
                 // Hide the status overlay before capturing
                 document.getElementById('pdfStatus').style.display = 'none';
-                var element = document.body;
+
+                // Restyle printArea for PDF capture: block with centering
+                var element = document.getElementById('printArea');
+                element.style.display = 'block';
+                element.style.width = '11in';
+                element.style.margin = '0 auto';
+
+                // Center each table within its page
+                var tables = element.querySelectorAll('table');
+                tables.forEach(function(t) {
+                    if (t.style.width === '10in') {
+                        t.style.margin = '0 auto';
+                    }
+                });
+
                 var opt = {
                     margin: 0,
                     filename: 'cage_cards.pdf',
