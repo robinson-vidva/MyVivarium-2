@@ -73,75 +73,119 @@ require 'header.php';
     <!-- Bootstrap CSS -->
     <!-- Bootstrap 5.3 loaded via header.php -->
 
-    <!-- Inline CSS for styling -->
     <style>
-        /* Basic styling for body */
         body {
             margin: 0;
             padding: 0;
         }
 
-        /* Styling for iframe container */
-        .iframe-container {
-            position: relative;
-            width: 100%;
-            height: auto;
-            margin-top: 20px;
-        }
-
-        /* Styling for iframes */
         .iframe {
             width: 100%;
             height: 300px;
             border: none;
+            border-radius: 6px;
+        }
+
+        .nav-tabs .nav-link {
+            font-weight: 500;
+        }
+
+        @media (max-width: 576px) {
+            .iframe {
+                height: 250px;
+            }
+
+            .nav-tabs .nav-link {
+                font-size: 0.9rem;
+                padding: 0.5rem 0.75rem;
+            }
         }
     </style>
 </head>
 
 <body>
     <div class="container mt-4 content" style="max-width: 900px;">
-        <h1 class="text-center">IOT Sensors</h1>
-        <!-- Section for Room 1 IOT Sensors -->
-        <?php if (!empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres)) : ?>
-            <div class="row mb-4">
-                <div class="col-12">
-                    <h3><?php echo htmlspecialchars($labName); ?> - Room 1 IOT Sensors</h3>
-                </div>
+        <h1 class="text-center mb-3">IOT Sensors</h1>
 
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_temp); ?>"></iframe>
-                </div>
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_humi); ?>"></iframe>
-                </div>
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_illu); ?>"></iframe>
-                </div>
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_pres); ?>"></iframe>
-                </div>
-            </div>
-        <?php endif; ?>
+        <?php
+        $hasRoom1 = !empty($r1_temp) || !empty($r1_humi) || !empty($r1_illu) || !empty($r1_pres);
+        $hasRoom2 = !empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres);
+        ?>
 
-        <!-- Section for Room 2 IOT Sensors -->
-        <?php if (!empty($r2_temp) || !empty($r2_humi) || !empty($r2_illu) || !empty($r2_pres)) : ?>
-            <div class="row">
-                <div class="col-12">
-                    <h3><?php echo htmlspecialchars($labName); ?> - Room 2 IOT Sensors</h3>
-                </div>
+        <?php if ($hasRoom1 || $hasRoom2) : ?>
+            <!-- Room Tabs -->
+            <ul class="nav nav-tabs" id="roomTabs" role="tablist">
+                <?php if ($hasRoom1) : ?>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="room1-tab" data-bs-toggle="tab" data-bs-target="#room1" type="button" role="tab" aria-controls="room1" aria-selected="true">
+                            <i class="fas fa-thermometer-half me-1"></i> Room 1
+                        </button>
+                    </li>
+                <?php endif; ?>
+                <?php if ($hasRoom2) : ?>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link <?= !$hasRoom1 ? 'active' : '' ?>" id="room2-tab" data-bs-toggle="tab" data-bs-target="#room2" type="button" role="tab" aria-controls="room2" aria-selected="<?= !$hasRoom1 ? 'true' : 'false' ?>">
+                            <i class="fas fa-thermometer-half me-1"></i> Room 2
+                        </button>
+                    </li>
+                <?php endif; ?>
+            </ul>
 
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_temp); ?>"></iframe>
-                </div>
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_humi); ?>"></iframe>
-                </div>
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_illu); ?>"></iframe>
-                </div>
-                <div class="col-md-6 mb-4">
-                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_pres); ?>"></iframe>
-                </div>
+            <!-- Tab Content -->
+            <div class="tab-content mt-3" id="roomTabContent">
+                <?php if ($hasRoom1) : ?>
+                    <div class="tab-pane fade show active" id="room1" role="tabpanel" aria-labelledby="room1-tab">
+                        <div class="row">
+                            <?php if (!empty($r1_temp)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_temp); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($r1_humi)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_humi); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($r1_illu)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_illu); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($r1_pres)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r1_pres); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($hasRoom2) : ?>
+                    <div class="tab-pane fade <?= !$hasRoom1 ? 'show active' : '' ?>" id="room2" role="tabpanel" aria-labelledby="room2-tab">
+                        <div class="row">
+                            <?php if (!empty($r2_temp)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_temp); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($r2_humi)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_humi); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($r2_illu)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_illu); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($r2_pres)) : ?>
+                                <div class="col-md-6 mb-3">
+                                    <iframe class="iframe" src="<?php echo htmlspecialchars($r2_pres); ?>"></iframe>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
