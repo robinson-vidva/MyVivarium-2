@@ -80,6 +80,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $stmt->close();
         if ($insertCount > 0) {
+            // Notify assigned-to users about the new reminder
+            $notifAssignees = array_filter(array_map('intval', explode(',', $assignedTo)));
+            foreach ($notifAssignees as $uid) {
+                if ($uid > 0) {
+                    $nTitle = "New Reminder: $title";
+                    $nMessage = "$currentUserName created a reminder for you ($recurrenceType)";
+                    $nLink = "manage_reminder.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'reminder')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
             $msg = $insertCount === 1 ? "Reminder added successfully." : "$insertCount reminders added successfully (one per cage).";
             redirectToPage($msg);
         } else {
@@ -90,6 +103,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt = $con->prepare("UPDATE reminders SET cage_id = ?, title = ?, description = ?, assigned_to = ?, recurrence_type = ?, day_of_week = ?, day_of_month = ?, time_of_day = ?, status = ? WHERE id = ?");
         $stmt->bind_param("sssisssssi", $cageId, $title, $description, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status, $id);
         if ($stmt->execute()) {
+            // Notify assigned-to users about the update
+            $notifAssignees = array_filter(array_map('intval', explode(',', $assignedTo)));
+            foreach ($notifAssignees as $uid) {
+                if ($uid > 0) {
+                    $nTitle = "Reminder Updated: $title";
+                    $nMessage = "$currentUserName updated a reminder assigned to you";
+                    $nLink = "manage_reminder.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'reminder')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
             redirectToPage("Reminder updated successfully.");
         } else {
             redirectToPage("Error: " . $stmt->error);
@@ -97,9 +123,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
     } elseif (isset($_POST['archive'])) {
         $id = (int)$_POST['id'];
+        // Fetch reminder details for notification
+        $fetchStmt = $con->prepare("SELECT title, assigned_to FROM reminders WHERE id = ?");
+        $fetchStmt->bind_param("i", $id);
+        $fetchStmt->execute();
+        $fetchStmt->bind_result($archTitle, $archAssignedTo);
+        $fetchStmt->fetch();
+        $fetchStmt->close();
+
         $stmt = $con->prepare("UPDATE reminders SET status = 'inactive' WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
+            // Notify assigned-to users
+            $notifAssignees = array_filter(array_map('intval', explode(',', $archAssignedTo)));
+            foreach ($notifAssignees as $uid) {
+                if ($uid > 0) {
+                    $nTitle = "Reminder Archived: $archTitle";
+                    $nMessage = "$currentUserName archived a reminder assigned to you";
+                    $nLink = "manage_reminder.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'reminder')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
             redirectToPage("Reminder archived successfully.");
         } else {
             redirectToPage("Error: " . $stmt->error);
@@ -107,9 +154,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
     } elseif (isset($_POST['restore'])) {
         $id = (int)$_POST['id'];
+        // Fetch reminder details for notification
+        $fetchStmt = $con->prepare("SELECT title, assigned_to FROM reminders WHERE id = ?");
+        $fetchStmt->bind_param("i", $id);
+        $fetchStmt->execute();
+        $fetchStmt->bind_result($restTitle, $restAssignedTo);
+        $fetchStmt->fetch();
+        $fetchStmt->close();
+
         $stmt = $con->prepare("UPDATE reminders SET status = 'active' WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
+            // Notify assigned-to users
+            $notifAssignees = array_filter(array_map('intval', explode(',', $restAssignedTo)));
+            foreach ($notifAssignees as $uid) {
+                if ($uid > 0) {
+                    $nTitle = "Reminder Restored: $restTitle";
+                    $nMessage = "$currentUserName restored a reminder assigned to you";
+                    $nLink = "manage_reminder.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'reminder')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
             $_SESSION['message'] = "Reminder restored successfully.";
             header('Location: manage_reminder.php?show_archived=1');
             exit();
@@ -121,9 +189,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
     } elseif (isset($_POST['delete'])) {
         $id = (int)$_POST['id'];
+        // Fetch reminder details for notification before deleting
+        $fetchStmt = $con->prepare("SELECT title, assigned_to FROM reminders WHERE id = ?");
+        $fetchStmt->bind_param("i", $id);
+        $fetchStmt->execute();
+        $fetchStmt->bind_result($delTitle, $delAssignedTo);
+        $fetchStmt->fetch();
+        $fetchStmt->close();
+
         $stmt = $con->prepare("DELETE FROM reminders WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
+            // Notify assigned-to users
+            $notifAssignees = array_filter(array_map('intval', explode(',', $delAssignedTo)));
+            foreach ($notifAssignees as $uid) {
+                if ($uid > 0) {
+                    $nTitle = "Reminder Deleted: $delTitle";
+                    $nMessage = "$currentUserName permanently deleted a reminder";
+                    $nLink = "manage_reminder.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'reminder')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
             $_SESSION['message'] = "Reminder deleted permanently.";
             header('Location: manage_reminder.php?show_archived=1');
             exit();

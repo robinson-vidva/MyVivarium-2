@@ -156,6 +156,72 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
+    // --- In-app notifications for all task events ---
+    $assignedToArray_notif = array_filter(array_map('intval', explode(',', $assignedTo)));
+    $assignedByName_notif = isset($users[$assignedBy]) ? $users[$assignedBy] : 'Someone';
+
+    if ($taskAction === 'added' || strpos($taskAction, 'added') === 0) {
+        // Notify all assigned-to users about the new task
+        foreach ($assignedToArray_notif as $uid) {
+            if ($uid > 0) {
+                $nTitle = "New Task: $title";
+                $nMessage = "$assignedByName_notif assigned you a new task" . ($cageId ? " (Cage $cageId)" : "");
+                $nLink = "manage_tasks.php";
+                $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+                $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                $nStmt->execute();
+                $nStmt->close();
+            }
+        }
+    } elseif ($taskAction === 'updated') {
+        // Notify all assigned-to users about the update
+        foreach ($assignedToArray_notif as $uid) {
+            if ($uid > 0) {
+                $nTitle = "Task Updated: $title";
+                $nMessage = "$assignedByName_notif updated the task" . ($status === 'Completed' ? " — marked as Completed" : "") . ($cageId ? " (Cage $cageId)" : "");
+                $nLink = "manage_tasks.php";
+                $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+                $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                $nStmt->execute();
+                $nStmt->close();
+            }
+        }
+        // Also notify the original assigner if current user is not the assigner
+        if ($assignedBy != $currentUserId) {
+            $currentUserNameNotif = $currentUserName;
+            $nTitle = "Task Updated: $title";
+            $nMessage = "$currentUserNameNotif updated your task" . ($status === 'Completed' ? " — marked as Completed" : "");
+            $nLink = "manage_tasks.php";
+            $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+            $nStmt->bind_param("isss", $assignedBy, $nTitle, $nMessage, $nLink);
+            $nStmt->execute();
+            $nStmt->close();
+        }
+    } elseif ($taskAction === 'deleted') {
+        // Notify all assigned-to users about the deletion
+        foreach ($assignedToArray_notif as $uid) {
+            if ($uid > 0) {
+                $nTitle = "Task Deleted: $title";
+                $nMessage = "$currentUserName deleted the task" . ($cageId ? " (Cage $cageId)" : "");
+                $nLink = "manage_tasks.php";
+                $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+                $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                $nStmt->execute();
+                $nStmt->close();
+            }
+        }
+        // Also notify the original assigner if current user is not the assigner
+        if ($assignedBy != $currentUserId) {
+            $nTitle = "Task Deleted: $title";
+            $nMessage = "$currentUserName deleted your task";
+            $nLink = "manage_tasks.php";
+            $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'task')");
+            $nStmt->bind_param("isss", $assignedBy, $nTitle, $nMessage, $nLink);
+            $nStmt->execute();
+            $nStmt->close();
+        }
+    }
+
     // Fetch emails of assigned by and assigned to users
     $emails = [];
     $assignedByEmailQuery = "SELECT username FROM users WHERE id = ?";
