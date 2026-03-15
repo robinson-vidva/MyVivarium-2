@@ -50,6 +50,11 @@ $allowedSorts = [
 ];
 $orderBy = isset($allowedSorts[$sortParam]) ? $allowedSorts[$sortParam] : $allowedSorts['cage_id_asc'];
 
+// Determine which optional columns to show
+$columnsParam = isset($_GET['columns']) ? $_GET['columns'] : 'cross,male_female';
+$allowedColumns = ['cross', 'male_female'];
+$visibleColumns = array_intersect(explode(',', $columnsParam), $allowedColumns);
+
 // Determine whether to show archived cages
 $showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
 $cageStatus = $showArchived ? 'archived' : 'active';
@@ -118,8 +123,12 @@ while ($row = mysqli_fetch_assoc($result)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
             $tableRows .= '<td data-label="Cage ID">' . htmlspecialchars($breedingcage['cage_id']) . '</td>';
-            $tableRows .= '<td data-label="Cross">' . htmlspecialchars($breedingcage['cross'] ?? '') . '</td>';
-            $tableRows .= '<td data-label="Male / Female">' . htmlspecialchars($breedingcage['male_id'] ?? '') . ' / ' . htmlspecialchars($breedingcage['female_id'] ?? '') . '</td>';
+            if (in_array('cross', $visibleColumns)) {
+                $tableRows .= '<td data-label="Cross">' . htmlspecialchars($breedingcage['cross'] ?? '') . '</td>';
+            }
+            if (in_array('male_female', $visibleColumns)) {
+                $tableRows .= '<td data-label="Male / Female">' . htmlspecialchars($breedingcage['male_id'] ?? '') . ' / ' . htmlspecialchars($breedingcage['female_id'] ?? '') . '</td>';
+            }
             $firstRow = false;
         }
         $tableRows .= '<td data-label="Action" class="action-icons">
