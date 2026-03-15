@@ -714,6 +714,13 @@ ob_end_flush(); // Flush the output buffer
                 fetchTaskData(id, 'view');
             });
 
+            // Auto-open add form if ?add=1 is in the URL (e.g. from calendar click)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('add') === '1') {
+                var prefillDate = urlParams.get('date') || '';
+                openForm(prefillDate);
+            }
+
             // Character counter for title
             $('#title').on('input', function() {
                 const currentLength = $(this).val().length;
@@ -730,13 +737,13 @@ ob_end_flush(); // Flush the output buffer
         /**
          * Open the form for adding or editing a task
          */
-        function openForm() {
+        function openForm(prefillDate) {
             document.getElementById('popupOverlay').style.display = 'block';
             document.getElementById('popupForm').style.display = 'block';
             document.getElementById('formTitle').innerText = 'Add New Task';
             document.getElementById('addButton').style.display = 'block';
             document.getElementById('editButton').style.display = 'none';
-            resetForm();
+            resetForm(prefillDate);
         }
 
         /**
@@ -757,8 +764,9 @@ ob_end_flush(); // Flush the output buffer
 
         /**
          * Reset the task form to its default state
+         * @param {string} [prefillDate] Optional date to pre-fill in completion_date
          */
-        function resetForm() {
+        function resetForm(prefillDate) {
             document.getElementById('id').value = '';
             document.getElementById('title').value = '';
             document.getElementById('description').value = '';
@@ -766,7 +774,7 @@ ob_end_flush(); // Flush the output buffer
             document.getElementById('assigned_by_id').value = '<?= $currentUserId; ?>';
             $('#assigned_to').val(null).trigger('change');
             document.querySelector('input[name="status"][value="Pending"]').checked = true;
-            document.getElementById('completion_date').value = '';
+            document.getElementById('completion_date').value = prefillDate || '';
 
             // Set the cage_id dropdown to the cageIdFilter value if it exists
             if (cageIdFilter) {
