@@ -39,8 +39,17 @@ if (!in_array($limit, $allowedLimits)) {
     $limit = 10; // Default to 10 if invalid value
 }
 
-// Validate and set sort direction
-$sort = isset($_GET['sort']) && strtolower($_GET['sort']) === 'desc' ? 'DESC' : 'ASC';
+// Validate and set sort column and direction
+$sortParam = isset($_GET['sort']) ? $_GET['sort'] : 'cage_id_asc';
+$allowedSorts = [
+    'cage_id_asc'    => 'h.`cage_id` ASC',
+    'cage_id_desc'   => 'h.`cage_id` DESC',
+    'created_at_desc' => 'MAX(c.`created_at`) DESC',
+    'created_at_asc'  => 'MAX(c.`created_at`) ASC',
+    'dob_desc'       => 'MAX(h.`dob`) DESC',
+    'dob_asc'        => 'MIN(h.`dob`) ASC',
+];
+$orderBy = isset($allowedSorts[$sortParam]) ? $allowedSorts[$sortParam] : $allowedSorts['cage_id_asc'];
 
 // Determine whether to show archived cages
 $showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
@@ -70,7 +79,7 @@ if (!empty($searchQuery)) {
     $stmtTotal->close();
 
     // Query with pagination and sort
-    $query = "SELECT DISTINCT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? AND h.`cage_id` LIKE ? ORDER BY h.`cage_id` $sort LIMIT ? OFFSET ?";
+    $query = "SELECT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? AND h.`cage_id` LIKE ? GROUP BY h.`cage_id` ORDER BY $orderBy LIMIT ? OFFSET ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("ssii", $cageStatus, $searchPattern, $limit, $offset);
     $stmt->execute();
@@ -86,7 +95,7 @@ if (!empty($searchQuery)) {
     $totalPages = ceil($totalRecords / $limit);
     $stmtTotal->close();
 
-    $query = "SELECT DISTINCT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? ORDER BY h.`cage_id` $sort LIMIT ? OFFSET ?";
+    $query = "SELECT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = ? GROUP BY h.`cage_id` ORDER BY $orderBy LIMIT ? OFFSET ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("sii", $cageStatus, $limit, $offset);
     $stmt->execute();

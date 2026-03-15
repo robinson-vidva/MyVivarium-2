@@ -34,6 +34,7 @@ CREATE TABLE `cages` (
   `status` enum('active', 'archived') NOT NULL DEFAULT 'active',
   `room` varchar(255) DEFAULT NULL,
   `rack` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`cage_id`),
   FOREIGN KEY (`pi_name`) REFERENCES `users` (`id`) ON DELETE SET NULL
 );

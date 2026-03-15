@@ -41,7 +41,7 @@ require 'header.php';
     <script>
         // State variables for pagination, sorting, and archive filtering
         var currentLimit = 10;
-        var currentSort = 'asc';
+        var currentSort = 'cage_id_asc';
         var showArchived = '0';
 
         // Initialize tooltips when the document is ready
@@ -133,16 +133,9 @@ require 'header.php';
             fetchData(1, searchQuery);
         }
 
-        // Toggle sort order and re-fetch
-        function toggleSort() {
-            currentSort = (currentSort === 'asc') ? 'desc' : 'asc';
-            // Update sort icon
-            var icon = document.getElementById('sortIcon');
-            if (currentSort === 'asc') {
-                icon.className = 'fas fa-sort-alpha-down';
-            } else {
-                icon.className = 'fas fa-sort-alpha-up';
-            }
+        // Change sort and re-fetch
+        function changeSort(value) {
+            currentSort = value;
             var searchQuery = document.getElementById('searchInput').value;
             fetchData(1, searchQuery);
         }
@@ -180,16 +173,12 @@ require 'header.php';
             const page = urlParams.get('page') || 1;
             const search = urlParams.get('search') || '';
             currentLimit = parseInt(urlParams.get('limit')) || 10;
-            currentSort = urlParams.get('sort') || 'asc';
+            currentSort = urlParams.get('sort') || 'cage_id_asc';
             showArchived = urlParams.get('show_archived') || '0';
 
             // Sync UI controls with URL params
             document.getElementById('pageSizeSelect').value = currentLimit;
-
-            var icon = document.getElementById('sortIcon');
-            if (currentSort === 'desc') {
-                icon.className = 'fas fa-sort-alpha-up';
-            }
+            document.getElementById('sortSelect').value = currentSort;
 
             if (showArchived === '1') {
                 var btn = document.getElementById('archiveToggleBtn');
@@ -285,9 +274,14 @@ require 'header.php';
                                     <option value="50">50</option>
                                 </select>
                             </div>
-                            <button class="btn btn-sm btn-outline-primary" onclick="toggleSort()" title="Toggle sort order">
-                                <i id="sortIcon" class="fas fa-sort-alpha-down"></i> Sort
-                            </button>
+                            <select id="sortSelect" class="form-select form-select-sm" style="width: auto;" onchange="changeSort(this.value)">
+                                <option value="cage_id_asc">Cage ID (A-Z)</option>
+                                <option value="cage_id_desc">Cage ID (Z-A)</option>
+                                <option value="created_at_desc">Date Added (Newest)</option>
+                                <option value="created_at_asc">Date Added (Oldest)</option>
+                                <option value="dob_desc">DOB (Newest)</option>
+                                <option value="dob_asc">DOB (Oldest)</option>
+                            </select>
                             <button id="archiveToggleBtn" class="btn btn-sm btn-outline-secondary" onclick="toggleArchive()">
                                 <i class="fas fa-archive me-1"></i> Show Archived
                             </button>
