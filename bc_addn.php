@@ -173,6 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Notify all assigned users about the new cage
+            try {
             $creatorName = $_SESSION['name'] ?? 'Someone';
             foreach ($user_ids as $uid) {
                 $uid = intval($uid);
@@ -186,6 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
 
             // Process litter data insertion if provided
             if (isset($_POST['dom'])) {
