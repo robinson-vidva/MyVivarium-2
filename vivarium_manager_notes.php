@@ -736,7 +736,6 @@ require 'header.php';
             });
         }
     </script>
-    <script>document.addEventListener('DOMContentLoaded', function() { initDatePickers(); });</script>
 
     <?php include 'footer.php'; ?>
 </body>

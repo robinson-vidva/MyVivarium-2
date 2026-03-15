@@ -517,7 +517,6 @@ require 'header.php';
         <?php endif; ?>
     </div>
 
-    <script>document.addEventListener('DOMContentLoaded', function() { initDatePickers(); });</script>
     <?php include 'footer.php'; ?>
 
     <script>
