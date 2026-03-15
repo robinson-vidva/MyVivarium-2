@@ -306,7 +306,7 @@ require 'header.php';
                                 <i class="fas fa-plus"></i>
                             </a>
                             <!-- Print cage card button with tooltip -->
-                            <a href="hc_slct_crd.php" class="btn btn-success btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage Card">
+                            <a href="slct_crd.php" class="btn btn-success btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage Card">
                                 <i class="fas fa-print"></i>
                             </a>
                             <!-- Maintenance button with tooltip -->
