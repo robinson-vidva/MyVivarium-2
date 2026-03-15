@@ -51,7 +51,7 @@ $allowedSorts = [
 $orderBy = isset($allowedSorts[$sortParam]) ? $allowedSorts[$sortParam] : $allowedSorts['cage_id_asc'];
 
 // Determine which optional columns to show
-$columnsParam = isset($_GET['columns']) ? $_GET['columns'] : 'cross,male_female';
+$columnsParam = isset($_GET['columns']) ? $_GET['columns'] : 'cross';
 $allowedColumns = ['cross', 'male_female'];
 $visibleColumns = array_intersect(explode(',', $columnsParam), $allowedColumns);
 

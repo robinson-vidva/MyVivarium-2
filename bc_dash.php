@@ -46,7 +46,7 @@ require 'header.php';
         var showArchived = '0';
         // Available optional columns for breeding dashboard (max 2 visible at a time)
         var allColumns = ['cross', 'male_female'];
-        var visibleColumns = ['cross', 'male_female']; // default: show both
+        var visibleColumns = ['cross']; // default: show cross only
 
         // Initialize tooltips when the document is ready
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
@@ -333,7 +333,7 @@ require 'header.php';
                                 </button>
                                 <ul class="dropdown-menu">
                                     <li><label class="dropdown-item"><input type="checkbox" class="col-toggle-check form-check-input me-2" value="cross" checked onchange="toggleColumn('cross', this)"> Cross</label></li>
-                                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle-check form-check-input me-2" value="male_female" checked onchange="toggleColumn('male_female', this)"> Male / Female</label></li>
+                                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle-check form-check-input me-2" value="male_female" onchange="toggleColumn('male_female', this)"> Male / Female</label></li>
                                 </ul>
                             </div>
                             <button id="archiveToggleBtn" class="btn btn-sm btn-outline-secondary" onclick="toggleArchive()">
@@ -347,7 +347,6 @@ require 'header.php';
                                     <tr>
                                         <th>Cage ID</th>
                                         <th>Cross</th>
-                                        <th>Male / Female</th>
                                         <th style="width: 220px;">Action</th>
                                     </tr>
                                 </thead>
