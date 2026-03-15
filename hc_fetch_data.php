@@ -51,6 +51,11 @@ $allowedSorts = [
 ];
 $orderBy = isset($allowedSorts[$sortParam]) ? $allowedSorts[$sortParam] : $allowedSorts['cage_id_asc'];
 
+// Determine which optional columns to show
+$columnsParam = isset($_GET['columns']) ? $_GET['columns'] : 'strain,age';
+$allowedColumns = ['strain', 'sex', 'age'];
+$visibleColumns = array_intersect(explode(',', $columnsParam), $allowedColumns);
+
 // Determine whether to show archived cages
 $showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
 $cageStatus = $showArchived ? 'archived' : 'active';
@@ -119,23 +124,29 @@ while ($row = mysqli_fetch_assoc($result)) {
         $tableRows .= '<tr>';
         if ($firstRow) {
             $tableRows .= '<td data-label="Cage ID">' . htmlspecialchars($holdingcage['cage_id']) . '</td>';
-            $tableRows .= '<td data-label="Strain">' . htmlspecialchars($holdingcage['strain'] ?? '') . '</td>';
-            $tableRows .= '<td data-label="Sex">' . htmlspecialchars(ucfirst($holdingcage['sex'] ?? '')) . '</td>';
-            // Calculate age from DOB
-            $ageStr = '';
-            if (!empty($holdingcage['dob'])) {
-                $dob = new DateTime($holdingcage['dob']);
-                $now = new DateTime();
-                $diff = $now->diff($dob);
-                if ($diff->y > 0) {
-                    $ageStr = $diff->y . 'y ' . $diff->m . 'm';
-                } elseif ($diff->m > 0) {
-                    $ageStr = $diff->m . 'm ' . $diff->d . 'd';
-                } else {
-                    $ageStr = $diff->d . 'd';
-                }
+            if (in_array('strain', $visibleColumns)) {
+                $tableRows .= '<td data-label="Strain">' . htmlspecialchars($holdingcage['strain'] ?? '') . '</td>';
             }
-            $tableRows .= '<td data-label="Age">' . htmlspecialchars($ageStr) . '</td>';
+            if (in_array('sex', $visibleColumns)) {
+                $tableRows .= '<td data-label="Sex">' . htmlspecialchars(ucfirst($holdingcage['sex'] ?? '')) . '</td>';
+            }
+            if (in_array('age', $visibleColumns)) {
+                // Calculate age from DOB
+                $ageStr = '';
+                if (!empty($holdingcage['dob'])) {
+                    $dob = new DateTime($holdingcage['dob']);
+                    $now = new DateTime();
+                    $diff = $now->diff($dob);
+                    if ($diff->y > 0) {
+                        $ageStr = $diff->y . 'y ' . $diff->m . 'm';
+                    } elseif ($diff->m > 0) {
+                        $ageStr = $diff->m . 'm ' . $diff->d . 'd';
+                    } else {
+                        $ageStr = $diff->d . 'd';
+                    }
+                }
+                $tableRows .= '<td data-label="Age">' . htmlspecialchars($ageStr) . '</td>';
+            }
             $firstRow = false;
         }
         $tableRows .= '<td data-label="Action" class="action-icons">

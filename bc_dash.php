@@ -40,10 +40,13 @@ require 'header.php';
     <!-- Bootstrap 5 CSS is already loaded via header.php -->
 
     <script>
-        // State variables for pagination, sorting, and archive filtering
+        // State variables for pagination, sorting, archive filtering, and visible columns
         var currentLimit = 10;
         var currentSort = 'cage_id_asc';
         var showArchived = '0';
+        // Available optional columns for breeding dashboard (max 2 visible at a time)
+        var allColumns = ['cross', 'male_female'];
+        var visibleColumns = ['cross', 'male_female']; // default: show both
 
         // Initialize tooltips when the document is ready
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
@@ -85,7 +88,8 @@ require 'header.php';
                 + '&search=' + encodeURIComponent(search)
                 + '&limit=' + currentLimit
                 + '&sort=' + currentSort
-                + '&show_archived=' + showArchived;
+                + '&show_archived=' + showArchived
+                + '&columns=' + encodeURIComponent(visibleColumns.join(','));
             xhr.open('GET', url, true);
             xhr.onload = function() {
                 if (xhr.status === 200) {
@@ -108,6 +112,9 @@ require 'header.php';
                             newUrl.searchParams.set('limit', currentLimit);
                             newUrl.searchParams.set('sort', currentSort);
                             newUrl.searchParams.set('show_archived', showArchived);
+                            newUrl.searchParams.set('columns', visibleColumns.join(','));
+                            // Update table headers based on visible columns
+                            updateTableHeaders();
                             window.history.replaceState({
                                 path: newUrl.href
                             }, '', newUrl.href);
@@ -139,6 +146,42 @@ require 'header.php';
             currentSort = value;
             var searchQuery = document.getElementById('searchInput').value;
             fetchData(1, searchQuery);
+        }
+
+        // Toggle a column on/off (max 2 optional columns)
+        function toggleColumn(col, checkbox) {
+            if (checkbox.checked) {
+                if (visibleColumns.length >= 2) {
+                    checkbox.checked = false;
+                    alert('Maximum 2 columns allowed. Uncheck one first.');
+                    return;
+                }
+                visibleColumns.push(col);
+            } else {
+                visibleColumns = visibleColumns.filter(function(c) { return c !== col; });
+            }
+            var searchQuery = document.getElementById('searchInput').value;
+            fetchData(1, searchQuery);
+        }
+
+        // Update table headers to match visible columns
+        function updateTableHeaders() {
+            var columnLabels = { 'cross': 'Cross', 'male_female': 'Male / Female' };
+            var headerRow = document.querySelector('#mouseTable thead tr');
+            // Rebuild: Cage ID + visible columns + Action
+            var html = '<th>Cage ID</th>';
+            visibleColumns.forEach(function(col) {
+                html += '<th>' + (columnLabels[col] || col) + '</th>';
+            });
+            html += '<th style="width: 220px;">Action</th>';
+            headerRow.innerHTML = html;
+        }
+
+        // Sync column checkboxes with state
+        function syncColumnCheckboxes() {
+            document.querySelectorAll('.col-toggle-check').forEach(function(cb) {
+                cb.checked = visibleColumns.indexOf(cb.value) !== -1;
+            });
         }
 
         // Toggle archive view and re-fetch
@@ -176,10 +219,15 @@ require 'header.php';
             currentLimit = parseInt(urlParams.get('limit')) || 10;
             currentSort = urlParams.get('sort') || 'cage_id_asc';
             showArchived = urlParams.get('show_archived') || '0';
+            var colsParam = urlParams.get('columns');
+            if (colsParam) {
+                visibleColumns = colsParam.split(',').filter(function(c) { return allColumns.indexOf(c) !== -1; });
+            }
 
             // Sync UI controls with URL params
             document.getElementById('pageSizeSelect').value = currentLimit;
             document.getElementById('sortSelect').value = currentSort;
+            syncColumnCheckboxes();
 
             if (showArchived === '1') {
                 var btn = document.getElementById('archiveToggleBtn');
@@ -279,6 +327,15 @@ require 'header.php';
                                 <option value="created_at_desc">Date Added (Newest)</option>
                                 <option value="created_at_asc">Date Added (Oldest)</option>
                             </select>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-columns me-1"></i> Columns
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle-check form-check-input me-2" value="cross" checked onchange="toggleColumn('cross', this)"> Cross</label></li>
+                                    <li><label class="dropdown-item"><input type="checkbox" class="col-toggle-check form-check-input me-2" value="male_female" checked onchange="toggleColumn('male_female', this)"> Male / Female</label></li>
+                                </ul>
+                            </div>
                             <button id="archiveToggleBtn" class="btn btn-sm btn-outline-secondary" onclick="toggleArchive()">
                                 <i class="fas fa-archive me-1"></i> Show Archived
                             </button>
