@@ -97,18 +97,22 @@ if ($reminderResult) {
             $stmt->close();
 
             // Insert in-app notifications for each assigned user
-            $notifAssignees = explode(',', $assignedTo);
-            foreach ($notifAssignees as $uid) {
-                $uid = intval(trim($uid));
-                if ($uid > 0) {
-                    $nTitle = "Reminder: $title";
-                    $nMessage = $description;
-                    $nLink = "manage_tasks.php";
-                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'reminder')");
-                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
-                    $nStmt->execute();
-                    $nStmt->close();
+            try {
+                $notifAssignees = explode(',', $assignedTo);
+                foreach ($notifAssignees as $uid) {
+                    $uid = intval(trim($uid));
+                    if ($uid > 0) {
+                        $nTitle = "Reminder: $title";
+                        $nMessage = $description;
+                        $nLink = "manage_tasks.php";
+                        $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'reminder')");
+                        $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                        $nStmt->execute();
+                        $nStmt->close();
+                    }
                 }
+            } catch (Exception $e) {
+                error_log("Notification error in process_reminders: " . $e->getMessage());
             }
 
             // Update the last_task_created in the reminders table

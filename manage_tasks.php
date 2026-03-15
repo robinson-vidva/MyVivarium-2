@@ -87,15 +87,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die('CSRF token validation failed');
     }
 
-    $title = trim($_POST['title']);
-    $description = trim($_POST['description']);
-    $assignedBy = $_POST['assigned_by_id'];
-    $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
-    $status = $_POST['status'];
-    $completionDate = !empty($_POST['completion_date']) ? $_POST['completion_date'] : NULL;
-    $cageId = empty($_POST['cage_id']) ? NULL : $_POST['cage_id'];
     $taskAction = '';
     $task_id = null; // Initialize task_id variable
+
+    // Only read form fields for add/edit actions (delete only sends id)
+    if (isset($_POST['add']) || isset($_POST['edit'])) {
+        $title = trim($_POST['title']);
+        $description = trim($_POST['description']);
+        $assignedBy = $_POST['assigned_by_id'];
+        $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
+        $status = $_POST['status'];
+        $completionDate = !empty($_POST['completion_date']) ? $_POST['completion_date'] : NULL;
+        $cageId = empty($_POST['cage_id']) ? NULL : $_POST['cage_id'];
+    }
 
     // Determine the action to perform (add, edit, or delete)
     if (isset($_POST['add'])) {
@@ -157,6 +161,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // --- In-app notifications for all task events ---
+    // Wrapped in try-catch so missing notifications table doesn't break task operations
+    try {
     $assignedToArray_notif = array_filter(array_map('intval', explode(',', $assignedTo)));
     $assignedByName_notif = isset($users[$assignedBy]) ? $users[$assignedBy] : 'Someone';
 
@@ -220,6 +226,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $nStmt->execute();
             $nStmt->close();
         }
+    }
+    } catch (Exception $e) {
+        error_log("Notification insert failed: " . $e->getMessage());
     }
 
     // Fetch emails of assigned by and assigned to users

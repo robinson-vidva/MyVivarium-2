@@ -250,6 +250,7 @@ if (isset($_GET['id'])) {
             $stmtInsertUsers->close();
 
             // Notify users about cage changes
+            try {
             $editorName = $_SESSION['name'] ?? 'Someone';
             $newlyAdded = array_diff(array_map('intval', $users), array_map('intval', $previousUsers));
             $removed = array_diff(array_map('intval', $previousUsers), array_map('intval', $users));
@@ -293,6 +294,7 @@ if (isset($_GET['id'])) {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
 
             // Update the cage_iacuc table
             $deleteIacucQuery = "DELETE FROM cage_iacuc WHERE cage_id = ?";

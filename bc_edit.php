@@ -238,6 +238,7 @@ if (isset($_GET['id'])) {
                 $insertUsersQuery->close();
 
                 // Notify users about cage changes
+                try {
                 $editorName = $_SESSION['name'] ?? 'Someone';
                 $newlyAdded = array_diff(array_map('intval', $users), array_map('intval', $previousUsers));
                 $removed = array_diff(array_map('intval', $previousUsers), array_map('intval', $users));
@@ -281,6 +282,7 @@ if (isset($_GET['id'])) {
                         $nStmt->close();
                     }
                 }
+                } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
 
                 // Handle maintenance log updates
                 if (isset($_POST['log_ids']) && isset($_POST['log_comments'])) {

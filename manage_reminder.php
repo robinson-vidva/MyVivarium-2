@@ -81,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
         if ($insertCount > 0) {
             // Notify assigned-to users about the new reminder
+            try {
             $notifAssignees = array_filter(array_map('intval', explode(',', $assignedTo)));
             foreach ($notifAssignees as $uid) {
                 if ($uid > 0) {
@@ -93,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
             $msg = $insertCount === 1 ? "Reminder added successfully." : "$insertCount reminders added successfully (one per cage).";
             redirectToPage($msg);
         } else {
@@ -104,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param("sssisssssi", $cageId, $title, $description, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status, $id);
         if ($stmt->execute()) {
             // Notify assigned-to users about the update
+            try {
             $notifAssignees = array_filter(array_map('intval', explode(',', $assignedTo)));
             foreach ($notifAssignees as $uid) {
                 if ($uid > 0) {
@@ -116,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
             redirectToPage("Reminder updated successfully.");
         } else {
             redirectToPage("Error: " . $stmt->error);
@@ -135,6 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
             // Notify assigned-to users
+            try {
             $notifAssignees = array_filter(array_map('intval', explode(',', $archAssignedTo)));
             foreach ($notifAssignees as $uid) {
                 if ($uid > 0) {
@@ -147,6 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
             redirectToPage("Reminder archived successfully.");
         } else {
             redirectToPage("Error: " . $stmt->error);
@@ -166,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
             // Notify assigned-to users
+            try {
             $notifAssignees = array_filter(array_map('intval', explode(',', $restAssignedTo)));
             foreach ($notifAssignees as $uid) {
                 if ($uid > 0) {
@@ -178,6 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
             $_SESSION['message'] = "Reminder restored successfully.";
             header('Location: manage_reminder.php?show_archived=1');
             exit();
@@ -201,6 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
             // Notify assigned-to users
+            try {
             $notifAssignees = array_filter(array_map('intval', explode(',', $delAssignedTo)));
             foreach ($notifAssignees as $uid) {
                 if ($uid > 0) {
@@ -213,6 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
             $_SESSION['message'] = "Reminder deleted permanently.";
             header('Location: manage_reminder.php?show_archived=1');
             exit();

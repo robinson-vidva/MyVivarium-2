@@ -123,6 +123,7 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
             log_activity($con, 'delete', 'cage', $id, 'Cage permanently deleted');
 
             // Notify cage users about permanent deletion
+            try {
             $actorName = $_SESSION['name'] ?? 'Someone';
             foreach ($cageUsers as $uid) {
                 $uid = intval($uid);
@@ -136,6 +137,7 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
 
             // Set a success message in the session
             $_SESSION['message'] = 'Cage ' . $id . ' and related data permanently deleted.';
@@ -160,6 +162,7 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
             log_activity($con, 'restore', 'cage', $id, 'Cage restored');
 
             // Notify cage users about restoration
+            try {
             $actorName = $_SESSION['name'] ?? 'Someone';
             foreach ($cageUsers as $uid) {
                 $uid = intval($uid);
@@ -173,6 +176,7 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
 
             // Set a success message in the session
             $_SESSION['message'] = 'Cage ' . $id . ' has been restored.';
@@ -197,6 +201,7 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
             log_activity($con, 'archive', 'cage', $id, 'Cage archived');
 
             // Notify cage users about archival
+            try {
             $actorName = $_SESSION['name'] ?? 'Someone';
             foreach ($cageUsers as $uid) {
                 $uid = intval($uid);
@@ -210,6 +215,7 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
                     $nStmt->close();
                 }
             }
+            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
 
             // Set a success message in the session
             $_SESSION['message'] = 'Cage ' . $id . ' has been archived.';
