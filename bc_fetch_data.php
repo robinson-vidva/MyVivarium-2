@@ -40,8 +40,15 @@ if (!in_array($limit, $allowedLimits)) {
     $limit = 10; // Default to 10 if invalid value
 }
 
-// Validate and set sort direction
-$sort = isset($_GET['sort']) && strtolower($_GET['sort']) === 'desc' ? 'DESC' : 'ASC';
+// Validate and set sort column and direction
+$sortParam = isset($_GET['sort']) ? $_GET['sort'] : 'cage_id_asc';
+$allowedSorts = [
+    'cage_id_asc'    => 'b.`cage_id` ASC',
+    'cage_id_desc'   => 'b.`cage_id` DESC',
+    'created_at_desc' => 'MAX(c.`created_at`) DESC',
+    'created_at_asc'  => 'MAX(c.`created_at`) ASC',
+];
+$orderBy = isset($allowedSorts[$sortParam]) ? $allowedSorts[$sortParam] : $allowedSorts['cage_id_asc'];
 
 // Determine whether to show archived cages
 $showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
@@ -71,7 +78,7 @@ if (!empty($searchQuery)) {
     $stmtTotal->close();
 
     // Query with pagination and sort
-    $query = "SELECT DISTINCT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ? AND b.`cage_id` LIKE ? ORDER BY b.`cage_id` $sort LIMIT ? OFFSET ?";
+    $query = "SELECT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ? AND b.`cage_id` LIKE ? GROUP BY b.`cage_id` ORDER BY $orderBy LIMIT ? OFFSET ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("ssii", $cageStatus, $searchPattern, $limit, $offset);
     $stmt->execute();
@@ -87,7 +94,7 @@ if (!empty($searchQuery)) {
     $totalPages = ceil($totalRecords / $limit);
     $stmtTotal->close();
 
-    $query = "SELECT DISTINCT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ? ORDER BY b.`cage_id` $sort LIMIT ? OFFSET ?";
+    $query = "SELECT b.`cage_id` FROM breeding b INNER JOIN cages c ON b.cage_id = c.cage_id WHERE c.status = ? GROUP BY b.`cage_id` ORDER BY $orderBy LIMIT ? OFFSET ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("sii", $cageStatus, $limit, $offset);
     $stmt->execute();

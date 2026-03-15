@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($check_result->num_rows > 0) {
         // Set an error message if cage_id already exists
-        $_SESSION['message'] = "Cage ID '$cage_id' already exists. Please use a different Cage ID.";
+        $_SESSION['message'] = "Cage ID '" . htmlspecialchars($cage_id) . "' already exists. Please use a different Cage ID.";
     } else {
         // Insert into the cages table
         $insert_cage_query = $con->prepare("INSERT INTO cages (`cage_id`, `pi_name`, `remarks`, `room`, `rack`) VALUES (?, ?, ?, ?, ?)");
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Execute the statements and check if they were successful
         if ($insert_cage_query->execute() && $insert_breeding_query->execute()) {
             // Set a success message
-            $_SESSION['message'] = "New breeding cage added successfully.";
+            $_SESSION['message'] = "New breeding cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' added successfully. <a href='bc_view.php?id=" . urlencode($cage_id) . "'>View cage</a>";
 
             // Log activity
             log_activity($con, 'create', 'cage', $cage_id, 'Created breeding cage');

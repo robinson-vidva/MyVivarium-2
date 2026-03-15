@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (mysqli_num_rows($check_result) > 0) {
         // Cage_id already exists, throw an error
-        $_SESSION['message'] = "Cage ID '$cage_id' already exists. Please use a different Cage ID.";
+        $_SESSION['message'] = "Cage ID '" . htmlspecialchars($cage_id) . "' already exists. Please use a different Cage ID.";
     } else {
         // Start a transaction
         mysqli_begin_transaction($con);
@@ -249,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             log_activity($con, 'create', 'cage', $cage_id, 'Created holding cage');
 
-            $_SESSION['message'] = "New holding cage added successfully.";
+            $_SESSION['message'] = "New holding cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' added successfully. <a href='hc_view.php?id=" . urlencode($cage_id) . "'>View cage</a>";
         } catch (Exception $e) {
             // Rollback the transaction in case of an error
             mysqli_rollback($con);
