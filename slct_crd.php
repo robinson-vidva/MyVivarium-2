@@ -3,9 +3,10 @@
 /**
  * Select Cages for Printing (Unified)
  *
- * This script allows the user to select up to 4 cages (holding and/or breeding)
+ * This script allows the user to select any number of cages (holding and/or breeding)
  * for printing their cage cards. It uses the Select2 library for an enhanced
  * multi-select dropdown and opens the selected cage IDs in a new tab for printing.
+ * Cards are printed 4 per page (2x2 grid), with automatic page breaks.
  */
 
 // Start a new session or resume the existing session
@@ -78,10 +79,6 @@ require 'header.php';
         // Validate the selection of cage IDs
         function validateSelection() {
             var selectedIds = document.getElementById("cageIds").selectedOptions;
-            if (selectedIds.length > 4) {
-                alert("You can select up to 4 cage IDs only.");
-                return false;
-            }
             if (selectedIds.length === 0) {
                 alert("Please select at least one cage ID.");
                 return false;
@@ -123,7 +120,7 @@ require 'header.php';
             <br>
             <form>
                 <div class="mb-3">
-                    <label for="cageIds" class="form-label">Select Cage IDs (up to 4):</label>
+                    <label for="cageIds" class="form-label">Select Cage IDs:</label>
                     <br>
                     <select id="cageIds" name="id[]" class="form-select" multiple size="10">
                         <?php if (!empty($holdingCageIds)) : ?>
