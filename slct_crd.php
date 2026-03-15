@@ -97,6 +97,17 @@ require 'header.php';
             }
         }
 
+        // Handle PDF download - opens print page with action=pdf in a new tab
+        function handleDownloadPDF(event) {
+            event.preventDefault();
+            if (validateSelection()) {
+                var selectedIds = document.getElementById("cageIds").selectedOptions;
+                var ids = Array.from(selectedIds).map(option => option.value);
+                var queryString = "prnt_crd.php?id=" + ids.join(",") + "&action=pdf";
+                window.open(queryString, '_blank');
+            }
+        }
+
         // Initialize Select2 for the cage IDs dropdown
         $(document).ready(function() {
             $('#cageIds').select2({
@@ -141,7 +152,8 @@ require 'header.php';
                 </div>
                 <br>
                 <div class="btn-container">
-                    <button type="submit" class="btn btn-primary btn-print" onclick="handleSubmit(event)">Print Cage Card</button>
+                    <button type="submit" class="btn btn-primary" onclick="handleSubmit(event)"><i class="fas fa-print me-1"></i> Print Cage Card</button>
+                    <button type="button" class="btn btn-danger" onclick="handleDownloadPDF(event)"><i class="fas fa-file-pdf me-1"></i> Download PDF</button>
                     <button type="button" class="btn btn-secondary" onclick="goBack()">Go Back</button>
                 </div>
             </form>
