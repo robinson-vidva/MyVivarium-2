@@ -77,6 +77,22 @@ ob_end_flush();
             gap: 0;
         }
 
+        /* Today button — match the today cell highlight color */
+        .fc .fc-today-button {
+            background-color: #fcf0c1 !important;
+            border-color: #e6d88a !important;
+            color: #665d1e !important;
+        }
+
+        .fc .fc-today-button:hover {
+            background-color: #f5e6a0 !important;
+            border-color: #d4c56e !important;
+        }
+
+        .fc .fc-today-button:disabled {
+            opacity: 0.65;
+        }
+
         .fc-event {
             cursor: pointer;
             font-size: 0.78rem;
@@ -175,6 +191,15 @@ ob_end_flush();
         .fc .fc-daygrid-day-number {
             font-size: 0.85rem;
             padding: 4px 8px;
+        }
+
+        /* Clickable day cells */
+        .fc .fc-daygrid-day {
+            cursor: pointer;
+        }
+
+        .fc .fc-daygrid-day:hover {
+            background-color: var(--bs-tertiary-bg);
         }
 
         /* Grid view — slightly taller day cells */
@@ -324,6 +349,17 @@ ob_end_flush();
             background-color: #454d55;
             border-color: #565e66;
             color: #dee2e6;
+        }
+
+        /* Dark mode Today button — match dark mode today cell highlight */
+        [data-bs-theme="dark"] .fc .fc-today-button {
+            background-color: rgba(13, 110, 253, 0.25) !important;
+            border-color: rgba(13, 110, 253, 0.4) !important;
+            color: #6ea8fe !important;
+        }
+
+        [data-bs-theme="dark"] .fc .fc-today-button:hover {
+            background-color: rgba(13, 110, 253, 0.35) !important;
         }
 
         [data-bs-theme="dark"] .fc .fc-button-primary:hover {
@@ -524,6 +560,9 @@ ob_end_flush();
             <a id="eventViewLink" href="#" class="btn btn-primary btn-sm" style="display:none;">
                 <i class="fas fa-external-link-alt"></i> View in Tasks
             </a>
+            <a id="eventAddTaskLink" href="#" class="btn btn-success btn-sm" style="display:none;">
+                <i class="fas fa-plus"></i> Add Task
+            </a>
             <button type="button" class="btn btn-secondary btn-sm" id="eventCloseButton">Close</button>
         </div>
     </div>
@@ -641,15 +680,18 @@ ob_end_flush();
                 showEventPopup(info.event);
             },
 
-            // Date click
+            // Date click — show events or offer to add a task
             dateClick: function(info) {
                 var events = calendar.getEvents().filter(function(event) {
                     var eventStart = event.startStr ? event.startStr.substring(0, 10) : '';
                     return eventStart === info.dateStr;
                 });
-                if (events.length === 1) {
+                if (events.length === 0) {
+                    // No events — go straight to add task with date pre-filled
+                    window.location.href = 'manage_tasks.php?add=1&date=' + info.dateStr;
+                } else if (events.length === 1) {
                     showEventPopup(events[0]);
-                } else if (events.length > 1) {
+                } else {
                     showDateSummary(info.dateStr, events);
                 }
             }
@@ -699,6 +741,15 @@ ob_end_flush();
 
             document.getElementById('eventTitle').textContent = event.title;
             document.getElementById('eventDetails').innerHTML = html;
+            // Show "Add Task" link with the event's date pre-filled
+            var eventDate = event.startStr ? event.startStr.substring(0, 10) : '';
+            var addLink = document.getElementById('eventAddTaskLink');
+            if (eventDate) {
+                addLink.href = 'manage_tasks.php?add=1&date=' + eventDate;
+                addLink.style.display = 'inline-block';
+            } else {
+                addLink.style.display = 'none';
+            }
             openPopup();
         }
 
@@ -733,6 +784,10 @@ ob_end_flush();
             document.getElementById('eventTitle').textContent = formatted;
             document.getElementById('eventDetails').innerHTML = html;
             document.getElementById('eventViewLink').style.display = 'none';
+            // Show "Add Task" link with the date pre-filled
+            var addLink = document.getElementById('eventAddTaskLink');
+            addLink.href = 'manage_tasks.php?add=1&date=' + dateStr;
+            addLink.style.display = 'inline-block';
             openPopup();
         }
 
