@@ -61,14 +61,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     if (isset($_POST['add'])) {
+        // Multi-cage: create one reminder per selected cage (or one with NULL if none selected)
+        $cageIds = $_POST['cage_ids'] ?? [];
+        if (empty($cageIds)) {
+            $cageIds = [null]; // Single reminder with no cage
+        }
         $stmt = $con->prepare("INSERT INTO reminders (cage_id, title, description, assigned_by, assigned_to, recurrence_type, day_of_week, day_of_month, time_of_day, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssissssss", $cageId, $title, $description, $assignedBy, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status);
-        if ($stmt->execute()) {
-            redirectToPage("Reminder added successfully.");
-        } else {
-            redirectToPage("Error: " . $stmt->error);
+        $insertCount = 0;
+        $lastError = '';
+        foreach ($cageIds as $singleCageId) {
+            $singleCageId = !empty($singleCageId) ? trim($singleCageId) : null;
+            $stmt->bind_param("sssissssss", $singleCageId, $title, $description, $assignedBy, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status);
+            if ($stmt->execute()) {
+                $insertCount++;
+            } else {
+                $lastError = $stmt->error;
+            }
         }
         $stmt->close();
+        if ($insertCount > 0) {
+            $msg = $insertCount === 1 ? "Reminder added successfully." : "$insertCount reminders added successfully (one per cage).";
+            redirectToPage($msg);
+        } else {
+            redirectToPage("Error: " . $lastError);
+        }
     } elseif (isset($_POST['edit'])) {
         $id = (int)$_POST['id'];
         $stmt = $con->prepare("UPDATE reminders SET cage_id = ?, title = ?, description = ?, assigned_to = ?, recurrence_type = ?, day_of_week = ?, day_of_month = ?, time_of_day = ?, status = ? WHERE id = ?");
@@ -406,13 +422,13 @@ ob_end_flush(); // Flush the output buffer
                 <!-- Status is managed via archive/restore buttons -->
                 <input type="hidden" name="status" id="status" value="active">
                 <div class="mb-3">
-                    <label for="cage_id">Cage ID</label>
-                    <select name="cage_id" id="cage_id" class="form-control">
-                        <option value="">Select Cage</option>
+                    <label for="cage_id" id="cageIdLabel">Cage ID</label>
+                    <select name="cage_ids[]" id="cage_id" class="form-control" multiple>
                         <?php foreach ($cages as $cageId) : ?>
                             <option value="<?= htmlspecialchars($cageId); ?>"><?= htmlspecialchars($cageId); ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <small class="form-text text-muted" id="cageIdHint">Select multiple cages to create a separate reminder for each.</small>
                 </div>
                 <div class="form-buttons">
                     <button type="submit" name="add" id="addButton" class="btn btn-primary"><i class="fas fa-plus"></i> Add Reminder</button>
@@ -565,6 +581,13 @@ ob_end_flush(); // Flush the output buffer
                 dropdownParent: $('#popupForm')
             });
 
+            // Initialize cage_id as multi-select with Select2
+            $('#cage_id').select2({
+                placeholder: "Select Cages",
+                allowClear: true,
+                dropdownParent: $('#popupForm')
+            });
+
             // Show/hide recurrence options based on selected recurrence type
             $('#recurrence_type').on('change', function() {
                 const recurrenceType = $(this).val();
@@ -587,6 +610,7 @@ ob_end_flush(); // Flush the output buffer
             // Open the add reminder form
             $('#addNewReminderButton').on('click', function() {
                 resetForm();
+                setCageMode('add');
                 $('#formTitle').text('Add New Reminder');
                 $('#addButton').show();
                 $('#editButton').hide();
@@ -652,10 +676,41 @@ ob_end_flush(); // Flush the output buffer
             });
         });
 
+        // Toggle cage_id between multi-select (add) and single-select (edit)
+        function setCageMode(mode) {
+            var $cage = $('#cage_id');
+            // Destroy existing Select2
+            if ($cage.hasClass('select2-hidden-accessible')) {
+                $cage.select2('destroy');
+            }
+            $cage.val(null);
+
+            if (mode === 'add') {
+                $cage.attr('multiple', true).attr('name', 'cage_ids[]');
+                $('#cageIdLabel').text('Cage IDs');
+                $('#cageIdHint').show();
+                $cage.select2({
+                    placeholder: "Select Cages",
+                    allowClear: true,
+                    dropdownParent: $('#popupForm')
+                });
+            } else {
+                $cage.removeAttr('multiple').attr('name', 'cage_id');
+                $('#cageIdLabel').text('Cage ID');
+                $('#cageIdHint').hide();
+                $cage.select2({
+                    placeholder: "Select Cage",
+                    allowClear: true,
+                    dropdownParent: $('#popupForm')
+                });
+            }
+        }
+
         // Reset form fields
         function resetForm() {
             $('#reminderForm')[0].reset();
             $('#assigned_to').val(null).trigger('change');
+            $('#cage_id').val(null).trigger('change');
             $('#weeklyOptions').hide();
             $('#monthlyOptions').hide();
             $('#titleCounter').text(`0/100 characters used`);
@@ -677,6 +732,9 @@ ob_end_flush(); // Flush the output buffer
                         alert(response.error);
                         return;
                     }
+                    // Switch cage_id to single-select mode for editing
+                    setCageMode('edit');
+
                     // Populate form fields
                     $('#id').val(response.id);
                     $('#title').val(response.title);
@@ -687,7 +745,7 @@ ob_end_flush(); // Flush the output buffer
                     $('#day_of_month').val(response.day_of_month);
                     $('#time_of_day').val(response.time_of_day);
                     $('#status').val(response.status);
-                    $('#cage_id').val(response.cage_id);
+                    $('#cage_id').val(response.cage_id).trigger('change');
 
                     // Update character counters
                     $('#titleCounter').text(`${response.title.length}/100 characters used`);
