@@ -1138,8 +1138,8 @@ require 'header.php';
                                                             <a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-outline-primary">
                                                                 <i class="fas fa-cloud-download-alt fa-sm"></i>
                                                             </a>
-                                                            <a href="delete_file.php?url=bc_edit&id=<?= intval($file['id']); ?>" class="btn-sm" onclick="return confirm('Are you sure you want to delete this file?');" aria-label="Delete <?= htmlspecialchars($file['file_name']); ?>">
-                                                                <i class="fas fa-trash fa-sm" style="color:red"></i>
+                                                            <a href="delete_file.php?url=bc_edit&id=<?= intval($file['id']); ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this file?');" aria-label="Delete <?= htmlspecialchars($file['file_name']); ?>">
+                                                                <i class="fas fa-trash fa-sm"></i>
                                                             </a>
                                                         </td>
                                                     </tr>
