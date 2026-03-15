@@ -191,6 +191,8 @@ foreach ($ids as $id) {
             width: 100%;
             height: 100%;
             box-sizing: border-box;
+            display: grid;
+            place-items: center;
         }
 
         span {
@@ -226,7 +228,6 @@ foreach ($ids as $id) {
 
 <?php $isPdfMode = isset($_GET['action']) && $_GET['action'] === 'pdf'; ?>
 <body>
-    <div id="printArea">
     <?php
     $totalCages = count($cages);
     $totalPages = ceil($totalCages / 4);
@@ -234,7 +235,6 @@ foreach ($ids as $id) {
         $pageStart = $pageNum * 4;
         $pageCages = array_slice($cages, $pageStart, 4);
     ?>
-    <div style="display: grid; place-items: center; width: 100%; height: 100%;<?= $pageNum < $totalPages - 1 ? '' : '' ?>"<?= $pageNum < $totalPages - 1 ? ' class="page-break"' : '' ?>>
     <table style="width: 10in; height: 6in; border-collapse: collapse; border: 1px dashed #D3D3D3;">
         <?php foreach ($pageCages as $index => $cageEntry) :
             $type = $cageEntry['type'];
@@ -448,9 +448,10 @@ foreach ($ids as $id) {
 
         <?php endforeach; ?>
     </table>
-    </div>
+    <?php if ($pageNum < $totalPages - 1) : ?>
+        <div class="page-break"></div>
+    <?php endif; ?>
     <?php endfor; ?>
-    </div>
 
     <?php if ($isPdfMode) : ?>
     <div id="pdfStatus" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); display:flex; align-items:center; justify-content:center; z-index:9999; font-family:Arial,sans-serif;">
@@ -463,12 +464,14 @@ foreach ($ids as $id) {
     <script>
         window.addEventListener('load', function() {
             // Wait for QR code images to load
-            var images = document.querySelectorAll('#printArea img');
+            var images = document.querySelectorAll('body img');
             var loaded = 0;
             var total = images.length;
 
             function generate() {
-                var element = document.getElementById('printArea');
+                // Hide the status overlay before capturing
+                document.getElementById('pdfStatus').style.display = 'none';
+                var element = document.body;
                 var opt = {
                     margin: 0,
                     filename: 'cage_cards.pdf',
@@ -478,9 +481,11 @@ foreach ($ids as $id) {
                     pagebreak: { mode: ['css'] }
                 };
                 html2pdf().set(opt).from(element).save().then(function() {
+                    document.getElementById('pdfStatus').style.display = 'flex';
                     document.getElementById('pdfMsg').textContent = 'PDF downloaded! You can close this tab.';
                     document.querySelector('#pdfStatus div div').textContent = '\u2705';
                 }).catch(function() {
+                    document.getElementById('pdfStatus').style.display = 'flex';
                     document.getElementById('pdfMsg').textContent = 'Error generating PDF. Please try again.';
                     document.querySelector('#pdfStatus div div').textContent = '\u274C';
                 });
