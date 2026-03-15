@@ -99,6 +99,20 @@ require 'header.php';
                             document.getElementById('paginationLinks').innerHTML = response.paginationLinks;
                             document.getElementById('searchInput').value = search;
 
+                            // Show search result info
+                            var infoEl = document.getElementById('searchResultInfo');
+                            if (search && search.trim() !== '') {
+                                var count = response.totalRecords || 0;
+                                if (count === 0) {
+                                    infoEl.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-circle"></i> No results found for "<strong>' + search.replace(/</g, '&lt;') + '</strong>"</span>';
+                                } else {
+                                    infoEl.innerHTML = '<span class="text-muted"><i class="fas fa-check-circle"></i> ' + count + ' cage' + (count !== 1 ? 's' : '') + ' found</span>';
+                                }
+                                infoEl.style.display = 'block';
+                            } else {
+                                infoEl.style.display = 'none';
+                            }
+
                             // Re-initialize tooltips on dynamically loaded content
                             document.querySelectorAll('#tableBody [data-bs-toggle="tooltip"]').forEach(function(el) {
                                 new bootstrap.Tooltip(el);
@@ -306,9 +320,11 @@ require 'header.php';
                     <div class="card-body">
                         <!-- Holding Cage Search Box -->
                         <div class="input-group mb-3">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Enter Cage ID" onkeyup="searchCages()"> <!-- Call search function on keyup -->
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search by Cage ID, Strain, or Sex" onkeyup="searchCages()"> <!-- Call search function on keyup -->
                             <button class="btn btn-primary" type="button" onclick="searchCages()"><i class="fas fa-search"></i> Search</button>
                         </div>
+
+                        <div id="searchResultInfo" class="mb-2" style="display:none;"></div>
 
                         <!-- Controls row: page size, sort toggle, archive toggle -->
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
