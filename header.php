@@ -252,7 +252,7 @@ if (isset($settings['r2_pres'])) {
             /* Compact icon-only buttons */
             .nav-collapsible > .btn,
             .nav-collapsible > .dropdown > .btn,
-            .nav-collapsible > #darkModeToggle {
+            .nav-collapsible > #notificationDropdown > .btn {
                 width: 44px;
                 height: 44px;
                 padding: 0;
@@ -374,19 +374,42 @@ if (isset($settings['r2_pres'])) {
                             echo '<li><hr class="dropdown-divider"></li>';
                         }
                         ?>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item" href="#" id="darkModeToggleItem" onclick="event.preventDefault(); document.getElementById('darkModeToggle').click();">
+                                <i class="fas fa-moon me-2" id="darkModeItemIcon"></i> <span id="darkModeItemLabel">Dark Mode</span>
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="logout.php">Logout</a></li>
                     </ul>
                 </div>
 
-                <!-- Dark Mode Toggle -->
-                <button id="darkModeToggle" class="btn btn-outline-light" aria-label="Toggle dark mode">
-                    <i class="fas fa-moon"></i>
-                </button>
+                <!-- Notification Bell -->
+                <div class="dropdown" id="notificationDropdown">
+                    <button class="btn btn-outline-light position-relative" type="button"
+                            id="notificationBell" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                              id="notifBadge" style="display:none; font-size:0.6rem;">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end shadow" id="notifDropdown"
+                         style="width:320px; max-height:420px; overflow:hidden; padding:0;">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                            <strong style="font-size:0.9rem;">Notifications</strong>
+                            <button class="btn btn-sm btn-link text-decoration-none p-0" id="markAllReadBtn" style="font-size:0.78rem;">Mark all read</button>
+                        </div>
+                        <div id="notificationList" style="max-height:360px; overflow-y:auto;">
+                            <div class="text-center text-muted py-4" style="font-size:0.85rem;">
+                                <i class="fas fa-bell-slash d-block mb-2" style="font-size:1.2rem; opacity:0.4;"></i>
+                                No notifications
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                <!-- Logout Button -->
-                <a href="logout.php" class="btn btn-danger" aria-label="Logout" title="Logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                </a>
+                <!-- Hidden dark mode toggle (triggered via Settings dropdown) -->
+                <button id="darkModeToggle" style="display:none;" aria-label="Toggle dark mode"></button>
             </div>
         </nav>
     </div>
@@ -424,10 +447,15 @@ if (isset($settings['r2_pres'])) {
         });
 
         function updateToggleIcon(btn, theme) {
-            btn.innerHTML = theme === 'dark'
-                ? '<i class="fas fa-sun"></i>'
-                : '<i class="fas fa-moon"></i>';
-            btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+            // Update the Settings dropdown item
+            var itemIcon = document.getElementById('darkModeItemIcon');
+            var itemLabel = document.getElementById('darkModeItemLabel');
+            if (itemIcon) {
+                itemIcon.className = theme === 'dark' ? 'fas fa-sun me-2' : 'fas fa-moon me-2';
+            }
+            if (itemLabel) {
+                itemLabel.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            }
         }
     })();
     </script>
@@ -471,6 +499,134 @@ if (isset($settings['r2_pres'])) {
         document.head.appendChild(s2style);
     });
     </script>
+
+    <!-- Notification System -->
+    <script>
+    (function() {
+        var POLL_INTERVAL = 60000; // 60 seconds
+
+        function fetchNotifications() {
+            fetch('get_notifications.php', { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) return;
+                    var badge = document.getElementById('notifBadge');
+                    var list = document.getElementById('notificationList');
+                    if (!badge || !list) return;
+
+                    // Update badge
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                        badge.style.display = '';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+
+                    // Build notification list
+                    if (data.notifications && data.notifications.length > 0) {
+                        var html = '';
+                        data.notifications.forEach(function(n) {
+                            var unreadClass = n.is_read == 0 ? ' notif-unread' : '';
+                            var icon = n.type === 'reminder' ? 'fa-bell' : n.type === 'task' ? 'fa-tasks' : 'fa-info-circle';
+                            var iconColor = n.type === 'reminder' ? '#6f42c1' : n.type === 'task' ? '#0d6efd' : '#6c757d';
+                            var timeAgo = formatTimeAgo(n.created_at);
+
+                            html += '<a href="' + escNotif(n.link || '#') + '" class="notif-item' + unreadClass + '" data-notif-id="' + n.id + '">' +
+                                '<div class="notif-icon"><i class="fas ' + icon + '" style="color:' + iconColor + ';"></i></div>' +
+                                '<div class="notif-content">' +
+                                '<div class="notif-title">' + escNotif(n.title) + '</div>' +
+                                (n.message ? '<div class="notif-msg">' + escNotif(n.message) + '</div>' : '') +
+                                '<div class="notif-time">' + timeAgo + '</div>' +
+                                '</div>' +
+                                '</a>';
+                        });
+                        list.innerHTML = html;
+                    } else {
+                        list.innerHTML = '<div class="text-center text-muted py-4" style="font-size:0.85rem;">' +
+                            '<i class="fas fa-bell-slash d-block mb-2" style="font-size:1.2rem; opacity:0.4;"></i>' +
+                            'No notifications</div>';
+                    }
+                })
+                .catch(function() {}); // Fail silently
+        }
+
+        function escNotif(str) {
+            if (!str) return '';
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
+        }
+
+        function formatTimeAgo(dateStr) {
+            var date = new Date(dateStr);
+            var now = new Date();
+            var diffMs = now - date;
+            var diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 1) return 'Just now';
+            if (diffMin < 60) return diffMin + 'm ago';
+            var diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return diffHr + 'h ago';
+            var diffDays = Math.floor(diffHr / 24);
+            if (diffDays < 7) return diffDays + 'd ago';
+            return date.toLocaleDateString();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchNotifications();
+            setInterval(fetchNotifications, POLL_INTERVAL);
+
+            // Mark all read
+            var markAllBtn = document.getElementById('markAllReadBtn');
+            if (markAllBtn) {
+                markAllBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var formData = new FormData();
+                    formData.append('mark_all', '1');
+                    fetch('mark_notification.php', { method: 'POST', body: formData, credentials: 'same-origin' })
+                        .then(function() { fetchNotifications(); });
+                });
+            }
+
+            // Mark individual as read on click
+            document.addEventListener('click', function(e) {
+                var item = e.target.closest('[data-notif-id]');
+                if (item) {
+                    var formData = new FormData();
+                    formData.append('id', item.dataset.notifId);
+                    fetch('mark_notification.php', { method: 'POST', body: formData, credentials: 'same-origin' });
+                }
+            });
+        });
+    })();
+    </script>
+
+    <!-- Notification Styles -->
+    <style>
+    .notif-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--bs-border-color);
+        text-decoration: none;
+        color: var(--bs-body-color);
+        transition: background-color 0.15s;
+    }
+    .notif-item:hover { background-color: var(--bs-tertiary-bg); color: var(--bs-body-color); }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-unread { background-color: rgba(13, 110, 253, 0.06); }
+    .notif-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .notif-content { flex: 1; min-width: 0; }
+    .notif-title { font-size: 0.82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notif-msg { font-size: 0.75rem; color: var(--bs-secondary-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notif-time { font-size: 0.68rem; color: var(--bs-secondary-color); margin-top: 2px; }
+    [data-bs-theme="dark"] .notif-unread { background-color: rgba(13, 110, 253, 0.12); }
+    [data-bs-theme="dark"] .notif-item:hover { background-color: #565e66; }
+    [data-bs-theme="dark"] #notifDropdown { background-color: #454d55 !important; border-color: #565e66 !important; }
+    @media (max-width: 576px) {
+        #notifDropdown { width: calc(100vw - 20px) !important; max-width: 320px; right: -60px !important; }
+    }
+    </style>
 
     <!-- Dark Mode Overrides -->
     <style>
