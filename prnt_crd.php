@@ -179,8 +179,12 @@ foreach ($ids as $id) {
                 color: #000;
             }
 
-            .page-break {
+            .page-wrapper {
                 page-break-after: always;
+            }
+
+            .page-wrapper:last-child {
+                page-break-after: auto;
             }
         }
 
@@ -224,9 +228,14 @@ foreach ($ids as $id) {
             border-top: none;
         }
 
-        /* Wrapper is invisible to layout in normal mode */
-        #printArea {
+        /* Wrappers are invisible to layout in normal mode */
+        #printArea, .page-wrapper {
             display: contents;
+        }
+
+        /* Used by html2pdf for page breaks in PDF mode */
+        .pdf-page-break {
+            page-break-before: always;
         }
     </style>
 </head>
@@ -241,6 +250,7 @@ foreach ($ids as $id) {
         $pageStart = $pageNum * 4;
         $pageCages = array_slice($cages, $pageStart, 4);
     ?>
+    <div class="page-wrapper">
     <table style="width: 10in; height: 6in; border-collapse: collapse; border: 1px dashed #D3D3D3;">
         <?php foreach ($pageCages as $index => $cageEntry) :
             $type = $cageEntry['type'];
@@ -454,9 +464,7 @@ foreach ($ids as $id) {
 
         <?php endforeach; ?>
     </table>
-    <?php if ($pageNum < $totalPages - 1) : ?>
-        <div class="page-break"></div>
-    <?php endif; ?>
+    </div>
     <?php endfor; ?>
     </div>
 
@@ -479,18 +487,21 @@ foreach ($ids as $id) {
                 // Hide the status overlay before capturing
                 document.getElementById('pdfStatus').style.display = 'none';
 
-                // Restyle printArea for PDF capture: block with centering
+                // Restyle for PDF capture (html2canvas doesn't support CSS grid)
                 var element = document.getElementById('printArea');
                 element.style.display = 'block';
-                element.style.width = '11in';
-                element.style.margin = '0 auto';
 
-                // Center each table within its page
-                var tables = element.querySelectorAll('table');
-                tables.forEach(function(t) {
-                    if (t.style.width === '10in') {
-                        t.style.margin = '0 auto';
-                    }
+                // Each page-wrapper becomes an exact page-sized box with padding to center the table
+                // Letter landscape: 11in x 8.5in, table: 10in x 6in
+                // Vertical padding: (8.5 - 6) / 2 = 1.25in, Horizontal padding: (11 - 10) / 2 = 0.5in
+                var wrappers = element.querySelectorAll('.page-wrapper');
+                wrappers.forEach(function(w, i) {
+                    w.style.display = 'block';
+                    w.style.width = '11in';
+                    w.style.height = '8.5in';
+                    w.style.padding = '1.25in 0.5in';
+                    w.style.boxSizing = 'border-box';
+                    if (i > 0) w.classList.add('pdf-page-break');
                 });
 
                 var opt = {
