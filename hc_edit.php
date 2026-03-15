@@ -781,10 +781,74 @@ require 'header.php';
                 // Hide the log row from the table
                 const logRow = document.getElementById(`log-row-${logId}`);
                 if (logRow) {
+                    logRow.classList.add('log-deleted');
                     logRow.style.display = 'none';
                 }
+                // Re-paginate after deletion
+                paginateMaintenanceLogs(1);
             }
         }
+
+        // Maintenance log pagination
+        var maintenanceLogPage = 1;
+        var maintenanceLogsPerPage = 5;
+
+        function paginateMaintenanceLogs(page) {
+            var rows = document.querySelectorAll('#maintenanceLogTable .maintenance-log-row:not(.log-deleted)');
+            var totalRows = rows.length;
+            var totalPages = Math.ceil(totalRows / maintenanceLogsPerPage);
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            maintenanceLogPage = page;
+
+            // Hide all rows, then show current page
+            document.querySelectorAll('#maintenanceLogTable .maintenance-log-row').forEach(function(row) {
+                if (!row.classList.contains('log-deleted')) {
+                    row.style.display = 'none';
+                }
+            });
+            var visibleRows = Array.from(rows);
+            var start = (page - 1) * maintenanceLogsPerPage;
+            var end = start + maintenanceLogsPerPage;
+            for (var i = start; i < end && i < visibleRows.length; i++) {
+                visibleRows[i].style.display = '';
+            }
+
+            // Build pagination links
+            var paginationEl = document.getElementById('maintenanceLogPagination');
+            if (!paginationEl) return;
+            paginationEl.innerHTML = '';
+            if (totalPages <= 1) return;
+
+            // Previous
+            var prevLi = document.createElement('li');
+            prevLi.className = 'page-item' + (page === 1 ? ' disabled' : '');
+            prevLi.innerHTML = '<a class="page-link" href="javascript:void(0);">&laquo;</a>';
+            if (page > 1) prevLi.querySelector('a').onclick = function() { paginateMaintenanceLogs(page - 1); };
+            paginationEl.appendChild(prevLi);
+
+            for (var i = 1; i <= totalPages; i++) {
+                var li = document.createElement('li');
+                li.className = 'page-item' + (i === page ? ' active' : '');
+                li.innerHTML = '<a class="page-link" href="javascript:void(0);">' + i + '</a>';
+                (function(p) { li.querySelector('a').onclick = function() { paginateMaintenanceLogs(p); }; })(i);
+                paginationEl.appendChild(li);
+            }
+
+            // Next
+            var nextLi = document.createElement('li');
+            nextLi.className = 'page-item' + (page === totalPages ? ' disabled' : '');
+            nextLi.innerHTML = '<a class="page-link" href="javascript:void(0);">&raquo;</a>';
+            if (page < totalPages) nextLi.querySelector('a').onclick = function() { paginateMaintenanceLogs(page + 1); };
+            paginationEl.appendChild(nextLi);
+        }
+
+        // Initialize pagination on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('maintenanceLogTable')) {
+                paginateMaintenanceLogs(1);
+            }
+        });
 
         // Information Completeness Tracking
         $(document).ready(function() {
@@ -1195,7 +1259,7 @@ require 'header.php';
 
                                 <?php if ($maintenanceLogs->num_rows > 0) : ?>
                                     <div class="table-responsive">
-                                        <table class="table table-hover">
+                                        <table class="table table-hover" id="maintenanceLogTable">
                                             <thead>
                                                 <tr>
                                                     <th style="width: 25%;">Date</th>
@@ -1206,7 +1270,7 @@ require 'header.php';
                                             </thead>
                                             <tbody>
                                                 <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
-                                                    <tr id="log-row-<?= $log['id']; ?>">
+                                                    <tr id="log-row-<?= $log['id']; ?>" class="maintenance-log-row">
                                                         <td data-label="Date" style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
                                                         <td data-label="User" style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
                                                         <td data-label="Comment" style="width: 40%;">
@@ -1223,6 +1287,9 @@ require 'header.php';
                                             </tbody>
                                         </table>
                                     </div>
+                                    <nav aria-label="Maintenance log pagination">
+                                        <ul class="pagination pagination-sm justify-content-center" id="maintenanceLogPagination"></ul>
+                                    </nav>
                                 <?php else : ?>
                                     <p>No maintenance records found for this cage.</p>
                                 <?php endif; ?>
