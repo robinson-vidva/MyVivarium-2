@@ -225,7 +225,6 @@ foreach ($ids as $id) {
 </head>
 
 <body>
-    <div id="printArea">
     <?php
     $totalCages = count($cages);
     $totalPages = ceil($totalCages / 4);
@@ -449,7 +448,6 @@ foreach ($ids as $id) {
     </table>
     </div>
     <?php endfor; ?>
-    </div>
 </body>
 
 </html>

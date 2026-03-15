@@ -97,63 +97,6 @@ require 'header.php';
             }
         }
 
-        // Handle PDF download via hidden iframe + html2pdf
-        function handleDownloadPDF(event) {
-            event.preventDefault();
-            if (!validateSelection()) return;
-
-            var selectedIds = document.getElementById("cageIds").selectedOptions;
-            var ids = Array.from(selectedIds).map(option => option.value);
-            var url = "prnt_crd.php?id=" + ids.join(",");
-
-            // Show loading state
-            var btn = document.getElementById('pdfBtn');
-            var originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-
-            // Load print page in hidden iframe
-            var iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.left = '-9999px';
-            iframe.style.width = '11in';
-            iframe.style.height = '8.5in';
-            document.body.appendChild(iframe);
-
-            iframe.onload = function() {
-                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                var printArea = iframeDoc.getElementById('printArea');
-
-                // Load html2pdf in the iframe context
-                var script = iframeDoc.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-                script.onload = function() {
-                    var h2p = iframe.contentWindow.html2pdf;
-                    var opt = {
-                        margin: 0,
-                        filename: 'cage_cards.pdf',
-                        image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2, useCORS: true },
-                        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
-                        pagebreak: { mode: ['css'] }
-                    };
-                    h2p().set(opt).from(printArea).save().then(function() {
-                        document.body.removeChild(iframe);
-                        btn.disabled = false;
-                        btn.innerHTML = originalText;
-                    }).catch(function() {
-                        document.body.removeChild(iframe);
-                        btn.disabled = false;
-                        btn.innerHTML = originalText;
-                        alert('Error generating PDF. Please try again.');
-                    });
-                };
-                iframeDoc.head.appendChild(script);
-            };
-
-            iframe.src = url;
-        }
-
         // Initialize Select2 for the cage IDs dropdown
         $(document).ready(function() {
             $('#cageIds').select2({
@@ -198,8 +141,7 @@ require 'header.php';
                 </div>
                 <br>
                 <div class="btn-container">
-                    <button type="submit" class="btn btn-primary" onclick="handleSubmit(event)"><i class="fas fa-print me-1"></i> Print Cage Card</button>
-                    <button type="button" id="pdfBtn" class="btn btn-danger" onclick="handleDownloadPDF(event)"><i class="fas fa-file-pdf me-1"></i> Download PDF</button>
+                    <button type="submit" class="btn btn-primary btn-print" onclick="handleSubmit(event)">Print Cage Card</button>
                     <button type="button" class="btn btn-secondary" onclick="goBack()">Go Back</button>
                 </div>
             </form>
