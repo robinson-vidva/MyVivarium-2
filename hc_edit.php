@@ -612,24 +612,23 @@ require 'header.php';
 
             const mouseFieldHTML = `
                 <div id="mouse_fields_${mouseCount}" class="mouse-field">
-                    <br>
-                    <h4>Mouse #${mouseCount}</h4>
-                    <div class="mb-3">
-                        <label for="mouse_id_${mouseCount}" class="form-label">Mouse ID</label>
-                        <input type="text" class="form-control" id="mouse_id_${mouseCount}" name="mouse_id[]" value="">
+                    <hr class="mt-3 mb-3" style="border-top: 2px solid var(--bs-border-color);">
+                    <h6 class="text-muted mb-3">Mouse #${mouseCount}</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="mouse_id_${mouseCount}" class="form-label">Mouse ID</label>
+                            <input type="text" class="form-control" id="mouse_id_${mouseCount}" name="mouse_id[]" value="">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="genotype_${mouseCount}" class="form-label">Genotype</label>
+                            <input type="text" class="form-control" id="genotype_${mouseCount}" name="genotype[]" value="">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="notes_${mouseCount}" class="form-label">Maintenance Notes</label>
+                            <textarea class="form-control" id="notes_${mouseCount}" name="notes[]" oninput="adjustTextareaHeight(this)"></textarea>
+                        </div>
                     </div>
-
-                    <div class="mb-3">
-                        <label for="genotype_${mouseCount}" class="form-label">Genotype</label>
-                        <input type="text" class="form-control" id="genotype_${mouseCount}" name="genotype[]" value="">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="notes_${mouseCount}" class="form-label">Maintenance Notes</label>
-                        <textarea class="form-control" id="notes_${mouseCount}" name="notes[]" oninput="adjustTextareaHeight(this)"></textarea>
-                    </div>
-
-                    <button type="button" class="btn btn-danger btn-icon" onclick="markForDeletion(${mouseCount}, null)"><i class="fas fa-trash"></i></button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="markForDeletion(${mouseCount}, null)"><i class="fas fa-trash"></i></button>
                 </div>`;
 
             mouseContainer.insertAdjacentHTML('beforeend', mouseFieldHTML);
@@ -994,75 +993,67 @@ require 'header.php';
                             <input type="hidden" id="mice_to_delete" name="mice_to_delete" value="">
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
 
-                            <div class="mb-3">
-                                <label for="cage_id" class="form-label">Current Cage ID</label>
-                                <input type="text" class="form-control" id="cage_id" name="cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" readonly>
+                            <!-- Cage Info -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="cage_id" class="form-label">Current Cage ID</label>
+                                    <input type="text" class="form-control" id="cage_id" name="cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" readonly>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="new_cage_id" class="form-label">New Cage ID <span class="required-asterisk">*</span></label>
+                                    <input type="text" class="form-control" id="new_cage_id" name="new_cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" required style="border: 2px solid #0d6efd;">
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="new_cage_id" class="form-label">New Cage ID <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control" id="new_cage_id" name="new_cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" required style="border: 2px solid #0d6efd;">
-                                <small class="form-text text-muted">Change the cage ID if needed.</small>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="pi_name" class="form-label">PI Name</label>
+                                    <select class="form-control" id="pi_name" name="pi_name" data-field-type="important">
+                                        <option value="">Select PI</option>
+                                        <?php while ($row = $piResult->fetch_assoc()) : ?>
+                                            <option value="<?= htmlspecialchars($row['id']); ?>" <?= ($row['id'] == $selectedPiId) ? 'selected' : ''; ?>>
+                                                <?= htmlspecialchars($row['initials']) . ' [' . htmlspecialchars($row['name']) . ']'; ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="created_at" class="form-label">Date Added</label>
+                                    <input type="date" class="form-control" id="created_at" name="created_at" value="<?= htmlspecialchars(!empty($holdingcage['created_at']) ? date('Y-m-d', strtotime($holdingcage['created_at'])) : ''); ?>" data-no-max-date>
+                                </div>
                             </div>
-
-                            <div class="mb-3">
-                                <label for="pi_name" class="form-label">PI Name</label>
-                                <select class="form-control" id="pi_name" name="pi_name" data-field-type="important">
-                                    <!-- Display a placeholder option for selection -->
-                                    <option value="">Select PI</option>
-                                    <?php while ($row = $piResult->fetch_assoc()) : ?>
-                                        <option value="<?= htmlspecialchars($row['id']); ?>" <?= ($row['id'] == $selectedPiId) ? 'selected' : ''; ?>>
-                                            <?= htmlspecialchars($row['initials']) . ' [' . htmlspecialchars($row['name']) . ']'; ?>
-                                        </option>
-                                    <?php endwhile; ?>
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="room" class="form-label">Room</label>
-                                <input type="text" class="form-control" id="room" name="room" value="<?= htmlspecialchars($holdingcage['room'] ?? ''); ?>">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="rack" class="form-label">Rack</label>
-                                <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($holdingcage['rack'] ?? ''); ?>">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="created_at" class="form-label">Date Added</label>
-                                <input type="date" class="form-control" id="created_at" name="created_at" value="<?= htmlspecialchars(!empty($holdingcage['created_at']) ? date('Y-m-d', strtotime($holdingcage['created_at'])) : ''); ?>" data-no-max-date>
-                                <small class="form-text text-muted">When this cage was added to the system.</small>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
-                                <select class="form-control" id="strain" name="strain" data-field-type="important">
-                                    <option value="" <?= empty($holdingcage['strain']) ? 'selected' : ''; ?>>None / Not Applicable</option>
-                                    <?php
-                                    // Initialize a flag to check if the current strain exists in the options
-                                    $strainExists = false;
-                                    $isCustomStrain = false;
-
-                                    // Populate the dropdown with options
-                                    foreach ($strainOptions as $option) {
-                                        $value = explode(" | ", $option)[0]; // Extract str_id
-                                        $selected = ($value == $holdingcage['strain']) ? 'selected' : '';
-
-                                        if ($value == $holdingcage['strain']) {
-                                            $strainExists = true;
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="room" class="form-label">Room</label>
+                                    <input type="text" class="form-control" id="room" name="room" value="<?= htmlspecialchars($holdingcage['room'] ?? ''); ?>">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="rack" class="form-label">Rack</label>
+                                    <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($holdingcage['rack'] ?? ''); ?>">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
+                                    <select class="form-control" id="strain" name="strain" data-field-type="important">
+                                        <option value="" <?= empty($holdingcage['strain']) ? 'selected' : ''; ?>>None / Not Applicable</option>
+                                        <?php
+                                        $strainExists = false;
+                                        $isCustomStrain = false;
+                                        foreach ($strainOptions as $option) {
+                                            $value = explode(" | ", $option)[0];
+                                            $selected = ($value == $holdingcage['strain']) ? 'selected' : '';
+                                            if ($value == $holdingcage['strain']) {
+                                                $strainExists = true;
+                                            }
+                                            echo "<option value='$value' $selected>$option</option>";
                                         }
-
-                                        echo "<option value='$value' $selected>$option</option>";
-                                    }
-
-                                    // If the current strain is not in the list and not empty, it's a custom strain
-                                    if (!$strainExists && !empty($holdingcage['strain'])) {
-                                        $isCustomStrain = true;
-                                        $currentStrainId = htmlspecialchars($holdingcage['strain']);
-                                        echo "<option value='$currentStrainId' selected>$currentStrainId (Custom)</option>";
-                                    }
-                                    ?>
-                                    <option value="custom" <?= $isCustomStrain ? '' : ''; ?>>Custom</option>
-                                </select>
+                                        if (!$strainExists && !empty($holdingcage['strain'])) {
+                                            $isCustomStrain = true;
+                                            $currentStrainId = htmlspecialchars($holdingcage['strain']);
+                                            echo "<option value='$currentStrainId' selected>$currentStrainId (Custom)</option>";
+                                        }
+                                        ?>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div class="mb-3" id="custom_strain_div" style="display: <?= $isCustomStrain ? 'block' : 'none'; ?>;">
@@ -1070,100 +1061,99 @@ require 'header.php';
                                 <input type="text" class="form-control" id="custom_strain" name="custom_strain" value="<?= $isCustomStrain ? htmlspecialchars($holdingcage['strain']) : ''; ?>">
                             </div>
 
-                            <div class="mb-3">
-                                <label for="iacuc" class="form-label">IACUC <span class="badge bg-info">Important</span></label>
-                                <select class="form-control" id="iacuc" name="iacuc[]" multiple data-field-type="important">
-                                    <option value="" disabled>Select IACUC</option>
-                                    <?php
-                                    if ($iacucResult->num_rows > 0) {
-                                        // Populate the dropdown with IACUC values from the database
-                                        while ($iacucRow = $iacucResult->fetch_assoc()) {
-                                            $iacuc_id = htmlspecialchars($iacucRow['iacuc_id']);
-                                            $iacuc_title = htmlspecialchars($iacucRow['iacuc_title']);
-                                            $truncated_title = strlen($iacuc_title) > 40 ? substr($iacuc_title, 0, 40) . '...' : $iacuc_title;
-                                            $selected = in_array($iacuc_id, $selectedIacucs) ? 'selected' : '';
-                                            echo "<option value='$iacuc_id' title='$iacuc_title' $selected>$iacuc_id | $truncated_title</option>";
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="iacuc" class="form-label">IACUC <span class="badge bg-info">Important</span></label>
+                                    <select class="form-control" id="iacuc" name="iacuc[]" multiple data-field-type="important">
+                                        <option value="" disabled>Select IACUC</option>
+                                        <?php
+                                        if ($iacucResult->num_rows > 0) {
+                                            while ($iacucRow = $iacucResult->fetch_assoc()) {
+                                                $iacuc_id = htmlspecialchars($iacucRow['iacuc_id']);
+                                                $iacuc_title = htmlspecialchars($iacucRow['iacuc_title']);
+                                                $truncated_title = strlen($iacuc_title) > 40 ? substr($iacuc_title, 0, 40) . '...' : $iacuc_title;
+                                                $selected = in_array($iacuc_id, $selectedIacucs) ? 'selected' : '';
+                                                echo "<option value='$iacuc_id' title='$iacuc_title' $selected>$iacuc_id | $truncated_title</option>";
+                                            }
+                                        } else {
+                                            echo "<option value='' disabled>No IACUC available</option>";
                                         }
-                                    } else {
-                                        echo "<option value='' disabled>No IACUC available</option>";
-                                    }
-                                    ?>
-                                </select>
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="user" class="form-label">User <span class="badge bg-info">Important</span></label>
+                                    <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
+                                        <?php
+                                        while ($userRow = $userResult->fetch_assoc()) {
+                                            $user_id = htmlspecialchars($userRow['id']);
+                                            $initials = htmlspecialchars($userRow['initials']);
+                                            $name = htmlspecialchars($userRow['name']);
+                                            $selected = in_array($user_id, $selectedUsers) ? 'selected' : '';
+                                            echo "<option value='$user_id' $selected>$initials [$name]</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label for="user" class="form-label">User <span class="badge bg-info">Important</span></label>
-                                <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
-                                    <?php
-                                    // Populate the dropdown with options from the database
-                                    while ($userRow = $userResult->fetch_assoc()) {
-                                        $user_id = htmlspecialchars($userRow['id']);
-                                        $initials = htmlspecialchars($userRow['initials']);
-                                        $name = htmlspecialchars($userRow['name']);
-                                        $selected = in_array($user_id, $selectedUsers) ? 'selected' : '';
-                                        echo "<option value='$user_id' $selected>$initials [$name]</option>";
-                                    }
-                                    ?>
-                                </select>
+                            <!-- Animal Details -->
+                            <hr class="mt-2 mb-3" style="border-top: 2px solid var(--bs-border-color);">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="dob" class="form-label">DOB <span class="badge bg-warning">Critical</span></label>
+                                    <input type="date" class="form-control" id="dob" name="dob" value="<?= htmlspecialchars($holdingcage['dob']); ?>" min="1900-01-01" data-field-type="critical">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
+                                    <select class="form-control" id="sex" name="sex" data-field-type="critical">
+                                        <option value="">Select Sex</option>
+                                        <option value="male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
+                                        <option value="female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
+                                    <input type="text" class="form-control" id="parent_cg" name="parent_cg" value="<?= htmlspecialchars($holdingcage['parent_cg']); ?>" data-field-type="useful">
+                                </div>
                             </div>
-
-                            <div class="mb-3">
-                                <label for="dob" class="form-label">DOB <span class="badge bg-warning">Critical</span></label>
-                                <input type="date" class="form-control" id="dob" name="dob" value="<?= htmlspecialchars($holdingcage['dob']); ?>" min="1900-01-01" data-field-type="critical">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
-                                <select class="form-control" id="sex" name="sex" data-field-type="critical">
-                                    <option value="">Select Sex</option>
-                                    <option value="male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
-                                    <option value="female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
-                                <input type="text" class="form-control" id="parent_cg" name="parent_cg" value="<?= htmlspecialchars($holdingcage['parent_cg']); ?>" data-field-type="useful">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="cage_genotype" class="form-label">Genotype</label>
-                                <input type="text" class="form-control" id="cage_genotype" name="cage_genotype" value="<?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?>">
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="remarks" class="form-label">Remarks</label>
-                                <textarea class="form-control" id="remarks" name="remarks" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($holdingcage['remarks']); ?></textarea>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="cage_genotype" class="form-label">Genotype</label>
+                                    <input type="text" class="form-control" id="cage_genotype" name="cage_genotype" value="<?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?>">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="remarks" class="form-label">Remarks</label>
+                                    <textarea class="form-control" id="remarks" name="remarks" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($holdingcage['remarks']); ?></textarea>
+                                </div>
                             </div>
 
                             <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
+                            <hr class="mt-2 mb-3" style="border-top: 3px solid var(--bs-border-color);">
 
                             <!-- HTML Form Section for Mouse Fields -->
                             <div id="mouse_fields_container">
-                                <!-- Loop to dynamically create fields for each mouse -->
                                 <?php foreach ($mice as $i => $mouse) : ?>
                                     <div id="mouse_fields_<?= $i + 1 ?>" class="mouse-field" data-mouse-id="<?= $mouse['id'] ?>">
-                                        <br>
-                                        <h4>Mouse #<?= $i + 1 ?></h4>
+                                        <hr class="mt-3 mb-3" style="border-top: 2px solid var(--bs-border-color);">
+                                        <h6 class="text-muted mb-3">Mouse #<?= $i + 1 ?></h6>
                                         <input type="hidden" name="existing_mouse_id[]" value="<?= htmlspecialchars($mouse['id']) ?>">
-                                        <div class="mb-3">
-                                            <label for="mouse_id_<?= $i + 1 ?>" class="form-label">Mouse ID</label>
-                                            <input type="text" class="form-control" id="mouse_id_<?= $i + 1 ?>" name="mouse_id[]" value="<?= htmlspecialchars($mouse['mouse_id']) ?>">
+                                        <div class="row">
+                                            <div class="col-md-4 mb-3">
+                                                <label for="mouse_id_<?= $i + 1 ?>" class="form-label">Mouse ID</label>
+                                                <input type="text" class="form-control" id="mouse_id_<?= $i + 1 ?>" name="mouse_id[]" value="<?= htmlspecialchars($mouse['mouse_id']) ?>">
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label for="genotype_<?= $i + 1 ?>" class="form-label">Genotype</label>
+                                                <input type="text" class="form-control" id="genotype_<?= $i + 1 ?>" name="genotype[]" value="<?= htmlspecialchars($mouse['genotype']) ?>">
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label for="notes_<?= $i + 1 ?>" class="form-label">Maintenance Notes</label>
+                                                <textarea class="form-control" id="notes_<?= $i + 1 ?>" name="notes[]" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($mouse['notes']) ?></textarea>
+                                            </div>
                                         </div>
-
-                                        <div class="mb-3">
-                                            <label for="genotype_<?= $i + 1 ?>" class="form-label">Genotype</label>
-                                            <input type="text" class="form-control" id="genotype_<?= $i + 1 ?>" name="genotype[]" value="<?= htmlspecialchars($mouse['genotype']) ?>">
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label for="notes_<?= $i + 1 ?>" class="form-label">Maintenance Notes</label>
-                                            <textarea class="form-control" id="notes_<?= $i + 1 ?>" name="notes[]" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($mouse['notes']) ?></textarea>
-                                        </div>
-
                                         <div class="button-group">
-                                            <button type="button" class="btn btn-danger btn-icon" onclick="markForDeletion(<?= $i + 1 ?>, <?= $mouse['id'] ?>)"><i class="fas fa-trash"></i></button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="markForDeletion(<?= $i + 1 ?>, <?= $mouse['id'] ?>)"><i class="fas fa-trash"></i></button>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
