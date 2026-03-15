@@ -252,7 +252,7 @@ if (isset($settings['r2_pres'])) {
             /* Compact icon-only buttons */
             .nav-collapsible > .btn,
             .nav-collapsible > .dropdown > .btn,
-            .nav-collapsible > #darkModeToggle {
+            .nav-collapsible > #notificationDropdown > .btn {
                 width: 44px;
                 height: 44px;
                 padding: 0;
@@ -374,6 +374,13 @@ if (isset($settings['r2_pres'])) {
                             echo '<li><hr class="dropdown-divider"></li>';
                         }
                         ?>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item" href="#" id="darkModeToggleItem" onclick="event.preventDefault(); document.getElementById('darkModeToggle').click();">
+                                <i class="fas fa-moon me-2" id="darkModeItemIcon"></i> <span id="darkModeItemLabel">Dark Mode</span>
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="logout.php">Logout</a></li>
                     </ul>
                 </div>
@@ -401,15 +408,8 @@ if (isset($settings['r2_pres'])) {
                     </div>
                 </div>
 
-                <!-- Dark Mode Toggle -->
-                <button id="darkModeToggle" class="btn btn-outline-light" aria-label="Toggle dark mode">
-                    <i class="fas fa-moon"></i>
-                </button>
-
-                <!-- Logout Button -->
-                <a href="logout.php" class="btn btn-danger" aria-label="Logout" title="Logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                </a>
+                <!-- Hidden dark mode toggle (triggered via Settings dropdown) -->
+                <button id="darkModeToggle" style="display:none;" aria-label="Toggle dark mode"></button>
             </div>
         </nav>
     </div>
@@ -447,10 +447,15 @@ if (isset($settings['r2_pres'])) {
         });
 
         function updateToggleIcon(btn, theme) {
-            btn.innerHTML = theme === 'dark'
-                ? '<i class="fas fa-sun"></i>'
-                : '<i class="fas fa-moon"></i>';
-            btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+            // Update the Settings dropdown item
+            var itemIcon = document.getElementById('darkModeItemIcon');
+            var itemLabel = document.getElementById('darkModeItemLabel');
+            if (itemIcon) {
+                itemIcon.className = theme === 'dark' ? 'fas fa-sun me-2' : 'fas fa-moon me-2';
+            }
+            if (itemLabel) {
+                itemLabel.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            }
         }
     })();
     </script>
@@ -618,6 +623,9 @@ if (isset($settings['r2_pres'])) {
     [data-bs-theme="dark"] .notif-unread { background-color: rgba(13, 110, 253, 0.12); }
     [data-bs-theme="dark"] .notif-item:hover { background-color: #565e66; }
     [data-bs-theme="dark"] #notifDropdown { background-color: #454d55 !important; border-color: #565e66 !important; }
+    @media (max-width: 576px) {
+        #notifDropdown { width: calc(100vw - 20px) !important; max-width: 320px; right: -60px !important; }
+    }
     </style>
 
     <!-- Dark Mode Overrides -->
