@@ -507,8 +507,8 @@ foreach ($ids as $id) {
                 var opt = {
                     margin: 0,
                     filename: 'cage_cards.pdf',
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true },
+                    image: { type: 'png' },
+                    html2canvas: { scale: 4, useCORS: true, logging: false },
                     jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
                     pagebreak: { mode: ['css'] }
                 };
