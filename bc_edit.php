@@ -224,6 +224,7 @@ if (isset($_GET['id'])) {
                 $insertIacucQuery->close();
 
                 // Update users in cage_users table
+                $previousUsers = $selectedUsers; // saved before POST processing
                 $deleteUsersQuery = $con->prepare("DELETE FROM cage_users WHERE cage_id = ?");
                 $deleteUsersQuery->bind_param("s", $cage_id);
                 $deleteUsersQuery->execute();
@@ -235,6 +236,51 @@ if (isset($_GET['id'])) {
                     $insertUsersQuery->execute();
                 }
                 $insertUsersQuery->close();
+
+                // Notify users about cage changes
+                $editorName = $_SESSION['name'] ?? 'Someone';
+                $newlyAdded = array_diff(array_map('intval', $users), array_map('intval', $previousUsers));
+                $removed = array_diff(array_map('intval', $previousUsers), array_map('intval', $users));
+
+                // Notify newly added users
+                foreach ($newlyAdded as $uid) {
+                    if ($uid > 0) {
+                        $nTitle = "Added to Cage: $cage_id";
+                        $nMessage = "$editorName added you to breeding cage $cage_id";
+                        $nLink = "bc_view.php?id=" . urlencode($cage_id);
+                        $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                        $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                        $nStmt->execute();
+                        $nStmt->close();
+                    }
+                }
+
+                // Notify removed users
+                foreach ($removed as $uid) {
+                    if ($uid > 0) {
+                        $nTitle = "Removed from Cage: $cage_id";
+                        $nMessage = "$editorName removed you from breeding cage $cage_id";
+                        $nLink = "bc_dash.php";
+                        $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                        $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                        $nStmt->execute();
+                        $nStmt->close();
+                    }
+                }
+
+                // Notify existing users (still on cage) about the update
+                $stillOnCage = array_intersect(array_map('intval', $users), array_map('intval', $previousUsers));
+                foreach ($stillOnCage as $uid) {
+                    if ($uid > 0 && $uid != $_SESSION['user_id']) {
+                        $nTitle = "Cage Updated: $cage_id";
+                        $nMessage = "$editorName updated breeding cage $cage_id";
+                        $nLink = "bc_view.php?id=" . urlencode($cage_id);
+                        $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                        $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                        $nStmt->execute();
+                        $nStmt->close();
+                    }
+                }
 
                 // Handle maintenance log updates
                 if (isset($_POST['log_ids']) && isset($_POST['log_comments'])) {

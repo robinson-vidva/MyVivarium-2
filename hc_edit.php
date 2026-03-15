@@ -234,6 +234,7 @@ if (isset($_GET['id'])) {
             $stmtCages->close();
 
             // Update the cage_users table
+            $previousUsers = $selectedUsers; // saved before POST processing
             $deleteUsersQuery = "DELETE FROM cage_users WHERE cage_id = ?";
             $stmtDeleteUsers = $con->prepare($deleteUsersQuery);
             $stmtDeleteUsers->bind_param("s", $cage_id);
@@ -247,6 +248,51 @@ if (isset($_GET['id'])) {
                 $stmtInsertUsers->execute();
             }
             $stmtInsertUsers->close();
+
+            // Notify users about cage changes
+            $editorName = $_SESSION['name'] ?? 'Someone';
+            $newlyAdded = array_diff(array_map('intval', $users), array_map('intval', $previousUsers));
+            $removed = array_diff(array_map('intval', $previousUsers), array_map('intval', $users));
+
+            // Notify newly added users
+            foreach ($newlyAdded as $uid) {
+                if ($uid > 0) {
+                    $nTitle = "Added to Cage: $cage_id";
+                    $nMessage = "$editorName added you to holding cage $cage_id";
+                    $nLink = "hc_view.php?id=" . urlencode($cage_id);
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
+
+            // Notify removed users
+            foreach ($removed as $uid) {
+                if ($uid > 0) {
+                    $nTitle = "Removed from Cage: $cage_id";
+                    $nMessage = "$editorName removed you from holding cage $cage_id";
+                    $nLink = "hc_dash.php";
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
+
+            // Notify existing users (still on cage) about the update
+            $stillOnCage = array_intersect(array_map('intval', $users), array_map('intval', $previousUsers));
+            foreach ($stillOnCage as $uid) {
+                if ($uid > 0 && $uid != $_SESSION['user_id']) {
+                    $nTitle = "Cage Updated: $cage_id";
+                    $nMessage = "$editorName updated holding cage $cage_id";
+                    $nLink = "hc_view.php?id=" . urlencode($cage_id);
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
 
             // Update the cage_iacuc table
             $deleteIacucQuery = "DELETE FROM cage_iacuc WHERE cage_id = ?";

@@ -172,6 +172,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insert_cage_user_query->close();
             }
 
+            // Notify all assigned users about the new cage
+            $creatorName = $_SESSION['name'] ?? 'Someone';
+            foreach ($user_ids as $uid) {
+                $uid = intval($uid);
+                if ($uid > 0) {
+                    $nTitle = "Added to Cage: $cage_id";
+                    $nMessage = "$creatorName added you to breeding cage $cage_id";
+                    $nLink = "bc_view.php?id=" . urlencode($cage_id);
+                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                    $nStmt->execute();
+                    $nStmt->close();
+                }
+            }
+
             // Process litter data insertion if provided
             if (isset($_POST['dom'])) {
                 $dom = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['dom']);
