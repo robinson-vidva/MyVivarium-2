@@ -6,7 +6,7 @@
  * This script generates a printable view of cage cards for both holding and breeding cages.
  * It accepts mixed cage IDs, determines each cage's type by checking which table it exists in,
  * then renders the appropriate card format. Cards are arranged in a 2x2 grid layout (5in x 3in each)
- * on letter landscape paper.
+ * on letter landscape paper, with automatic page breaks every 4 cages.
  */
 
 // Start a new session or resume the existing session
@@ -178,6 +178,10 @@ foreach ($ids as $id) {
                 margin: 0;
                 color: #000;
             }
+
+            .page-break {
+                page-break-after: always;
+            }
         }
 
         body,
@@ -187,8 +191,6 @@ foreach ($ids as $id) {
             width: 100%;
             height: 100%;
             box-sizing: border-box;
-            display: grid;
-            place-items: center;
         }
 
         span {
@@ -223,8 +225,16 @@ foreach ($ids as $id) {
 </head>
 
 <body>
+    <?php
+    $totalCages = count($cages);
+    $totalPages = ceil($totalCages / 4);
+    for ($pageNum = 0; $pageNum < $totalPages; $pageNum++) :
+        $pageStart = $pageNum * 4;
+        $pageCages = array_slice($cages, $pageStart, 4);
+    ?>
+    <div style="display: grid; place-items: center; width: 100%; height: 100%;<?= $pageNum < $totalPages - 1 ? '' : '' ?>"<?= $pageNum < $totalPages - 1 ? ' class="page-break"' : '' ?>>
     <table style="width: 10in; height: 6in; border-collapse: collapse; border: 1px dashed #D3D3D3;">
-        <?php foreach ($cages as $index => $cageEntry) :
+        <?php foreach ($pageCages as $index => $cageEntry) :
             $type = $cageEntry['type'];
             $cage = $cageEntry['data'];
         ?>
@@ -430,12 +440,14 @@ foreach ($ids as $id) {
 
                 </td>
 
-            <?php if ($index % 2 === 1 || $index === count($cages) - 1) : ?>
+            <?php if ($index % 2 === 1 || $index === count($pageCages) - 1) : ?>
                 </tr>
             <?php endif; ?>
 
         <?php endforeach; ?>
     </table>
+    </div>
+    <?php endfor; ?>
 </body>
 
 </html>
