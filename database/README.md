@@ -11,7 +11,8 @@ tracked at the mouse level, not duplicated per cage.
 |---|---|
 | `schema.sql` | Canonical V2 schema. Apply once to a new database. |
 | `install.php` | CLI installer. Reads `.env`, connects to your configured database, applies `schema.sql`. Use `--reset` to drop existing tables first (dev only). |
-| `export_for_v2.php` | Drop into the **V1 repo** and run on the V1 server to produce a JSON dump that V2's admin importer consumes. |
+| `export_for_v2.php` | CLI exporter. Drop into the **V1 repo** and run on the V1 server to produce a JSON dump that V2's admin importer consumes. |
+| `export_for_v2_web.php` | Web UI exporter. Drop-in for the **V1 repo** so admins can download the JSON via "Administration → Export for V2 Migration" — no shell access needed. |
 | `import_from_v1.sql` | Alternative SQL-based import (cross-database INSERT/SELECT) for users who'd rather operate at the SQL level than the UI uploader. |
 | `erd.png` | ER diagram. **Stale** — depicts the V1 schema and needs regeneration. |
 
@@ -57,22 +58,55 @@ There are two paths for moving V1 data across.
 ### Recommended: JSON export + admin upload
 
 Portable, no shell access on the V2 host required. Works across MySQL
-servers, hosting environments, and operating systems.
+servers, hosting environments, and operating systems. There are two
+exporter flavors for the V1 side — UI for non-technical admins, CLI for
+shell-friendly ones. Pick one.
+
+#### V1 exporter — UI version (recommended)
+
+One-time setup on the V1 repo: copy two files in and add one nav link.
+
+1. Copy `database/export_for_v2_web.php` from this V2 repo into the V1
+   repo's project root, **renamed to `export_for_v2.php`** (V1 keeps
+   admin pages flat at the project root):
+
+   ```bash
+   cp /path/to/v2/database/export_for_v2_web.php /path/to/v1/export_for_v2.php
+   ```
+
+2. Add a nav link in V1's `header.php`. Find the admin section (the
+   block under `if ($_SESSION['role'] === 'admin')` that lists Manage
+   Users / Manage IACUC / etc.) and append:
+
+   ```php
+   echo '<li><a class="dropdown-item" href="export_for_v2.php"><i class="fas fa-file-export me-1"></i> Export for V2 Migration</a></li>';
+   ```
+
+3. Commit + deploy V1.
+
+After that, V1 admins can: log in → menu → **Administration → Export
+for V2 Migration** → browser downloads `v1_export_YYYYMMDD_HHMMSS.json`.
+Then in V2: menu → **Administration → Import V1 Data** → upload that
+JSON file.
+
+#### V1 exporter — CLI version
+
+For shell-friendly admins. Use `database/export_for_v2.php` (the CLI
+sibling — same JSON output):
 
 ```bash
-# On the V1 server — copy the exporter into the V1 project root once:
-cp /path/to/v2/repo/database/export_for_v2.php /path/to/v1/database/
-
-# Run the exporter (read-only against V1).
+cp /path/to/v2/database/export_for_v2.php /path/to/v1/database/
 cd /path/to/v1
 php database/export_for_v2.php --out=v1_export.json
-
-# Move v1_export.json to the machine you'll log in to V2 from.
 ```
 
-Then in V2: log in as admin → menu → **Administration → Import V1 Data**
-→ upload `v1_export.json`. The page validates, transforms (V1 holding +
-mice + breeding parents → V2 mice; seeds `mouse_cage_history`; slims
+Then upload through V2's admin UI as above.
+
+### V2 import (either path)
+
+In V2: log in as admin → menu → **Administration → Import V1 Data** →
+upload the JSON. The page validates, transforms (V1 holding + mice +
+breeding parents → V2 mice; seeds `mouse_cage_history`; slims
 `breeding`), and applies everything in a single transaction. If the V2
 database isn't empty, run `php database/install.php --reset` first.
 
