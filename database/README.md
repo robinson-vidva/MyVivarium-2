@@ -13,6 +13,7 @@ tracked at the mouse level, not duplicated per cage.
 | `install.php` | CLI installer. Reads `.env`, connects to your configured database, applies `schema.sql`. Use `--reset` to drop existing tables first (dev only). |
 | `reset_admin.php` | CLI helper to create or reset an admin user with a known email/password. Useful after a `--reset` if you don't remember the seeded admin password. |
 | `import_from_v1.sql` | Alternative SQL-based import (cross-database INSERT/SELECT) for users who'd rather operate at the SQL level than the UI uploader. |
+| `sync_from_v1.sh` | One-command shell wrapper around `import_from_v1.sql`. Handles same-server runs (just substitutes DB names) and cross-server runs (mysqldump V1 → load into a temp schema on V2 → import → drop temp schema). |
 | `erd.png` | ER diagram. **Stale** — depicts the V1 schema and needs regeneration. |
 
 The V1 *export* side (the page that produces the JSON file V2 imports)
@@ -58,6 +59,15 @@ Don't run `--reset` against a database that has data you care about.
 V2 is greenfield: it doesn't upgrade an existing V1 database in place.
 There are two paths for moving V1 data across.
 
+There are three flavors of import. Pick one:
+
+- **JSON / UI** — admin clicks export in V1, uploads in V2. No shell access
+  needed on either side. (Recommended for non-technical operators.)
+- **`sync_from_v1.sh`** — one-command shell wrapper. Same-server or
+  cross-server, handles dump/load + import in one shot.
+- **`import_from_v1.sql`** — raw SQL you run yourself. Maximum control,
+  minimum magic.
+
 ### Recommended: JSON export + admin upload
 
 Portable, no shell access on the V2 host required. Works across MySQL
@@ -74,19 +84,36 @@ servers, hosting environments, and operating systems.
 If the V2 database isn't empty, run `php database/install.php --reset`
 first.
 
-### Alternative: SQL-based import (`import_from_v1.sql`)
+### Alternative: shell sync (`sync_from_v1.sh`)
 
-If both V1 and V2 databases are on the same MySQL server and you'd rather
-operate at the SQL level:
+One command, both same-server and cross-server runs:
+
+```bash
+# Same-server (V1 + V2 on the same MySQL host):
+database/sync_from_v1.sh \
+    --v1-db myvivarium_v1 \
+    --v2-db myvivarium_v2
+
+# Cross-server (V1 on a remote host):
+database/sync_from_v1.sh \
+    --v1-host db.lab.example --v1-user reader --v1-pass '...' --v1-db myvivarium_v1 \
+    --v2-host localhost      --v2-user root   --v2-pass '...' --v2-db myvivarium_v2
+```
+
+The script: pre-flights that V2 is empty enough → dumps V1 (cross-server
+only) → loads into a temp schema on V2 → runs `import_from_v1.sql` →
+prints sanity counts → drops the temp schema. V1 is never written to.
+
+### Alternative: raw SQL (`import_from_v1.sql`)
+
+If you want full control over the import. Same transformations as the
+shell wrapper, just executed by hand:
 
 ```bash
 mysqldump -u root -p myvivarium_v1 > backup_v1_$(date +%Y%m%d).sql
 # Edit database/import_from_v1.sql to point at your two DB names, then:
 mysql -u root -p < database/import_from_v1.sql
 ```
-
-The SQL version does the same transformations as the JSON path but reads
-directly from the source schema instead of a JSON file.
 
 ## Schema overview
 
