@@ -11,7 +11,8 @@ tracked at the mouse level, not duplicated per cage.
 |---|---|
 | `schema.sql` | Canonical V2 schema. Apply once to a new database. |
 | `install.php` | CLI installer. Reads `.env`, connects to your configured database, applies `schema.sql`. Use `--reset` to drop existing tables first (dev only). |
-| `import_from_v1.sql` | One-shot import: copies V1 production data into a freshly-initialized V2 database. |
+| `export_for_v2.php` | Drop into the **V1 repo** and run on the V1 server to produce a JSON dump that V2's admin importer consumes. |
+| `import_from_v1.sql` | Alternative SQL-based import (cross-database INSERT/SELECT) for users who'd rather operate at the SQL level than the UI uploader. |
 | `erd.png` | ER diagram. **Stale** — depicts the V1 schema and needs regeneration. |
 
 ## Set up a fresh V2 database
@@ -50,29 +51,44 @@ Don't run `--reset` against a database that has data you care about.
 
 ## Import data from a V1 production database
 
-V2 is greenfield: it doesn't upgrade an existing V1 database in place. To
-move users from V1, point the import script at a V1 source DB and a fresh
-V2 destination DB on the same MySQL server:
+V2 is greenfield: it doesn't upgrade an existing V1 database in place.
+There are two paths for moving V1 data across.
+
+### Recommended: JSON export + admin upload
+
+Portable, no shell access on the V2 host required. Works across MySQL
+servers, hosting environments, and operating systems.
 
 ```bash
-# 1. Back up V1 first.
-mysqldump -u root -p myvivarium_v1 > backup_v1_$(date +%Y%m%d).sql
+# On the V1 server — copy the exporter into the V1 project root once:
+cp /path/to/v2/repo/database/export_for_v2.php /path/to/v1/database/
 
-# 2. Apply the V2 schema to a new database (see "Set up" above), naming
-#    it something like `myvivarium_v2`.
+# Run the exporter (read-only against V1).
+cd /path/to/v1
+php database/export_for_v2.php --out=v1_export.json
 
-# 3. Edit database/import_from_v1.sql and replace the placeholder DB names
-#    `myvivarium_v1` and `myvivarium_v2` with your actual DB names.
-
-# 4. Run the import.
-mysql -u root -p < database/import_from_v1.sql
-
-# 5. Spot-check counts; the file has sanity-check queries at the bottom.
+# Move v1_export.json to the machine you'll log in to V2 from.
 ```
 
-If V1 and V2 are on **different MySQL servers**, dump V1's data tables,
-restore them into a temporary `myvivarium_v1` schema on the V2 host, then
-run the import. The script's footer has the exact `mysqldump` command.
+Then in V2: log in as admin → menu → **Administration → Import V1 Data**
+→ upload `v1_export.json`. The page validates, transforms (V1 holding +
+mice + breeding parents → V2 mice; seeds `mouse_cage_history`; slims
+`breeding`), and applies everything in a single transaction. If the V2
+database isn't empty, run `php database/install.php --reset` first.
+
+### Alternative: SQL-based import (`import_from_v1.sql`)
+
+If both V1 and V2 databases are on the same MySQL server and you'd rather
+operate at the SQL level:
+
+```bash
+mysqldump -u root -p myvivarium_v1 > backup_v1_$(date +%Y%m%d).sql
+# Edit database/import_from_v1.sql to point at your two DB names, then:
+mysql -u root -p < database/import_from_v1.sql
+```
+
+The SQL version does the same transformations as the JSON path but reads
+directly from the source schema instead of a JSON file.
 
 ## Schema overview
 
