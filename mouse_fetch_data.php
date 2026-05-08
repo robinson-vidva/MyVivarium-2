@@ -97,8 +97,8 @@ if ($mode === 'parent_search') {
 
 // Default: paginated list for mouse_dash.php
 $page    = max(1, (int)($_GET['page'] ?? 1));
-$limit   = (int)($_GET['limit'] ?? 25);
-if (!in_array($limit, [10, 25, 50, 100], true)) $limit = 25;
+$limit   = (int)($_GET['limit'] ?? 10);
+if (!in_array($limit, [10, 20, 30, 50], true)) $limit = 10;
 $offset  = ($page - 1) * $limit;
 $search  = trim($_GET['search'] ?? '');
 $sort    = $_GET['sort'] ?? 'mouse_id_asc';

@@ -35,7 +35,7 @@ require 'header.php';
         }
     </style>
     <script>
-        var currentLimit = 25;
+        var currentLimit = 10;
         var currentSort = 'mouse_id_asc';
         var currentStatus = 'alive';
         var currentSex = 'all';
@@ -118,7 +118,7 @@ require 'header.php';
 
         document.addEventListener('DOMContentLoaded', function () {
             var p = new URLSearchParams(window.location.search);
-            currentLimit  = parseInt(p.get('limit')) || 25;
+            currentLimit  = parseInt(p.get('limit')) || 10;
             currentSort   = p.get('sort')   || 'mouse_id_asc';
             currentStatus = p.get('status') || 'alive';
             currentSex    = p.get('sex')    || 'all';
@@ -165,9 +165,9 @@ require 'header.php';
                                 <label for="limitSel" class="form-label mb-0 me-2 text-nowrap" style="font-size: 0.875rem;">Show</label>
                                 <select id="limitSel" class="form-select form-select-sm" style="width: auto;" onchange="currentLimit=parseInt(this.value); fetchData(1);">
                                     <option value="10">10</option>
-                                    <option value="25">25</option>
+                                    <option value="20">20</option>
+                                    <option value="30">30</option>
                                     <option value="50">50</option>
-                                    <option value="100">100</option>
                                 </select>
                             </div>
                             <select id="statusSel" class="form-select form-select-sm" style="width: auto;" onchange="currentStatus=this.value; fetchData(1);">
