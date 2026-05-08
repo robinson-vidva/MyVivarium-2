@@ -10,18 +10,43 @@ tracked at the mouse level, not duplicated per cage.
 | File | Purpose |
 |---|---|
 | `schema.sql` | Canonical V2 schema. Apply once to a new database. |
+| `install.php` | CLI installer. Reads `.env`, connects to your configured database, applies `schema.sql`. Use `--reset` to drop existing tables first (dev only). |
 | `import_from_v1.sql` | One-shot import: copies V1 production data into a freshly-initialized V2 database. |
 | `erd.png` | ER diagram. **Stale** — depicts the V1 schema and needs regeneration. |
 
 ## Set up a fresh V2 database
 
+The installer pulls credentials from `.env` (the same file `dbcon.php` reads),
+so you only need to configure the connection in one place.
+
 ```bash
-mysql -u root -p -e "CREATE DATABASE myvivarium;"
-mysql -u root -p myvivarium < database/schema.sql
+# 1. Configure .env (copy from .env.example if you haven't already).
+cp .env.example .env
+$EDITOR .env   # set DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE
+
+# 2. Create the empty database matching DB_DATABASE in your .env.
+#    (The installer doesn't CREATE DATABASE itself — it expects you to
+#    have created it and granted privileges to DB_USERNAME.)
+mysql -e "CREATE DATABASE myvivarium;"
+
+# 3. Apply the schema.
+php database/install.php
 ```
 
-This creates 19 tables. The default admin user is seeded by `schema.sql` —
-log in and change the password before doing anything else.
+The installer reports each table it creates. The default admin user is
+seeded by `schema.sql` — log in and change the password before doing
+anything else.
+
+### Reset a dev database
+
+`--reset` drops every table in the configured database before applying
+the schema. Keeps the database itself, the user, and grants intact.
+
+```bash
+php database/install.php --reset
+```
+
+Don't run `--reset` against a database that has data you care about.
 
 ## Import data from a V1 production database
 
