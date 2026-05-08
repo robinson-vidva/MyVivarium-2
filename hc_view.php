@@ -616,6 +616,9 @@ require 'header.php';
                                         <div class="action-buttons">
                                             <a href="mouse_view.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
                                             <a href="mouse_edit.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
+                                            <?php if ($mouse['status'] === 'alive'): ?>
+                                                <button type="button" class="btn btn-sm btn-secondary" onclick="openTransferModal(<?= htmlspecialchars(json_encode($mouse['mouse_id'])); ?>)" title="Transfer to another cage"><i class="fas fa-exchange-alt"></i></button>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
@@ -760,7 +763,55 @@ require 'header.php';
         <button type="button" class="btn btn-secondary" onclick="closeQrCodePopup()">Close</button>
     </div>
 
-    <!-- v2: mouse moves are initiated from mouse_view.php (so the cage history log stays consistent). -->
+    <!-- Transfer Mouse Modal — posts to mouse_move.php so the cage-history log stays consistent. -->
+    <div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="mouse_move.php">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
+            <input type="hidden" id="transfer_mouse_id" name="mouse_id" value="">
+            <div class="modal-header">
+              <h5 class="modal-title">Transfer mouse <span id="transfer_mouse_id_display" class="text-muted"></span></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Target Cage</label>
+                <?php if (!empty($targetCages)): ?>
+                  <select class="form-control" name="target_cage_id" required>
+                    <option value="">Select cage…</option>
+                    <option value="__none__">— No cage (remove from cage) —</option>
+                    <?php foreach ($targetCages as $cageId): ?>
+                      <option value="<?= htmlspecialchars($cageId); ?>"><?= htmlspecialchars($cageId); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                <?php else: ?>
+                  <div class="alert alert-warning mb-0">No other active cages available — create a holding or breeding cage first.</div>
+                <?php endif; ?>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Reason <small class="text-muted">(optional)</small></label>
+                <input type="text" name="reason" class="form-control" placeholder="e.g. weaning, surgery, breeding setup">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <?php if (!empty($targetCages)): ?>
+                <button type="submit" class="btn btn-primary">Transfer</button>
+              <?php endif; ?>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function openTransferModal(mouseId) {
+        document.getElementById('transfer_mouse_id').value = mouseId;
+        document.getElementById('transfer_mouse_id_display').textContent = mouseId;
+        new bootstrap.Modal(document.getElementById('transferModal')).show();
+    }
+    </script>
 
 
     <script>
