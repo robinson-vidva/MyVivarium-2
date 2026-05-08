@@ -1,168 +1,121 @@
-# Database Schema and Migrations
+# Database
 
-This folder contains the database schema, migration scripts, and tools for MyVivarium v2.
+V2 of MyVivarium uses a **mouse-as-entity** model: a mouse is a first-class
+record with stable identity (`mouse_id`), and cages are containers it moves
+through. Lineage (sire/dam) and cage moves (`mouse_cage_history`) are
+tracked at the mouse level, not duplicated per cage.
 
-## Files Overview
+## Files
 
 | File | Purpose |
-|------|---------|
-| `schema.sql` | Complete v2 schema (17 tables) for **new installations** |
-| `migrate_v1_to_v2.sql` | **In-place upgrade** from MyVivarium v1 to v2 |
-| `migrate_v1_to_v2.sh` | **Full migration** script (old DB -> new DB, with verification) |
-| `migrate_add_parent_cage.sql` | Adds parent cage columns to breeding table |
-| `erd.png` | Entity-Relationship Diagram |
+|---|---|
+| `schema.sql` | Canonical V2 schema. Apply once to a new database. |
+| `import_from_v1.sql` | One-shot import: copies V1 production data into a freshly-initialized V2 database. |
+| `erd.png` | ER diagram. **Stale** — depicts the V1 schema and needs regeneration. |
 
-## New Installation
-
-Use `schema.sql` to create all tables with the latest v2 structure:
+## Set up a fresh V2 database
 
 ```bash
-mysql -u root -p your_database_name < database/schema.sql
+mysql -u root -p -e "CREATE DATABASE myvivarium;"
+mysql -u root -p myvivarium < database/schema.sql
 ```
 
-## Database Tables
+This creates 19 tables. The default admin user is seeded by `schema.sql` —
+log in and change the password before doing anything else.
 
-### Core Tables
-| Table | Description |
-|-------|-------------|
-| `users` | User accounts (name, email, role, password, login security fields) |
-| `cages` | Base cage info (cage_id, PI, quantity, status, room, rack) |
-| `cage_users` | Junction: cage-to-user assignments |
-| `cage_iacuc` | Junction: cage-to-IACUC protocol associations |
-| `strains` | Mouse strains (JAX ID, name, aliases, RRID, URL) |
-| `settings` | System settings (key-value pairs) |
+## Import data from a V1 production database
 
-### Cage Data Tables
-| Table | Description |
-|-------|-------------|
-| `holding` | Holding cage details (strain, DOB, sex, parent cage, genotype) |
-| `breeding` | Breeding cage details (cross, male/female IDs, DOBs, genotypes, parent cages) |
-| `litters` | Litter records (DOM, DOB, pup counts, sex counts) |
-| `mice` | Individual mouse tracking (mouse ID, genotype, notes) |
-| `files` | File attachments per cage |
-| `notes` | Sticky notes per cage |
-| `maintenance` | Maintenance log entries per cage |
-
-### Task & Reminder Tables
-| Table | Description |
-|-------|-------------|
-| `tasks` | Tasks with title, description, assignment, status (Pending/In Progress/Completed), due date |
-| `reminders` | Recurring reminders (daily/weekly/monthly) with status (active/inactive for archiving) |
-| `outbox` | Email queue for reminder notifications (pending/sent/failed) |
-
-### Audit Tables
-| Table | Description |
-|-------|-------------|
-| `activity_log` | Audit trail (user, action, entity, details, IP, timestamp) |
-| `iacuc` | IACUC protocols (ID, title, file URL) |
-
-## Key Schema Details
-
-### Status Fields
-- **Cages**: `status` ENUM('active', 'archived') -- supports cage archiving workflow
-- **Reminders**: `status` ENUM('active', 'inactive') -- supports reminder archiving workflow
-- **Tasks**: `status` ENUM('Pending', 'In Progress', 'Completed') -- task progress tracking
-- **Outbox**: `status` ENUM('pending', 'sent', 'failed') -- email delivery tracking
-
-### Foreign Keys
-- Cage deletions cascade through `cage_users`, `cage_iacuc`, and related tables
-- Cage ID renames propagate via `ON UPDATE CASCADE` on all foreign keys
-- User deletions use `ON DELETE SET NULL` for ownership fields, `ON DELETE CASCADE` for assignments
-
-## Upgrading from MyVivarium v1
-
-### Option A: In-Place Upgrade (Recommended)
-
-Run the SQL migration directly on your existing database:
+V2 is greenfield: it doesn't upgrade an existing V1 database in place. To
+move users from V1, point the import script at a V1 source DB and a fresh
+V2 destination DB on the same MySQL server:
 
 ```bash
-# 1. Backup first!
-mysqldump -u root -p myvivarium > backup_$(date +%Y%m%d).sql
+# 1. Back up V1 first.
+mysqldump -u root -p myvivarium_v1 > backup_v1_$(date +%Y%m%d).sql
 
-# 2. Run migration
-mysql -u root -p myvivarium < database/migrate_v1_to_v2.sql
+# 2. Apply the V2 schema to a new database (see "Set up" above), naming
+#    it something like `myvivarium_v2`.
+
+# 3. Edit database/import_from_v1.sql and replace the placeholder DB names
+#    `myvivarium_v1` and `myvivarium_v2` with your actual DB names.
+
+# 4. Run the import.
+mysql -u root -p < database/import_from_v1.sql
+
+# 5. Spot-check counts; the file has sanity-check queries at the bottom.
 ```
 
-### Option B: Full Migration (New Database)
+If V1 and V2 are on **different MySQL servers**, dump V1's data tables,
+restore them into a temporary `myvivarium_v1` schema on the V2 host, then
+run the import. The script's footer has the exact `mysqldump` command.
 
-Use the interactive shell script to migrate data to a fresh database:
+## Schema overview
 
-```bash
-# 1. Create new database and import v2 schema
-mysql -u root -p -e "CREATE DATABASE myvivarium2;"
-mysql -u root -p myvivarium2 < database/schema.sql
+### Mouse-as-entity tables (the V2 change)
 
-# 2. Run migration script
-chmod +x database/migrate_v1_to_v2.sh
-./database/migrate_v1_to_v2.sh
-```
+| Table | Description |
+|---|---|
+| `mice` | Canonical mouse record. PK `mouse_id` is user-supplied, globally unique, and editable (`ON UPDATE CASCADE` propagates to every FK). Columns: sex, dob, current_cage_id, strain, genotype, ear_code, sire_id/dam_id (self-FK), sire_external_ref/dam_external_ref (text fallback for founders), status enum, sacrificed_at, audit fields. |
+| `mouse_cage_history` | Append-only log of every cage assignment. The "current" cage is the row where `moved_out_at IS NULL`. `mice.current_cage_id` is a denormalized pointer kept in sync by the app. |
 
-The script will:
-- Back up the old database automatically
-- Migrate all data table by table
-- Map v1 columns to v2 schema (setting new columns to defaults)
-- Verify row counts match between old and new databases
+### Cage and reference tables
 
-## What Changed in v2
+| Table | Description |
+|---|---|
+| `cages` | Cage container: cage_id, PI, room, rack, status (active/archived), remarks. |
+| `cage_users` / `cage_iacuc` | Junctions: cage ↔ user, cage ↔ IACUC protocol. |
+| `breeding` | Breeding-cage label + parent FKs (`male_id`/`female_id` → `mice.mouse_id`). Per-parent dob/genotype/parent-cage are read via JOIN from `mice` — they no longer live on this row. |
+| `litters` | Litter counts (alive/dead/male/female) per breeding cage. |
+| `strains` | JAX strain catalog. |
+| `iacuc` | IACUC protocols (id, title, file URL). |
 
-### New Tables (v2 only)
-| Table | Purpose |
-|-------|---------|
-| `tasks` | Task management with status workflow |
-| `reminders` | Recurring reminder scheduling |
-| `outbox` | Email notification queue |
-| `maintenance` | Cage maintenance log |
-| `activity_log` | Audit trail |
-| `settings` | System configuration |
-| `mice` | Individual mouse tracking |
+### App data tables
 
-### New Columns on Existing Tables
+| Table | Description |
+|---|---|
+| `users` | Accounts, roles (admin / vivarium_manager / user), email-verification & lockout fields. |
+| `tasks` | Task tracking (Pending / In Progress / Completed). |
+| `reminders` | Recurring reminders (daily / weekly / monthly). |
+| `outbox` | Outgoing email queue. |
+| `notifications` | In-app notifications. |
+| `maintenance` | Per-cage maintenance log. |
+| `notes` | Sticky notes per cage. |
+| `files` | File attachments per cage. |
+| `activity_log` | Audit trail (action, entity, IP, timestamp). |
+| `settings` | System config (key-value pairs). |
 
-| Table | Column | Type | Default | Purpose |
-|-------|--------|------|---------|---------|
-| `cages` | `status` | ENUM('active','archived') | 'active' | Soft-delete / archive |
-| `cages` | `room` | VARCHAR(255) | NULL | Physical location |
-| `cages` | `rack` | VARCHAR(255) | NULL | Physical location |
-| `holding` | `genotype` | VARCHAR(255) | NULL | Cage-level genotype |
-| `breeding` | `male_genotype` | VARCHAR(255) | NULL | Male parent genotype |
-| `breeding` | `female_genotype` | VARCHAR(255) | NULL | Female parent genotype |
-| `breeding` | `male_parent_cage` | VARCHAR(255) | NULL | Male source cage |
-| `breeding` | `female_parent_cage` | VARCHAR(255) | NULL | Female source cage |
+## Foreign key behavior
 
-### Fields Made Optional (Allow NULL)
+- **Renaming a mouse** (`UPDATE mice SET mouse_id = ?`) cascades to
+  `mouse_cage_history`, `breeding.male_id`/`female_id`, and self-FKs in
+  `mice.sire_id`/`dam_id` automatically — every reference follows.
+- **Renaming a cage** cascades to `mice.current_cage_id`,
+  `mouse_cage_history.cage_id`, `breeding.cage_id`, and every other
+  cage_id FK.
+- **Deleting a cage** sets `mice.current_cage_id` and
+  `mouse_cage_history.cage_id` to NULL (history rows survive). The app
+  layer additionally marks affected mice as `transferred_out` and closes
+  their open history intervals — see `hc_drop.php`.
+- **Deleting a mouse** (admin hard delete) cascades through
+  `mouse_cage_history`. Offspring's `sire_id`/`dam_id` get set to NULL,
+  preserving the offspring rows. The audit-log entry is written *before*
+  the delete so the trail survives. See `mouse_drop.php`.
 
-**Holding**: `dob`, `parent_cg`
-**Breeding**: `cross`, `male_id`, `female_id`, `male_dob`, `female_dob`
-
-### New Role
-
-`vivarium_manager` role auto-assigned to users with position "Vivarium Manager" or "Animal Care Technician".
-
-## Verification
-
-After migration, run these queries to verify:
+## Sanity checks
 
 ```sql
--- Check v2 schema
-DESCRIBE cages;
-DESCRIBE holding;
-DESCRIBE breeding;
-DESCRIBE tasks;
-DESCRIBE reminders;
+-- Counts after import
+SELECT COUNT(*) AS n FROM mice;
+SELECT status, COUNT(*) FROM mice GROUP BY status;
+SELECT COUNT(*) AS open_intervals FROM mouse_cage_history WHERE moved_out_at IS NULL;
 
--- Check cage counts
-SELECT status, COUNT(*) FROM cages GROUP BY status;
+-- Spot-check a mouse and its history
+SELECT * FROM mice WHERE mouse_id = '<some_id>';
+SELECT * FROM mouse_cage_history WHERE mouse_id = '<some_id>' ORDER BY moved_in_at DESC;
 
--- Check roles
-SELECT role, COUNT(*) FROM users GROUP BY role;
-
--- Check new tables exist
+-- Schema parity
 SHOW TABLES;
+DESCRIBE mice;
+DESCRIBE mouse_cage_history;
+DESCRIBE breeding;
 ```
-
-## Best Practices
-
-1. **Always backup** before running any migration
-2. **Test on dev** before applying to production
-3. **Run verification queries** after migration
-4. Update `.env` if you created a new database
