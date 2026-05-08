@@ -190,6 +190,13 @@ require 'header.php';
                         <span class="text-muted">—</span>
                     <?php endif; ?>
                 </td></tr>
+            <?php if (!empty($mouse['source_cage_label'])): ?>
+            <tr><th>Source Cage</th>
+                <td>
+                    <em><?= htmlspecialchars($mouse['source_cage_label']); ?></em>
+                    <small class="text-muted d-block">Cage this mouse originated from. Carried over from V1 — V2 lineage is per-mouse via Sire/Dam above.</small>
+                </td></tr>
+            <?php endif; ?>
             <?php if ($mouse['status'] === 'sacrificed'): ?>
             <tr><th>Sacrificed On</th><td><?= htmlspecialchars($mouse['sacrificed_at'] ?? '—'); ?></td></tr>
             <tr><th>Sacrifice Reason</th><td><?= htmlspecialchars($mouse['sacrifice_reason'] ?? '—'); ?></td></tr>

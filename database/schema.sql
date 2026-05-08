@@ -88,6 +88,11 @@ CREATE TABLE `strains` (
 -- parents:  hybrid model — `sire_id`/`dam_id` are FKs (NULL allowed for
 --           founders); `sire_external_ref`/`dam_external_ref` carry free-text
 --           descriptors for parents that live outside this system.
+-- source_cage_label: free-text "the cage this mouse came from", primarily
+--           used to preserve V1's `holding.parent_cg` value (cage-level
+--           lineage in V1; in V2 lineage is per-mouse via sire/dam, but we
+--           keep the legacy parent-cage label so imported records don't
+--           lose the breadcrumb).
 -- status:   alive → sacrificed | transferred_out | archived. `archived` is the
 --           soft-delete equivalent. Hard delete is admin-only and writes to
 --           activity_log first.
@@ -103,6 +108,7 @@ CREATE TABLE `mice` (
   `dam_id` varchar(255) DEFAULT NULL,
   `sire_external_ref` varchar(255) DEFAULT NULL,
   `dam_external_ref` varchar(255) DEFAULT NULL,
+  `source_cage_label` varchar(255) DEFAULT NULL,
   `status` enum('alive','sacrificed','transferred_out','archived') NOT NULL DEFAULT 'alive',
   `sacrificed_at` date DEFAULT NULL,
   `sacrifice_reason` varchar(255) DEFAULT NULL,

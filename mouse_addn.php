@@ -56,9 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ear_code   = !empty($_POST['ear_code']) ? trim($_POST['ear_code']) : null;
     $sire_id    = !empty($_POST['sire_id']) ? trim($_POST['sire_id']) : null;
     $dam_id     = !empty($_POST['dam_id']) ? trim($_POST['dam_id']) : null;
-    $sire_ext   = !empty($_POST['sire_external_ref']) ? trim($_POST['sire_external_ref']) : null;
-    $dam_ext    = !empty($_POST['dam_external_ref']) ? trim($_POST['dam_external_ref']) : null;
-    $notes      = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
+    $sire_ext     = !empty($_POST['sire_external_ref']) ? trim($_POST['sire_external_ref']) : null;
+    $dam_ext      = !empty($_POST['dam_external_ref']) ? trim($_POST['dam_external_ref']) : null;
+    $source_cage  = !empty($_POST['source_cage_label']) ? trim($_POST['source_cage_label']) : null;
+    $notes        = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
     $created_by = $_SESSION['user_id'] ?? null;
 
     if (!in_array($sex, ['male', 'female', 'unknown'], true)) $sex = 'unknown';
@@ -84,13 +85,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $insert = $con->prepare("
                 INSERT INTO mice
                   (mouse_id, sex, dob, current_cage_id, strain, genotype, ear_code,
-                   sire_id, dam_id, sire_external_ref, dam_external_ref, status, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'alive', ?, ?)
+                   sire_id, dam_id, sire_external_ref, dam_external_ref,
+                   source_cage_label, status, notes, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'alive', ?, ?)
             ");
             $insert->bind_param(
-                "sssssssssssss" . "i",
+                "ssssssssssssss" . "i",
                 $mouse_id, $sex, $dob, $cage_id, $strain, $genotype, $ear_code,
-                $sire_id, $dam_id, $sire_ext, $dam_ext, $notes, $created_by
+                $sire_id, $dam_id, $sire_ext, $dam_ext,
+                $source_cage, $notes, $created_by
             );
             $insert->execute();
             $insert->close();
@@ -234,6 +237,13 @@ require 'header.php';
                     <label for="dam_external_ref" class="form-label">Or external reference</label>
                     <input type="text" class="form-control" id="dam_external_ref" name="dam_external_ref" maxlength="255">
                 </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="source_cage_label" class="form-label">Source Cage <small class="text-muted">(optional)</small></label>
+                <input type="text" class="form-control" id="source_cage_label" name="source_cage_label" maxlength="255"
+                       placeholder="e.g. MDp16-2 — the cage this mouse came from">
+                <small class="text-muted">Use this when the parents aren't tracked individually but you know which cage the mouse came from.</small>
             </div>
 
             <div class="mb-3">

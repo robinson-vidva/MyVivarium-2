@@ -57,6 +57,13 @@ START TRANSACTION;
 USE `myvivarium_v2`;
 
 -- -----------------------------------------------------------------------------
+-- 0. Drop the seed admin (id=1) so V1's user with id=1 doesn't collide
+-- with the schema.sql Temporary Admin and get silently dropped by
+-- INSERT IGNORE.
+-- -----------------------------------------------------------------------------
+DELETE FROM `users` WHERE id = 1;
+
+-- -----------------------------------------------------------------------------
 -- 1. Reference data with no FK dependencies — copy first.
 -- -----------------------------------------------------------------------------
 
@@ -98,52 +105,50 @@ INSERT IGNORE INTO `cage_users` (cage_id, user_id)
 SELECT cage_id, user_id FROM `myvivarium_v1`.`cage_users`;
 
 -- -----------------------------------------------------------------------------
--- 3. Mice. The hard one — three sources merge into the canonical entity:
---    a) v1 `holding` rows (cage-scoped, no real mouse_id)
---    b) v1 `mice` rows (cage-scoped, has user-supplied mouse_id)
---    c) breeding parents (synthesized from breeding.male_id / female_id)
---
--- Order matters: parents need to exist before children reference them via
--- sire_id / dam_id (self-FK). We don't try to wire those FKs here because
--- v1 has no mouse-level parent links — lineage starts fresh in v2 and gets
--- populated as users register new mice with parent pickers.
+-- 3. Mice. V1 stored cage-level defaults (strain/dob/sex/parent_cg) on
+-- `holding` and per-mouse identity (mouse_id/genotype/notes) on `mice`. V2
+-- has a single canonical mouse entity, so each V1 mouse picks up its
+-- cage's holding-row defaults at import time. A defensive fallback then
+-- handles any cage that has a holding row but no individual mice listed.
 -- -----------------------------------------------------------------------------
 
--- 3a) holding rows → mice. Synthesize mouse_id so v1's nameless holding
--- rows get a stable, unique id. Users can rename via mouse_edit later
--- (rename CASCADEs everywhere).
+-- 3a) Each V1 mouse merges in its cage's holding row (LEFT JOIN so mice
+-- whose cage has no holding row still land, just without strain/dob/sex).
 INSERT IGNORE INTO `mice`
-  (mouse_id, sex, dob, current_cage_id, strain, genotype, status, notes)
+  (mouse_id, sex, dob, current_cage_id, strain, genotype, status, notes, source_cage_label)
 SELECT
-  CONCAT('H', h.cage_id, '_', h.id)               AS mouse_id,
-  COALESCE(h.sex, 'unknown')                       AS sex,
+  m.mouse_id                                       AS mouse_id,
+  COALESCE(NULLIF(LOWER(h.sex), ''), 'unknown')    AS sex,
+  h.dob                                            AS dob,
+  m.cage_id                                        AS current_cage_id,
+  h.strain                                         AS strain,
+  m.genotype                                       AS genotype,
+  'alive'                                          AS status,
+  m.notes                                          AS notes,
+  h.parent_cg                                      AS source_cage_label
+FROM `myvivarium_v1`.`mice` m
+LEFT JOIN `myvivarium_v1`.`holding` h ON h.cage_id = m.cage_id
+WHERE m.mouse_id IS NOT NULL AND m.mouse_id != '';
+
+-- 3b) Defensive fallback: cages with a holding row but no mice rows
+-- (V1 cage-level data with no individual mice listed). Synthesize one
+-- mouse so the holding-row data isn't lost.
+INSERT IGNORE INTO `mice`
+  (mouse_id, sex, dob, current_cage_id, strain, status, notes, source_cage_label)
+SELECT
+  CONCAT('H_', h.cage_id, '_', h.id)               AS mouse_id,
+  COALESCE(NULLIF(LOWER(h.sex), ''), 'unknown')    AS sex,
   h.dob                                            AS dob,
   h.cage_id                                        AS current_cage_id,
   h.strain                                         AS strain,
-  h.genotype                                       AS genotype,
   'alive'                                          AS status,
-  CASE WHEN h.parent_cg IS NOT NULL AND h.parent_cg != ''
-       THEN CONCAT('Imported from v1 holding; v1 parent_cg: ', h.parent_cg)
-       ELSE 'Imported from v1 holding'
-  END                                              AS notes
+  'Synthesized from v1 holding row (no individual mice listed for this cage in v1).' AS notes,
+  h.parent_cg                                      AS source_cage_label
 FROM `myvivarium_v1`.`holding` h
-WHERE h.cage_id IS NOT NULL;
-
--- 3b) v1 `mice` rows → mice. v1.mice had user-supplied mouse_ids that we
--- want to preserve. INSERT IGNORE on the PK skips any that collide with
--- step 3a synthesized ids.
-INSERT IGNORE INTO `mice`
-  (mouse_id, sex, dob, current_cage_id, genotype, status, notes)
-SELECT
-  m.mouse_id,
-  'unknown'                                        AS sex,
-  NULL                                              AS dob,
-  m.cage_id                                        AS current_cage_id,
-  m.genotype                                       AS genotype,
-  'alive'                                          AS status,
-  CONCAT('Imported from v1 mice. ', COALESCE(m.notes, '')) AS notes
-FROM `myvivarium_v1`.`mice` m
-WHERE m.mouse_id IS NOT NULL AND m.mouse_id != '';
+WHERE h.cage_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `myvivarium_v1`.`mice` m WHERE m.cage_id = h.cage_id
+  );
 
 -- 3c) Breeding parents — synthesize archived mouse rows for any
 -- male_id/female_id values referenced by v1.breeding that we haven't

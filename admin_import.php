@@ -115,7 +115,12 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
     $con->begin_transaction();
     $counts = [];
     try {
-        // 1. Reference data
+        // 0. Drop the seed admin (id=1, default Temporary Admin from
+        // schema.sql) so the imported V1 user with id=1 doesn't collide
+        // and get silently dropped by INSERT IGNORE.
+        $con->query("DELETE FROM users WHERE id = 1");
+
+        // 1. Reference data — copied as-is.
         copy_table($con, $tables, 'users',
             ['id','name','username','position','role','password','status',
              'reset_token','reset_token_expiration','login_attempts','account_locked',
@@ -126,7 +131,9 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
         copy_table($con, $tables, 'strains', ['id','str_id','str_name','str_aka','str_url','str_rrid','str_notes'], $counts);
         copy_table($con, $tables, 'settings', ['name','value'], $counts);
 
-        // 2. Cages + junctions
+        // 2. Cages + junctions. V1 cages don't carry status/room/rack/
+        // created_at on the original schema; default them here so the
+        // INSERT works against V2's column set.
         $cageRows = $tables['cages'] ?? [];
         foreach ($cageRows as $row) {
             insert_row($con, 'cages',
@@ -147,50 +154,79 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
         copy_table($con, $tables, 'cage_iacuc', ['cage_id','iacuc_id'], $counts);
         copy_table($con, $tables, 'cage_users', ['cage_id','user_id'], $counts);
 
-        // 3a. Mice from V1 holding (synthesized mouse_id)
-        $importedMice = 0;
+        // 3. Mice. V1 stored cage-level defaults (strain/dob/sex/parent_cg)
+        // on `holding` and per-mouse identity (mouse_id/genotype/notes) on
+        // `mice`. V2 has a single canonical mouse entity, so each V1 mouse
+        // picks up its cage's holding-row defaults at import time. This
+        // preserves data that the previous "synthesize one mouse per
+        // holding row" approach was throwing away.
+        $holdingByCage = [];
         foreach (($tables['holding'] ?? []) as $h) {
-            if (empty($h['cage_id'])) continue;
-            $mouseId = 'H' . $h['cage_id'] . '_' . $h['id'];
-            $note = !empty($h['parent_cg'])
-                ? "Imported from v1 holding; v1 parent_cg: {$h['parent_cg']}"
-                : 'Imported from v1 holding';
-            insert_row($con, 'mice',
-                ['mouse_id','sex','dob','current_cage_id','strain','genotype','status','notes'],
-                [
-                    'mouse_id'        => $mouseId,
-                    'sex'             => $h['sex'] ?: 'unknown',
-                    'dob'             => $h['dob'] ?? null,
-                    'current_cage_id' => $h['cage_id'],
-                    'strain'          => $h['strain']   ?? null,
-                    'genotype'        => $h['genotype'] ?? null,
-                    'status'          => 'alive',
-                    'notes'           => $note,
-                ]);
-            $importedMice++;
+            if (!empty($h['cage_id'])) $holdingByCage[$h['cage_id']] = $h;
         }
-        $counts['mice_from_holding'] = $importedMice;
 
-        // 3b. Mice from V1 mice table (preserve mouse_id)
+        $miceByCage = [];
+        foreach (($tables['mice'] ?? []) as $m) {
+            if (!empty($m['cage_id'])) $miceByCage[$m['cage_id']][] = $m;
+        }
+
+        // 3a. For each V1 mouse, merge in its cage's holding row defaults.
         $importedV1Mice = 0;
         foreach (($tables['mice'] ?? []) as $m) {
             if (empty($m['mouse_id'])) continue;
+            $cageId  = $m['cage_id'] ?? null;
+            $holding = $cageId ? ($holdingByCage[$cageId] ?? null) : null;
+
+            $sex = strtolower((string)($holding['sex'] ?? ''));
+            if (!in_array($sex, ['male', 'female'], true)) $sex = 'unknown';
+
             insert_row($con, 'mice',
-                ['mouse_id','sex','dob','current_cage_id','genotype','status','notes'],
+                ['mouse_id','sex','dob','current_cage_id','strain','genotype','status','notes','source_cage_label'],
                 [
-                    'mouse_id'        => $m['mouse_id'],
-                    'sex'             => 'unknown',
-                    'dob'             => null,
-                    'current_cage_id' => $m['cage_id'] ?? null,
-                    'genotype'        => $m['genotype'] ?? null,
-                    'status'          => 'alive',
-                    'notes'           => 'Imported from v1 mice. ' . ($m['notes'] ?? ''),
+                    'mouse_id'          => $m['mouse_id'],
+                    'sex'               => $sex,
+                    'dob'               => $holding['dob']    ?? null,
+                    'current_cage_id'   => $cageId,
+                    'strain'            => $holding['strain'] ?? null,
+                    'genotype'          => $m['genotype']     ?? null,
+                    'status'            => 'alive',
+                    'notes'             => $m['notes']        ?? null,
+                    'source_cage_label' => $holding['parent_cg'] ?? null,
                 ]);
             $importedV1Mice++;
         }
-        $counts['mice_from_v1_mice'] = $importedV1Mice;
+        $counts['mice'] = $importedV1Mice;
 
-        // 3c. Synthesize parent mice from V1 breeding rows
+        // 3b. Defensive fallback: for any cage that had a holding row but
+        // *no* mice rows (V1 cage-level data with no individual mice
+        // listed), synthesize one mouse so the holding-row data isn't
+        // lost. This shouldn't trigger on well-populated V1 dbs but
+        // protects against partial/legacy data.
+        $synthFromHolding = 0;
+        foreach ($holdingByCage as $cageId => $h) {
+            if (!empty($miceByCage[$cageId])) continue;
+            $sex = strtolower((string)($h['sex'] ?? ''));
+            if (!in_array($sex, ['male', 'female'], true)) $sex = 'unknown';
+            insert_row($con, 'mice',
+                ['mouse_id','sex','dob','current_cage_id','strain','status','notes','source_cage_label'],
+                [
+                    'mouse_id'          => 'H_' . $cageId . '_' . ($h['id'] ?? '0'),
+                    'sex'               => $sex,
+                    'dob'               => $h['dob'] ?? null,
+                    'current_cage_id'   => $cageId,
+                    'strain'            => $h['strain'] ?? null,
+                    'status'            => 'alive',
+                    'notes'             => 'Synthesized from v1 holding row (no individual mice listed for this cage in v1).',
+                    'source_cage_label' => $h['parent_cg'] ?? null,
+                ]);
+            $synthFromHolding++;
+        }
+        if ($synthFromHolding > 0) $counts['mice_synthesized_from_orphan_holding'] = $synthFromHolding;
+
+        // 3c. Breeding parents — synthesize archived mouse rows for any
+        // male_id/female_id values that the V1 breeding row references but
+        // we haven't already imported as a real mouse. status='archived'
+        // + current_cage_id=NULL keeps them out of live counts.
         $existingMouseIds = [];
         $r = $con->query("SELECT mouse_id FROM mice");
         while ($row = $r->fetch_assoc()) $existingMouseIds[$row['mouse_id']] = true;
@@ -232,7 +268,9 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
                 $synthFemales++;
             }
         }
-        $counts['mice_synthesized_from_breeding'] = $synthMales + $synthFemales;
+        if ($synthMales + $synthFemales > 0) {
+            $counts['mice_synthesized_from_breeding'] = $synthMales + $synthFemales;
+        }
 
         // 4. Seed mouse_cage_history with one open interval per cage-resident mouse.
         $seedHistory = $con->prepare("
