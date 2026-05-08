@@ -11,6 +11,7 @@ tracked at the mouse level, not duplicated per cage.
 |---|---|
 | `schema.sql` | Canonical V2 schema. Apply once to a new database. |
 | `install.php` | CLI installer. Reads `.env`, connects to your configured database, applies `schema.sql`. Use `--reset` to drop existing tables first (dev only). |
+| `reset_admin.php` | CLI helper to create or reset an admin user with a known email/password. Useful after a `--reset` if you don't remember the seeded admin password. |
 | `import_from_v1.sql` | Alternative SQL-based import (cross-database INSERT/SELECT) for users who'd rather operate at the SQL level than the UI uploader. |
 | `erd.png` | ER diagram. **Stale** — depicts the V1 schema and needs regeneration. |
 
