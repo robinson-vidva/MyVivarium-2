@@ -32,13 +32,18 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$report = null;
-$errors = [];
+$report          = null;
+$errors          = [];
+$needsConfirm    = false;   // destination has data; show "are you sure" UI
+$dbSummary       = null;    // counts shown to admin in the warning
+$confirmedReset  = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die('CSRF token validation failed');
     }
+    $confirmedReset = (($_POST['confirm_overwrite'] ?? '') === '1');
+
     if (!isset($_FILES['v1_export']) || $_FILES['v1_export']['error'] !== UPLOAD_ERR_OK) {
         $errors[] = 'No file uploaded, or upload failed (check upload_max_filesize and post_max_size in php.ini).';
     } else {
@@ -47,12 +52,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($data) || !isset($data['tables']) || !is_array($data['tables'])) {
             $errors[] = 'Uploaded file is not a valid V1 export JSON.';
         } else {
-            $report = run_import($con, $data, $errors, $_SESSION['user_id'] ?? null);
+            $dbSummary = describe_destination($con);
+            if ($dbSummary['has_data'] && !$confirmedReset) {
+                // Stop and ask. Don't touch the DB.
+                $needsConfirm = true;
+            } else {
+                if ($dbSummary['has_data'] && $confirmedReset) {
+                    // Wipe before importing. Logged so the action is visible
+                    // in the audit trail.
+                    log_activity($con, 'reset', 'database', null,
+                        'Admin wiped existing data before V1 import: ' . json_encode($dbSummary));
+                    reset_destination($con);
+                }
+                $report = run_import($con, $data, $errors, $_SESSION['user_id'] ?? null);
+            }
         }
     }
 }
 
 require 'header.php';
+
+/**
+ * Snapshot the destination DB so we can show admins exactly what's at risk
+ * before they confirm an overwrite. `has_data` is the gate the upstream
+ * caller uses to decide whether to ask for confirmation.
+ */
+function describe_destination(mysqli $con): array
+{
+    $row = $con->query("
+        SELECT
+          (SELECT COUNT(*) FROM mice)     AS mice,
+          (SELECT COUNT(*) FROM cages)    AS cages,
+          (SELECT COUNT(*) FROM breeding) AS breeding,
+          (SELECT COUNT(*) FROM litters)  AS litters,
+          (SELECT COUNT(*) FROM users WHERE id > 1) AS users_beyond_seed,
+          (SELECT COUNT(*) FROM users)    AS users_total
+    ")->fetch_assoc();
+
+    return [
+        'mice'              => (int)$row['mice'],
+        'cages'             => (int)$row['cages'],
+        'breeding'          => (int)$row['breeding'],
+        'litters'           => (int)$row['litters'],
+        'users_beyond_seed' => (int)$row['users_beyond_seed'],
+        'users_total'       => (int)$row['users_total'],
+        'has_data'          => ((int)$row['mice'] + (int)$row['cages']
+                              + (int)$row['breeding'] + (int)$row['litters']
+                              + (int)$row['users_beyond_seed']) > 0,
+    ];
+}
+
+/**
+ * Wipe all data from every table while keeping the schema intact. Used
+ * when the admin has explicitly confirmed an overwrite. Order doesn't
+ * matter once FK checks are off — TRUNCATE is faster than DELETE and
+ * resets AUTO_INCREMENT.
+ */
+function reset_destination(mysqli $con): void
+{
+    $tables = [
+        // Junction / dependent tables first (good practice even with
+        // FK_CHECKS off — keeps the order intuitive).
+        'activity_log', 'outbox', 'notifications', 'reminders',
+        'maintenance', 'tasks', 'notes', 'files',
+        'mouse_cage_history',
+        'litters', 'breeding',
+        'mice',
+        'cage_users', 'cage_iacuc',
+        'cages',
+        'strains', 'iacuc',
+        'settings',
+        'users',
+    ];
+    $con->query("SET FOREIGN_KEY_CHECKS = 0");
+    foreach ($tables as $t) {
+        $con->query("TRUNCATE TABLE `$t`");
+    }
+    $con->query("SET FOREIGN_KEY_CHECKS = 1");
+}
 
 /**
  * Insert a single row, named columns, INSERT IGNORE.
@@ -99,17 +176,9 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
 {
     $tables = $payload['tables'];
 
-    // Pre-flight: make sure the destination is empty enough for an import.
-    $check = $con->query("SELECT
-        (SELECT COUNT(*) FROM mice) +
-        (SELECT COUNT(*) FROM cages) +
-        (SELECT COUNT(*) FROM breeding) +
-        (SELECT COUNT(*) FROM users WHERE id > 1) AS n");
-    $row = $check->fetch_assoc();
-    if ((int)$row['n'] > 0) {
-        $errors[] = 'Destination database already contains data (mice/cages/breeding/users beyond seed). Reset first via `php database/install.php --reset`, then retry.';
-        return null;
-    }
+    // Caller decides whether the destination is empty enough — if not, it
+    // either bails out asking for confirmation, or calls reset_destination()
+    // first. So we proceed directly here.
 
     $con->query("SET FOREIGN_KEY_CHECKS = 0");
     $con->begin_transaction();
@@ -377,6 +446,21 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
         </div>
     <?php endif; ?>
 
+    <?php if ($needsConfirm && $dbSummary): ?>
+        <div class="alert alert-warning">
+            <h6 class="mb-2"><i class="fas fa-exclamation-triangle"></i> Existing data in this lab</h6>
+            <p class="mb-2">This lab already contains data. Importing will <strong>erase everything</strong> below and replace it with what's in the upload:</p>
+            <ul class="mb-3">
+                <li><strong><?= $dbSummary['mice']; ?></strong> mice</li>
+                <li><strong><?= $dbSummary['cages']; ?></strong> cages</li>
+                <li><strong><?= $dbSummary['breeding']; ?></strong> breeding cages</li>
+                <li><strong><?= $dbSummary['litters']; ?></strong> litters</li>
+                <li><strong><?= $dbSummary['users_total']; ?></strong> user accounts</li>
+            </ul>
+            <p class="mb-0 small">If you didn't intend to overwrite, click Cancel. Otherwise re-pick the same export file below and tick the confirmation box.</p>
+        </div>
+    <?php endif; ?>
+
     <form method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
         <div class="mb-3">
@@ -388,15 +472,23 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
                 you the resulting <code>.json</code> file.
             </small>
         </div>
-        <button type="submit" class="btn btn-primary">Import</button>
+
+        <?php if ($needsConfirm): ?>
+            <div class="form-check mb-3">
+                <input type="checkbox" id="confirm_overwrite" name="confirm_overwrite" value="1" class="form-check-input" required>
+                <label for="confirm_overwrite" class="form-check-label">
+                    Yes, erase the existing data in this lab and replace it with the uploaded export.
+                </label>
+            </div>
+            <button type="submit" class="btn btn-danger">
+                <i class="fas fa-exclamation-triangle"></i> Erase &amp; Import
+            </button>
+        <?php else: ?>
+            <button type="submit" class="btn btn-primary">Import</button>
+        <?php endif; ?>
+
         <a href="home.php" class="btn btn-secondary">Cancel</a>
     </form>
-
-    <p class="text-muted small mt-4 mb-0">
-        Heads up: the import requires a fresh database. If this lab already
-        has data in it, ask your system administrator to reset it before
-        re-running this step.
-    </p>
 </div>
 <br>
 <?php include 'footer.php'; ?>

@@ -78,6 +78,21 @@ if (isset($_GET['id'])) {
     $stmt3->execute();
     $litters = $stmt3->get_result();
 
+    // v2: mice currently housed in this breeding cage. The breeding row's
+    // male_id / female_id pick up the parents wherever they live; this
+    // section shows everyone *physically in this cage right now* —
+    // typically the breeding pair plus any pre-weaning offspring.
+    $bcMiceStmt = $con->prepare("
+        SELECT mouse_id, sex, dob, genotype, status, ear_code
+          FROM mice
+         WHERE current_cage_id = ?
+         ORDER BY status = 'alive' DESC, sex DESC, mouse_id ASC
+    ");
+    $bcMiceStmt->bind_param("s", $id);
+    $bcMiceStmt->execute();
+    $bcMice = $bcMiceStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $bcMiceStmt->close();
+
     // Check if the breeding cage record exists
     if (mysqli_num_rows($result) === 1) {
         $breedingcage = mysqli_fetch_assoc($result);
@@ -585,6 +600,71 @@ require 'header.php';
                     <td><?= htmlspecialchars($breedingcage['remarks']); ?></td>
                 </tr>
             </table>
+        </div>
+
+        <!-- Mice in Cage Section (v2) -->
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-paw"></i>
+                <h5>Mice in this cage (<?= count($bcMice); ?>)</h5>
+                <div class="action-buttons">
+                    <a href="mouse_addn.php?cage_id=<?= rawurlencode($breedingcage['cage_id']); ?>" class="btn btn-primary btn-sm" title="Register Mouse in this Cage">
+                        <i class="fas fa-plus"></i>
+                    </a>
+                </div>
+            </div>
+            <?php if (!empty($bcMice)) : ?>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Mouse ID</th>
+                                <th>Sex</th>
+                                <th>DOB</th>
+                                <th>Genotype</th>
+                                <th>Status</th>
+                                <th style="width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($bcMice as $mouse):
+                                $statusBadge = [
+                                    'alive'           => 'bg-success',
+                                    'sacrificed'      => 'bg-secondary',
+                                    'archived'        => 'bg-dark',
+                                    'transferred_out' => 'bg-warning text-dark',
+                                ][$mouse['status']] ?? 'bg-light text-dark';
+                                $isParent = ($mouse['mouse_id'] === ($breedingcage['male_id'] ?? null))
+                                         || ($mouse['mouse_id'] === ($breedingcage['female_id'] ?? null));
+                            ?>
+                                <tr>
+                                    <td data-label="Mouse ID">
+                                        <a href="mouse_view.php?id=<?= rawurlencode($mouse['mouse_id']); ?>"><strong><?= htmlspecialchars($mouse['mouse_id']); ?></strong></a>
+                                        <?php if ($isParent): ?>
+                                            <span class="badge bg-info text-dark ms-1" title="Listed as a parent on this breeding cage">parent</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td data-label="Sex"><?= htmlspecialchars(ucfirst($mouse['sex'])); ?></td>
+                                    <td data-label="DOB"><?= htmlspecialchars($mouse['dob'] ?? '—'); ?></td>
+                                    <td data-label="Genotype"><?= htmlspecialchars($mouse['genotype'] ?? ''); ?></td>
+                                    <td data-label="Status"><span class="badge <?= $statusBadge; ?>"><?= htmlspecialchars($mouse['status']); ?></span></td>
+                                    <td data-label="Actions">
+                                        <div class="action-buttons">
+                                            <a href="mouse_view.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
+                                            <a href="mouse_edit.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <small class="text-muted d-block mt-2">
+                    Parents listed on the breeding row above may be housed elsewhere — those FK links don't require physical co-housing. This list is "who's in this cage right now."
+                </small>
+            <?php else : ?>
+                <p class="text-muted mb-0">No mice currently housed in this cage. <a href="mouse_addn.php?cage_id=<?= rawurlencode($breedingcage['cage_id']); ?>">Register one</a>.</p>
+            <?php endif; ?>
         </div>
 
         <!-- Files Section -->
