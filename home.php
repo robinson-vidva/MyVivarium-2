@@ -21,12 +21,15 @@ if (!isset($_SESSION['name'])) {
     exit;
 }
 
-// Fetch the counts for holding and breeding cages (active vs archived)
+// v2: count holding cages directly from `cages` (the per-cage `holding` row
+// no longer exists). A "holding cage" is any non-breeding cage; we treat
+// every cage that isn't referenced by `breeding` as holding.
 $holdingCountResult = $con->query("SELECT
     COUNT(*) AS total,
     SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END) AS active,
     SUM(CASE WHEN c.status = 'archived' THEN 1 ELSE 0 END) AS archived
-    FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id");
+    FROM cages c
+    WHERE NOT EXISTS (SELECT 1 FROM breeding b WHERE b.cage_id = c.cage_id)");
 $holdingCountRow = $holdingCountResult->fetch_assoc();
 $holdingCount = $holdingCountRow['active'] ?? 0;
 $holdingArchived = $holdingCountRow['archived'] ?? 0;

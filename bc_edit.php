@@ -142,14 +142,11 @@ if (isset($_GET['id'])) {
             $cross = !empty($_POST['cross']) ? trim($_POST['cross']) : null;
             $iacuc = isset($_POST['iacuc']) ? $_POST['iacuc'] : []; // Array of selected IACUC values
             $users = isset($_POST['user']) ? $_POST['user'] : []; // Array of selected users
-            $male_id = !empty($_POST['male_id']) ? trim($_POST['male_id']) : null;
+            // v2: only male_id / female_id (FKs) live on the breeding row.
+            // Per-parent dob/genotype/parent_cage are properties of the
+            // mouse entity now — edit them via mouse_edit.php.
+            $male_id   = !empty($_POST['male_id'])   ? trim($_POST['male_id'])   : null;
             $female_id = !empty($_POST['female_id']) ? trim($_POST['female_id']) : null;
-            $male_dob = !empty($_POST['male_dob']) ? trim($_POST['male_dob']) : null;
-            $female_dob = !empty($_POST['female_dob']) ? trim($_POST['female_dob']) : null;
-            $male_genotype = !empty($_POST['male_genotype']) ? trim($_POST['male_genotype']) : null;
-            $male_parent_cage = !empty($_POST['male_parent_cage']) ? trim($_POST['male_parent_cage']) : null;
-            $female_genotype = !empty($_POST['female_genotype']) ? trim($_POST['female_genotype']) : null;
-            $female_parent_cage = !empty($_POST['female_parent_cage']) ? trim($_POST['female_parent_cage']) : null;
             $remarks = trim($_POST['remarks']);
             $created_at = !empty($_POST['created_at']) ? trim($_POST['created_at']) : null;
 
@@ -194,19 +191,9 @@ if (isset($_GET['id'])) {
                 $updateCageQuery->execute();
                 $updateCageQuery->close();
 
-                // Update breeding table
-                $updateBreedingQuery = $con->prepare("UPDATE breeding SET
-                                    `cross` = ?,
-                                    male_id = ?,
-                                    female_id = ?,
-                                    male_dob = ?,
-                                    female_dob = ?,
-                                    male_genotype = ?,
-                                    male_parent_cage = ?,
-                                    female_genotype = ?,
-                                    female_parent_cage = ?
-                                    WHERE cage_id = ?");
-                $updateBreedingQuery->bind_param("ssssssssss", $cross, $male_id, $female_id, $male_dob, $female_dob, $male_genotype, $male_parent_cage, $female_genotype, $female_parent_cage, $cage_id);
+                // v2 breeding update: only the cage + cross label + parent FKs.
+                $updateBreedingQuery = $con->prepare("UPDATE breeding SET `cross` = ?, male_id = ?, female_id = ? WHERE cage_id = ?");
+                $updateBreedingQuery->bind_param("ssss", $cross, $male_id, $female_id, $cage_id);
                 $updateBreedingQuery->execute();
                 $updateBreedingQuery->close();
 
@@ -683,6 +670,27 @@ require 'header.php';
                     return $result;
                 }
             });
+
+            // v2: parent pickers — Select2 + AJAX into mouse_fetch_data.php
+            $('.parent-picker').each(function () {
+                var $el = $(this);
+                var sex = $el.data('sex-filter');
+                $el.select2({
+                    placeholder: 'Search by Mouse ID…',
+                    allowClear: true,
+                    width: '100%',
+                    minimumInputLength: 1,
+                    ajax: {
+                        url: 'mouse_fetch_data.php', dataType: 'json', delay: 250,
+                        data: function (params) { return { search: params.term, sex: sex, mode: 'parent_search' }; },
+                        processResults: function (data) {
+                            return { results: (data.results || []).map(function (r) {
+                                return { id: r.mouse_id, text: r.mouse_id + (r.dob ? ' (DOB ' + r.dob + ')' : '') };
+                            }) };
+                        }
+                    }
+                });
+            });
         });
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -785,7 +793,7 @@ require 'header.php';
                 const fields = {
                     critical: ['male_id', 'female_id'],
                     important: ['pi_name', 'cross', 'iacuc', 'user'],
-                    useful: ['male_dob', 'female_dob']
+                    useful: []
                 };
 
                 let totalFields = 0;
@@ -1110,49 +1118,30 @@ require 'header.php';
                             <!-- Male Section -->
                             <hr class="mt-2 mb-3" style="border-top: 2px solid var(--bs-border-color);">
                             <h6 class="text-muted mb-3"><i class="fas fa-mars"></i> Male</h6>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="male_id" class="form-label">Male ID <span class="badge bg-warning">Critical</span></label>
-                                    <input type="text" class="form-control" id="male_id" name="male_id" value="<?= htmlspecialchars($breedingcage['male_id']); ?>" data-field-type="critical">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="male_genotype" class="form-label">Male Genotype</label>
-                                    <input type="text" class="form-control" id="male_genotype" name="male_genotype" value="<?= htmlspecialchars($breedingcage['male_genotype'] ?? ''); ?>">
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="male_dob" class="form-label">Male DOB <span class="badge bg-secondary">Useful</span></label>
-                                    <input type="date" class="form-control" id="male_dob" name="male_dob" value="<?= htmlspecialchars($breedingcage['male_dob']); ?>" min="1900-01-01" data-field-type="useful">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="male_parent_cage" class="form-label">Male Source / Parent Cage</label>
-                                    <input type="text" class="form-control" id="male_parent_cage" name="male_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($breedingcage['male_parent_cage'] ?? ''); ?>">
-                                </div>
+                            <!-- v2: parent dob/genotype/source live on the mouse entity (mouse_view.php). -->
+                            <div class="mb-3">
+                                <label for="male_id" class="form-label">Male (Sire) <span class="badge bg-warning">Critical</span></label>
+                                <select class="form-control parent-picker" id="male_id" name="male_id" data-sex-filter="male" data-field-type="critical">
+                                    <?php if (!empty($breedingcage['male_id'])): ?>
+                                        <option value="<?= htmlspecialchars($breedingcage['male_id']); ?>" selected><?= htmlspecialchars($breedingcage['male_id']); ?></option>
+                                    <?php else: ?>
+                                        <option value="">— Select male mouse —</option>
+                                    <?php endif; ?>
+                                </select>
+                                <small class="text-muted">Search by Mouse ID. Edit DOB/genotype on the mouse itself.</small>
                             </div>
 
-                            <!-- Female Section -->
                             <hr class="mt-2 mb-3" style="border-top: 2px solid var(--bs-border-color);">
                             <h6 class="text-muted mb-3"><i class="fas fa-venus"></i> Female</h6>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="female_id" class="form-label">Female ID <span class="badge bg-warning">Critical</span></label>
-                                    <input type="text" class="form-control" id="female_id" name="female_id" value="<?= htmlspecialchars($breedingcage['female_id']); ?>" data-field-type="critical">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="female_genotype" class="form-label">Female Genotype</label>
-                                    <input type="text" class="form-control" id="female_genotype" name="female_genotype" value="<?= htmlspecialchars($breedingcage['female_genotype'] ?? ''); ?>">
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="female_dob" class="form-label">Female DOB <span class="badge bg-secondary">Useful</span></label>
-                                    <input type="date" class="form-control" id="female_dob" name="female_dob" value="<?= htmlspecialchars($breedingcage['female_dob']); ?>" min="1900-01-01" data-field-type="useful">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="female_parent_cage" class="form-label">Female Source / Parent Cage</label>
-                                    <input type="text" class="form-control" id="female_parent_cage" name="female_parent_cage" placeholder="e.g. Jax Lab, cage ID, or other source" value="<?= htmlspecialchars($breedingcage['female_parent_cage'] ?? ''); ?>">
-                                </div>
+                            <div class="mb-3">
+                                <label for="female_id" class="form-label">Female (Dam) <span class="badge bg-warning">Critical</span></label>
+                                <select class="form-control parent-picker" id="female_id" name="female_id" data-sex-filter="female" data-field-type="critical">
+                                    <?php if (!empty($breedingcage['female_id'])): ?>
+                                        <option value="<?= htmlspecialchars($breedingcage['female_id']); ?>" selected><?= htmlspecialchars($breedingcage['female_id']); ?></option>
+                                    <?php else: ?>
+                                        <option value="">— Select female mouse —</option>
+                                    <?php endif; ?>
+                                </select>
                             </div>
 
                             <hr class="mt-2 mb-3" style="border-top: 2px solid var(--bs-border-color);">

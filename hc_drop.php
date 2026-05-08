@@ -91,18 +91,37 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
 
     try {
         if ($action === 'permanent_delete') {
-            // Permanently delete records from all related tables
+            // v2: mice are first-class entities; we don't delete them with the
+            // cage. Instead, mark any mice currently in this cage as
+            // transferred_out (their cage history will get the close stamp,
+            // and current_cage_id auto-NULLs via FK ON DELETE SET NULL when
+            // the cage row goes).
+            $closeHist = $con->prepare("UPDATE mouse_cage_history SET moved_out_at = CURRENT_TIMESTAMP, reason = COALESCE(reason, 'cage permanently deleted') WHERE cage_id = ? AND moved_out_at IS NULL");
+            $closeHist->bind_param("s", $id);
+            if (!$closeHist->execute()) {
+                throw new Exception("Error closing mouse history intervals: " . mysqli_error($con));
+            }
+            $closeHist->close();
+
+            $orphanMice = $con->prepare("UPDATE mice SET status = 'transferred_out' WHERE current_cage_id = ? AND status = 'alive'");
+            $orphanMice->bind_param("s", $id);
+            if (!$orphanMice->execute()) {
+                throw new Exception("Error updating orphan mice: " . mysqli_error($con));
+            }
+            $orphanMice->close();
+
+            // Tables that need explicit cleanup before the cage row goes.
+            // The `mice` table FK is ON DELETE SET NULL — current_cage_id auto-clears.
+            // The `mouse_cage_history` FK is ON DELETE SET NULL — history rows survive with cage_id NULL.
             $tables = [
-                'holding' => 'cage_id',
-                'mice' => 'cage_id',
-                'files' => 'cage_id',
-                'notes' => 'cage_id',
-                'cage_iacuc' => 'cage_id',
-                'cage_users' => 'cage_id',
-                'tasks' => 'cage_id',
+                'files'       => 'cage_id',
+                'notes'       => 'cage_id',
+                'cage_iacuc'  => 'cage_id',
+                'cage_users'  => 'cage_id',
+                'tasks'       => 'cage_id',
                 'maintenance' => 'cage_id',
-                'reminders' => 'cage_id',
-                'cages' => 'cage_id'
+                'reminders'   => 'cage_id',
+                'cages'       => 'cage_id',
             ];
 
             foreach ($tables as $table => $column) {

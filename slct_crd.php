@@ -22,8 +22,11 @@ if (!isset($_SESSION['username'])) {
     exit;
 }
 
-// Fetch all distinct holding cage IDs
-$hcQuery = "SELECT DISTINCT h.`cage_id` FROM holding h INNER JOIN cages c ON h.cage_id = c.cage_id WHERE c.status = 'active'";
+// v2: holding cages are simply non-breeding active cages (no `holding` row anymore).
+$hcQuery = "SELECT c.cage_id FROM cages c
+            WHERE c.status = 'active'
+              AND NOT EXISTS (SELECT 1 FROM breeding b WHERE b.cage_id = c.cage_id)
+            ORDER BY c.cage_id";
 $hcResult = mysqli_query($con, $hcQuery);
 $holdingCageIds = [];
 while ($row = mysqli_fetch_assoc($hcResult)) {

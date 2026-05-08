@@ -41,13 +41,20 @@ if (isset($_GET['id'])) {
     foreach ($ids as $id) {
         $id = mysqli_real_escape_string($con, $id); // Sanitize the ID
 
-        // Fetch the holding cage record with the specified ID
-        $query = "SELECT h.*, pi.name AS pi_name, c.quantity as qty, c.room, c.rack, h.dob, h.sex, h.parent_cg, s.str_name
-                  FROM holding h
-                  LEFT JOIN cages c ON h.cage_id = c.cage_id
-                  LEFT JOIN users pi ON c.pi_name = pi.id
-                  LEFT JOIN strains s ON h.strain = s.str_id
-                  WHERE h.cage_id = ?";
+        // v2: aggregate cage card data from cages + currently-assigned mice.
+        // Strain/sex/dob/parent_cg are pulled from a representative live mouse
+        // (or aggregated where there are multiple).
+        $query = "SELECT c.cage_id,
+                         pi.name AS pi_name,
+                         c.quantity AS qty, c.room, c.rack,
+                         (SELECT MIN(mi.dob) FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS dob,
+                         (SELECT GROUP_CONCAT(DISTINCT mi.sex SEPARATOR ', ') FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS sex,
+                         NULL AS parent_cg,
+                         s.str_name
+                  FROM cages c
+                  LEFT JOIN users pi   ON c.pi_name = pi.id
+                  LEFT JOIN strains s  ON s.str_id = (SELECT mi.strain FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.strain IS NOT NULL LIMIT 1)
+                  WHERE c.cage_id = ?";
         $stmt = $con->prepare($query);
         $stmt->bind_param("s", $id);
         $stmt->execute();
@@ -57,11 +64,11 @@ if (isset($_GET['id'])) {
         if (mysqli_num_rows($result) === 1) {
             $holdingcage = mysqli_fetch_assoc($result);
 
-            // Fetch mouse data for this cage, limit to first 5 records
+            // v2: mice are first-class entities; pull live ones currently in this cage
             $mouseQuery = "SELECT mouse_id, genotype
-                           FROM mice
-                           WHERE cage_id = ?
-                           LIMIT 5";
+                             FROM mice
+                            WHERE current_cage_id = ? AND status = 'alive'
+                            ORDER BY mouse_id LIMIT 5";
             $stmtMouse = $con->prepare($mouseQuery);
             $stmtMouse->bind_param("s", $id);
             $stmtMouse->execute();

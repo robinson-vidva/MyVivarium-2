@@ -322,6 +322,7 @@ if (isset($settings['r2_pres'])) {
                         <i class="fas fa-tachometer-alt"></i> <span class="nav-label">Dashboards</span>
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dashboardMenuButton">
+                        <li><a class="dropdown-item" href="mouse_dash.php"><i class="fas fa-paw me-1"></i> Mice</a></li>
                         <li><a class="dropdown-item" href="hc_dash.php">Holding Cage</a></li>
                         <li><a class="dropdown-item" href="bc_dash.php">Breeding Cage</a></li>
                         <?php

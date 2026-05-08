@@ -1,1356 +1,299 @@
 <?php
 
 /**
- * Edit Holding Cage Script
- * 
- * This script handles the editing of holding cage records, including maintenance logs and mouse data.
- * 
+ * Edit Holding Cage (v2)
+ *
+ * Cage-only editor. The v1 form bundled cage metadata + per-cage mouse rows
+ * (`holding`) + per-cage `mice` rows in one mega-form. In v2 mice are
+ * independent entities — they're managed from mouse_view.php / mouse_edit.php
+ * and can be added via mouse_addn.php (or via "+ Add Mouse" on hc_view.php).
+ *
+ * What this form covers: cage_id (rename), PI, room/rack, IACUC, assigned
+ * users, remarks, file uploads. Cage-id rename relies on `cages.cage_id`'s
+ * ON UPDATE CASCADE so every dependent FK (mice.current_cage_id,
+ * mouse_cage_history.cage_id, breeding.cage_id, files, etc.) follows.
  */
 
-// Start a new session or resume the existing session
 require 'session_config.php';
-
-// Include the database connection file
 require 'dbcon.php';
-
-// Include the activity log helper
 require_once 'log_activity.php';
 
-// Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-// Check if the user is not logged in, redirect them to index.php with the current URL for redirection after login
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
-    exit; // Exit to ensure no further code is executed
+    exit;
 }
 
-// Generate a CSRF token if it doesn't exist
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 function getCurrentUrlParams() {
-    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-    $search = isset($_GET['search']) ? urlencode($_GET['search']) : '';
+    $page   = (int)($_GET['page'] ?? 1);
+    $search = urlencode($_GET['search'] ?? '');
     return "page=$page&search=$search";
 }
 
-// Query to retrieve users with initials and names
-$userQuery = "SELECT id, initials, name FROM users WHERE status = 'approved'";
-$userResult = $con->query($userQuery);
-
-// Query to retrieve options where role is 'Principal Investigator'
-$piQuery = "SELECT id, initials, name FROM users WHERE position = 'Principal Investigator' AND status = 'approved'";
-$piResult = $con->query($piQuery);
-
-// Query to retrieve IACUC values
-$iacucQuery = "SELECT iacuc_id, iacuc_title FROM iacuc";
-$iacucResult = $con->query($iacucQuery);
-
-// Query to retrieve strain details including common names
-$strainQuery = "SELECT str_id, str_name, str_aka FROM strains";
-$strainResult = $con->query($strainQuery);
-
-// Initialize an array to hold all options
-$strainOptions = [];
-
-// Process each row to generate options
-while ($strainrow = $strainResult->fetch_assoc()) {
-    $str_id = htmlspecialchars($strainrow['str_id'] ?? 'Unknown');
-    $str_name = htmlspecialchars($strainrow['str_name'] ?? 'Unnamed Strain');
-    $str_aka = $strainrow['str_aka'] ? htmlspecialchars($strainrow['str_aka']) : '';
-
-    // Add the main strain option
-    $strainOptions[] = "$str_id | $str_name";
-
-    // Explode the common names if they exist
-    if (!empty($str_aka)) {
-        $akaNames = explode(', ', $str_aka);
-        foreach ($akaNames as $aka) {
-            $strainOptions[] = "$str_id | " . htmlspecialchars(trim($aka));
-        }
-    }
+$id = trim($_GET['id'] ?? $_POST['cage_id'] ?? '');
+if ($id === '') {
+    $_SESSION['message'] = 'Missing cage ID.';
+    header('Location: hc_dash.php'); exit;
 }
 
-// Sort the options based on str_id
-sort($strainOptions, SORT_STRING);
+// Fetch cage
+$stmt = $con->prepare("SELECT cage_id, pi_name, remarks, room, rack, created_at FROM cages WHERE cage_id = ?");
+$stmt->bind_param("s", $id);
+$stmt->execute();
+$res = $stmt->get_result();
+if ($res->num_rows !== 1) {
+    $_SESSION['message'] = 'Cage not found.';
+    header('Location: hc_dash.php'); exit;
+}
+$cage = $res->fetch_assoc();
+$stmt->close();
 
-// Check if the ID parameter is set in the URL
-if (isset($_GET['id'])) {
-    $id = $_GET['id'];
+// Currently-assigned users
+$cu = $con->prepare("SELECT user_id FROM cage_users WHERE cage_id = ?");
+$cu->bind_param("s", $id);
+$cu->execute();
+$selectedUsers = array_column($cu->get_result()->fetch_all(MYSQLI_ASSOC), 'user_id');
+$cu->close();
 
-    // Fetch the holding cage record with the specified ID including PI name details
-    $query = "SELECT h.*, c.pi_name AS pi_name, c.quantity, c.remarks, c.room, c.rack, c.created_at
-              FROM holding h
-              LEFT JOIN cages c ON h.cage_id = c.cage_id
-              WHERE h.cage_id = ?";
-    $stmt = $con->prepare($query);
-    $stmt->bind_param("s", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    // Fetch associated files for the holding cage
-    $query2 = "SELECT * FROM files WHERE cage_id = ?";
-    $stmt2 = $con->prepare($query2);
-    $stmt2->bind_param("s", $id);
-    $stmt2->execute();
-    $files = $stmt2->get_result();
-
-    // Fetch the mouse data related to this cage
-    $mouseQuery = "SELECT * FROM mice WHERE cage_id = ?";
-    $stmtMouse = $con->prepare($mouseQuery);
-    $stmtMouse->bind_param("s", $id);
-    $stmtMouse->execute();
-    $mouseResult = $stmtMouse->get_result();
-    $mice = $mouseResult->fetch_all(MYSQLI_ASSOC);
-
-    // Check if the holding cage record exists
-    if ($result->num_rows === 1) {
-        $holdingcage = $result->fetch_assoc();
-
-        // Fetch currently selected users
-        $selectedUsersQuery = "SELECT user_id FROM cage_users WHERE cage_id = ?";
-        $stmtUsers = $con->prepare($selectedUsersQuery);
-        $stmtUsers->bind_param("s", $id);
-        $stmtUsers->execute();
-        $usersResult = $stmtUsers->get_result();
-        $selectedUsers = array_column($usersResult->fetch_all(MYSQLI_ASSOC), 'user_id');
-        $stmtUsers->close();
-
-        // SECURITY: Authorization check to prevent unauthorized cage editing
-        // Prevents users from editing cages they're not assigned to by manipulating the URL
-        // This check matches the security pattern used in bc_edit.php
-        $currentUserId = $_SESSION['user_id']; // User ID from session
-        $userRole = $_SESSION['role']; // User role from session
-        $cageUsers = $selectedUsers; // Array of user IDs associated with the cage
-
-        // Check if the user is either an admin or one of the users associated with the cage
-        if ($userRole !== 'admin' && !in_array($currentUserId, $cageUsers)) {
-            $_SESSION['message'] = 'Access denied. Only the admin or the assigned user can edit.';
-            header("Location: hc_dash.php?" . getCurrentUrlParams());
-            exit();
-        }
-
-        // Fetching the selected IACUC values for the cage
-        $selectedIacucs = [];
-        $selectedIacucQuery = "SELECT iacuc_id FROM cage_iacuc WHERE cage_id = ?";
-        $stmtSelectedIacuc = $con->prepare($selectedIacucQuery);
-        $stmtSelectedIacuc->bind_param("s", $id);
-        $stmtSelectedIacuc->execute();
-        $resultSelectedIacuc = $stmtSelectedIacuc->get_result();
-        while ($row = $resultSelectedIacuc->fetch_assoc()) {
-            $selectedIacucs[] = $row['iacuc_id'];
-        }
-        $stmtSelectedIacuc->close();
-
-        // Fetch currently selected PI
-        $selectedPiId = $holdingcage['pi_name'];
-
-        // Process the form submission
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-            // Validate CSRF token
-            if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-                die('CSRF token validation failed');
-            }
-
-            // Retrieve and sanitize form data
-            $cage_id = trim($_POST['cage_id']);
-            $new_cage_id = trim($_POST['new_cage_id']);
-            $pi_name = !empty($_POST['pi_name']) ? (int)$_POST['pi_name'] : null;
-            $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
-            $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-            $strain = !empty($_POST['strain']) ? trim($_POST['strain']) : null;
-            if ($strain === 'custom') {
-                $strain = !empty($_POST['custom_strain']) ? trim($_POST['custom_strain']) : null;
-            }
-            $cage_genotype = !empty($_POST['cage_genotype']) ? trim($_POST['cage_genotype']) : null;
-            $iacuc = isset($_POST['iacuc']) ? array_map('trim', $_POST['iacuc']) : [];
-            $users = isset($_POST['user']) ? array_map('trim', $_POST['user']) : [];
-            $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
-            $sex = !empty($_POST['sex']) ? strtolower(trim($_POST['sex'])) : null;
-            $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
-            $remarks = trim($_POST['remarks']);
-            $created_at = !empty($_POST['created_at']) ? trim($_POST['created_at']) : null;
-
-            // Handle cage ID change if new_cage_id differs from current cage_id
-            $cageIdChanged = false;
-            $oldCageId = $cage_id;
-            if ($new_cage_id !== $cage_id) {
-                // Check if the new cage_id already exists
-                $checkDup = $con->prepare("SELECT cage_id FROM cages WHERE cage_id = ?");
-                $checkDup->bind_param("s", $new_cage_id);
-                $checkDup->execute();
-                $dupResult = $checkDup->get_result();
-                if ($dupResult->num_rows > 0) {
-                    $checkDup->close();
-                    $_SESSION['message'] = "Cage ID '" . htmlspecialchars($new_cage_id) . "' already exists. Please choose a different ID.";
-                    header("Location: hc_edit.php?id=" . urlencode($cage_id) . "&" . getCurrentUrlParams());
-                    exit();
-                }
-                $checkDup->close();
-
-                // Update cage_id in cages table (ON UPDATE CASCADE propagates to all related tables)
-                $updateCageIdQuery = $con->prepare("UPDATE cages SET cage_id = ? WHERE cage_id = ?");
-                $updateCageIdQuery->bind_param("ss", $new_cage_id, $cage_id);
-                $updateCageIdQuery->execute();
-                $updateCageIdQuery->close();
-
-                $cageIdChanged = true;
-                $cage_id = $new_cage_id;
-            }
-
-            $_SESSION['message'] = ($cageIdChanged ? "Cage ID changed from '$oldCageId' to '$cage_id'. " : '') . 'Entry updated successfully.';
-
-            // Update query for holding table
-            $updateQueryHolding = "UPDATE holding SET
-                                    `strain` = ?,
-                                    `dob` = ?,
-                                    `sex` = ?,
-                                    `parent_cg` = ?,
-                                    `genotype` = ?
-                                    WHERE `cage_id` = ?";
-
-            $stmtHolding = $con->prepare($updateQueryHolding);
-            $stmtHolding->bind_param("ssssss", $strain, $dob, $sex, $parent_cg, $cage_genotype, $cage_id);
-            $resultHolding = $stmtHolding->execute();
-            $stmtHolding->close();
-
-            // Update query for cages table
-            $updateQueryCages = "UPDATE cages SET
-                                 `pi_name` = ?,
-                                 `remarks` = ?,
-                                 `room` = ?,
-                                 `rack` = ?,
-                                 `created_at` = ?
-                                 WHERE `cage_id` = ?";
-
-            $stmtCages = $con->prepare($updateQueryCages);
-            $stmtCages->bind_param("ssssss", $pi_name, $remarks, $room, $rack, $created_at, $cage_id);
-            $resultCages = $stmtCages->execute();
-            $stmtCages->close();
-
-            // Update the cage_users table
-            $previousUsers = $selectedUsers; // saved before POST processing
-            $deleteUsersQuery = "DELETE FROM cage_users WHERE cage_id = ?";
-            $stmtDeleteUsers = $con->prepare($deleteUsersQuery);
-            $stmtDeleteUsers->bind_param("s", $cage_id);
-            $stmtDeleteUsers->execute();
-            $stmtDeleteUsers->close();
-
-            $insertUsersQuery = "INSERT INTO cage_users (cage_id, user_id) VALUES (?, ?)";
-            $stmtInsertUsers = $con->prepare($insertUsersQuery);
-            foreach ($users as $user_id) {
-                $stmtInsertUsers->bind_param("si", $cage_id, $user_id);
-                $stmtInsertUsers->execute();
-            }
-            $stmtInsertUsers->close();
-
-            // Notify users about cage changes
-            try {
-            $editorName = $_SESSION['name'] ?? 'Someone';
-            $newlyAdded = array_diff(array_map('intval', $users), array_map('intval', $previousUsers));
-            $removed = array_diff(array_map('intval', $previousUsers), array_map('intval', $users));
-
-            // Notify newly added users
-            foreach ($newlyAdded as $uid) {
-                if ($uid > 0) {
-                    $nTitle = "Added to Cage: $cage_id";
-                    $nMessage = "$editorName added you to holding cage $cage_id";
-                    $nLink = "hc_view.php?id=" . urlencode($cage_id);
-                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
-                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
-                    $nStmt->execute();
-                    $nStmt->close();
-                }
-            }
-
-            // Notify removed users
-            foreach ($removed as $uid) {
-                if ($uid > 0) {
-                    $nTitle = "Removed from Cage: $cage_id";
-                    $nMessage = "$editorName removed you from holding cage $cage_id";
-                    $nLink = "hc_dash.php";
-                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
-                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
-                    $nStmt->execute();
-                    $nStmt->close();
-                }
-            }
-
-            // Notify existing users (still on cage) about the update
-            $stillOnCage = array_intersect(array_map('intval', $users), array_map('intval', $previousUsers));
-            foreach ($stillOnCage as $uid) {
-                if ($uid > 0 && $uid != $_SESSION['user_id']) {
-                    $nTitle = "Cage Updated: $cage_id";
-                    $nMessage = "$editorName updated holding cage $cage_id";
-                    $nLink = "hc_view.php?id=" . urlencode($cage_id);
-                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
-                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
-                    $nStmt->execute();
-                    $nStmt->close();
-                }
-            }
-            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
-
-            // Update the cage_iacuc table
-            $deleteIacucQuery = "DELETE FROM cage_iacuc WHERE cage_id = ?";
-            $stmtDeleteIacuc = $con->prepare($deleteIacucQuery);
-            $stmtDeleteIacuc->bind_param("s", $cage_id);
-            $stmtDeleteIacuc->execute();
-            $stmtDeleteIacuc->close();
-
-            $insertIacucQuery = "INSERT INTO cage_iacuc (cage_id, iacuc_id) VALUES (?, ?)";
-            $stmtInsertIacuc = $con->prepare($insertIacucQuery);
-            foreach ($iacuc as $iacuc_id) {
-                $stmtInsertIacuc->bind_param("ss", $cage_id, $iacuc_id);
-                $stmtInsertIacuc->execute();
-            }
-            $stmtInsertIacuc->close();
-
-            // Update the mice table with new data
-            $mouse_ids = $_POST['mouse_id'] ?? [];
-            $genotypes = $_POST['genotype'] ?? [];
-            $notes = $_POST['notes'] ?? [];
-            $existing_mouse_ids = $_POST['existing_mouse_id'] ?? [];
-
-            // Handle existing and new mouse records
-            for ($i = 0; $i < count($mouse_ids); $i++) {
-                $mouse_id = trim($mouse_ids[$i]);
-                $genotype = trim($genotypes[$i]);
-                $note = trim($notes[$i]);
-                $existing_mouse_id = isset($existing_mouse_ids[$i]) ? trim($existing_mouse_ids[$i]) : null;
-
-                if (!empty($mouse_id)) {
-                    if ($existing_mouse_id) {
-                        // Update existing mouse record
-                        $updateMouseQuery = "UPDATE mice SET mouse_id = ?, genotype = ?, notes = ? WHERE id = ?";
-                        $stmtMouseUpdate = $con->prepare($updateMouseQuery);
-                        $stmtMouseUpdate->bind_param("sssi", $mouse_id, $genotype, $note, $existing_mouse_id);
-                        $stmtMouseUpdate->execute();
-                        $stmtMouseUpdate->close();
-                    } else {
-                        // Insert new mouse record
-                        $insertMouseQuery = "INSERT INTO mice (cage_id, mouse_id, genotype, notes) VALUES (?, ?, ?, ?)";
-                        $stmtMouseInsert = $con->prepare($insertMouseQuery);
-                        $stmtMouseInsert->bind_param("ssss", $cage_id, $mouse_id, $genotype, $note);
-                        $stmtMouseInsert->execute();
-                        $stmtMouseInsert->close();
-                    }
-                }
-            }
-
-            // Delete mouse records if marked for deletion
-            if (!empty($_POST['mice_to_delete'])) {
-                $miceToDelete = explode(',', $_POST['mice_to_delete']);
-                foreach ($miceToDelete as $mouseId) {
-                    $deleteMouseQuery = "DELETE FROM mice WHERE id = ?";
-                    $stmtMouseDelete = $con->prepare($deleteMouseQuery);
-                    $stmtMouseDelete->bind_param("i", $mouseId);
-                    $stmtMouseDelete->execute();
-                    $stmtMouseDelete->close();
-                }
-            }
-
-            // Update the qty field in cages based on the number of mouse records
-            $newQtyQuery = "SELECT COUNT(*) AS new_qty FROM mice WHERE cage_id = ?";
-            $stmtNewQty = $con->prepare($newQtyQuery);
-            $stmtNewQty->bind_param("s", $cage_id);
-            $stmtNewQty->execute();
-            $stmtNewQty->bind_result($newQty);
-            $stmtNewQty->fetch();
-            $stmtNewQty->close();
-
-            $updateQtyQuery = "UPDATE cages SET quantity = ? WHERE cage_id = ?";
-            $stmtUpdateQty = $con->prepare($updateQtyQuery);
-            $stmtUpdateQty->bind_param("is", $newQty, $cage_id);
-            $stmtUpdateQty->execute();
-            $stmtUpdateQty->close();
-
-            // Handle maintenance log updates
-            if (isset($_POST['log_ids']) && isset($_POST['log_comments'])) {
-                $logIds = $_POST['log_ids'];
-                $logComments = $_POST['log_comments'];
-
-                for ($i = 0; $i < count($logIds); $i++) {
-                    $edit_log_id = intval($logIds[$i]);
-                    $edit_comment = trim($logComments[$i]);
-
-                    $updateLogQuery = "UPDATE maintenance SET comments = ? WHERE id = ?";
-                    $stmtUpdateLog = $con->prepare($updateLogQuery);
-                    $stmtUpdateLog->bind_param("si", $edit_comment, $edit_log_id);
-                    $stmtUpdateLog->execute();
-                    $stmtUpdateLog->close();
-                }
-
-                $_SESSION['message'] .= ' Maintenance logs updated successfully.';
-            }
-
-            // Process maintenance logs deletion
-            if (!empty($_POST['logs_to_delete'])) {
-                $logsToDelete = explode(',', $_POST['logs_to_delete']);
-                foreach ($logsToDelete as $logId) {
-                    $deleteLogQuery = "DELETE FROM maintenance WHERE id = ?";
-                    $stmtDeleteLog = $con->prepare($deleteLogQuery);
-                    $stmtDeleteLog->bind_param("i", $logId);
-                    $stmtDeleteLog->execute();
-                    $stmtDeleteLog->close();
-                }
-            }
-
-
-            // Handle file upload with validation
-            if (isset($_FILES['fileUpload']) && $_FILES['fileUpload']['error'] == UPLOAD_ERR_OK) {
-                // Define allowed file types and maximum size
-                $allowedExtensions = ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx',
-                                      'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
-                $maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
-
-                // Validate file size
-                if ($_FILES['fileUpload']['size'] > $maxFileSize) {
-                    $_SESSION['message'] .= " File size exceeds 10MB limit.";
-                } else {
-                    // Get and validate file extension
-                    $fileExtension = strtolower(pathinfo($_FILES['fileUpload']['name'], PATHINFO_EXTENSION));
-
-                    if (!in_array($fileExtension, $allowedExtensions)) {
-                        $_SESSION['message'] .= " Invalid file type. Allowed: pdf, doc, docx, txt, xls, xlsx, ppt, pptx, jpg, jpeg, png, gif, bmp, svg, webp";
-                    } else {
-                        // Sanitize filename to prevent directory traversal
-                        $originalFileName = preg_replace("/[^a-zA-Z0-9._-]/", "_", basename($_FILES['fileUpload']['name']));
-
-                        $targetDirectory = "uploads/$cage_id/"; // Define the target directory
-
-                        // Create the cage_id specific sub-directory if it doesn't exist
-                        if (!file_exists($targetDirectory)) {
-                            if (!mkdir($targetDirectory, 0777, true)) {
-                                $_SESSION['message'] .= " Failed to create directory.";
-                                exit;
-                            }
-                        }
-
-                        $targetFilePath = $targetDirectory . $originalFileName;
-
-                        // Check if file already exists
-                        if (!file_exists($targetFilePath)) {
-                            if (move_uploaded_file($_FILES['fileUpload']['tmp_name'], $targetFilePath)) {
-                                // Insert file info into the database
-                                $insert = $con->prepare("INSERT INTO files (file_name, file_path, cage_id) VALUES (?, ?, ?)");
-                                $insert->bind_param("sss", $originalFileName, $targetFilePath, $cage_id);
-                                if ($insert->execute()) {
-                                    $_SESSION['message'] .= " File uploaded successfully.";
-                                } else {
-                                    $_SESSION['message'] .= " File upload failed, please try again.";
-                                }
-                            } else {
-                                $_SESSION['message'] .= " Sorry, there was an error uploading your file.";
-                            }
-                        } else {
-                            $_SESSION['message'] .= " Sorry, file already exists.";
-                        }
-                    }
-                }
-            }
-
-            // Log activity
-            log_activity($con, 'edit', 'cage', $cage_id, 'Cage details updated');
-            if ($cageIdChanged) {
-                log_activity($con, 'rename', 'cage', $cage_id, 'Cage renamed from ' . $oldCageId);
-            }
-
-            // Redirect to the same page to prevent resubmission on refresh
-            header("Location: hc_dash.php?" . getCurrentUrlParams());
-            exit();
-        }
-    } else {
-        // Set an error message if the ID is invalid
-        $_SESSION['message'] = 'Invalid ID.';
-        header("Location: hc_dash.php?" . getCurrentUrlParams());
-        exit();
-    }
-} else {
-    // Set an error message if the ID parameter is missing
-    $_SESSION['message'] = 'ID parameter is missing.';
+// Authz: admin OR assigned user
+$currentUserId = $_SESSION['user_id'] ?? 0;
+$userRole      = $_SESSION['role'] ?? '';
+if ($userRole !== 'admin' && !in_array($currentUserId, $selectedUsers)) {
+    $_SESSION['message'] = 'Access denied. Only admins or assigned users can edit this cage.';
     header("Location: hc_dash.php?" . getCurrentUrlParams());
-    exit();
+    exit;
 }
 
-// Function to fetch user details by IDs
-function getUserDetailsByIds($con, $userIds)
-{
-    $placeholders = implode(',', array_fill(0, count($userIds), '?'));
-    $query = "SELECT id, initials, name FROM users WHERE id IN ($placeholders)";
-    $stmt = $con->prepare($query);
-    $stmt->bind_param(str_repeat('i', count($userIds)), ...$userIds);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $userDetails = [];
-    while ($row = $result->fetch_assoc()) {
-        $userDetails[$row['id']] = htmlspecialchars($row['initials'] . ' [' . $row['name'] . ']');
+// IACUC currently linked
+$ci = $con->prepare("SELECT iacuc_id FROM cage_iacuc WHERE cage_id = ?");
+$ci->bind_param("s", $id);
+$ci->execute();
+$selectedIacucs = array_column($ci->get_result()->fetch_all(MYSQLI_ASSOC), 'iacuc_id');
+$ci->close();
+
+// Files (display only — uploads handled by separate page)
+$fs = $con->prepare("SELECT id, file_name, file_path FROM files WHERE cage_id = ?");
+$fs->bind_param("s", $id);
+$fs->execute();
+$files = $fs->get_result()->fetch_all(MYSQLI_ASSOC);
+$fs->close();
+
+// Dropdown options for the form
+$userResult  = $con->query("SELECT id, initials, name FROM users WHERE status = 'approved'");
+$piResult    = $con->query("SELECT id, initials, name FROM users WHERE position = 'Principal Investigator' AND status = 'approved'");
+$iacucResult = $con->query("SELECT iacuc_id, iacuc_title FROM iacuc");
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die('CSRF token validation failed');
     }
-    $stmt->close();
-    return $userDetails;
+
+    $new_cage_id = trim($_POST['new_cage_id'] ?? $id);
+    $pi_name = !empty($_POST['pi_name']) ? (int)$_POST['pi_name'] : null;
+    $room    = !empty($_POST['room'])    ? trim($_POST['room'])   : null;
+    $rack    = !empty($_POST['rack'])    ? trim($_POST['rack'])   : null;
+    $iacuc   = isset($_POST['iacuc'])    ? (array)$_POST['iacuc'] : [];
+    $users   = isset($_POST['user'])     ? (array)$_POST['user']  : [];
+    $remarks = trim($_POST['remarks'] ?? '');
+
+    // Cage-id rename
+    $cageIdChanged = false;
+    if ($new_cage_id !== $id) {
+        $check = $con->prepare("SELECT 1 FROM cages WHERE cage_id = ?");
+        $check->bind_param("s", $new_cage_id);
+        $check->execute();
+        if ($check->get_result()->num_rows > 0) {
+            $check->close();
+            $_SESSION['message'] = "Cage ID '" . htmlspecialchars($new_cage_id) . "' already exists.";
+            header("Location: hc_edit.php?id=" . urlencode($id));
+            exit;
+        }
+        $check->close();
+
+        $r = $con->prepare("UPDATE cages SET cage_id = ? WHERE cage_id = ?");
+        $r->bind_param("ss", $new_cage_id, $id);
+        $r->execute(); $r->close();
+        $cageIdChanged = true;
+        $oldId = $id;
+        $id = $new_cage_id;
+    }
+
+    // Update cage metadata
+    $u = $con->prepare("UPDATE cages SET pi_name = ?, remarks = ?, room = ?, rack = ? WHERE cage_id = ?");
+    $u->bind_param("issss", $pi_name, $remarks, $room, $rack, $id);
+    $u->execute(); $u->close();
+
+    // Replace cage_users
+    $previousUsers = $selectedUsers;
+    $du = $con->prepare("DELETE FROM cage_users WHERE cage_id = ?");
+    $du->bind_param("s", $id); $du->execute(); $du->close();
+    if ($users) {
+        $iu = $con->prepare("INSERT INTO cage_users (cage_id, user_id) VALUES (?, ?)");
+        foreach (array_filter($users) as $uid) {
+            $uidInt = (int)$uid;
+            $iu->bind_param("si", $id, $uidInt);
+            $iu->execute();
+        }
+        $iu->close();
+    }
+
+    // Replace cage_iacuc
+    $diq = $con->prepare("DELETE FROM cage_iacuc WHERE cage_id = ?");
+    $diq->bind_param("s", $id); $diq->execute(); $diq->close();
+    if ($iacuc) {
+        $iiq = $con->prepare("INSERT INTO cage_iacuc (cage_id, iacuc_id) VALUES (?, ?)");
+        foreach (array_filter($iacuc) as $iac) {
+            $iiq->bind_param("ss", $id, $iac);
+            $iiq->execute();
+        }
+        $iiq->close();
+    }
+
+    // Notifications
+    try {
+        $editorName = $_SESSION['name'] ?? 'Someone';
+        $newSet  = array_map('intval', $users);
+        $oldSet  = array_map('intval', $previousUsers);
+        $added   = array_diff($newSet, $oldSet);
+        $removed = array_diff($oldSet, $newSet);
+
+        $sendNote = function ($uid, $title, $msg, $link) use ($con) {
+            $n = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+            $n->bind_param("isss", $uid, $title, $msg, $link);
+            $n->execute(); $n->close();
+        };
+        foreach ($added as $uid) {
+            if ($uid > 0) $sendNote($uid, "Added to Cage: $id", "$editorName added you to holding cage $id", "hc_view.php?id=" . urlencode($id));
+        }
+        foreach ($removed as $uid) {
+            if ($uid > 0) $sendNote($uid, "Removed from Cage: $id", "$editorName removed you from holding cage $id", "hc_dash.php");
+        }
+    } catch (Exception $e) {
+        error_log("Notification error: " . $e->getMessage());
+    }
+
+    log_activity($con, 'update', 'cage', $id,
+        ($cageIdChanged ? "Renamed from $oldId. " : '') . 'Cage metadata updated');
+    $_SESSION['message'] = ($cageIdChanged ? "Cage renamed from '$oldId' to '$id'. " : '') . 'Cage updated.';
+
+    header("Location: hc_view.php?id=" . urlencode($id));
+    exit;
 }
 
-// Fetch currently selected PI details
-$piDetails = getUserDetailsByIds($con, [$selectedPiId]);
-$piDisplay = isset($piDetails[$selectedPiId]) ? $piDetails[$selectedPiId] : 'Unknown PI';
-
-// Include the header file
 require 'header.php';
 ?>
-
 <!doctype html>
 <html lang="en">
-
 <head>
-    <title>Edit Holding Cage | <?php echo htmlspecialchars($labName); ?></title>
-
-    <!-- Include Bootstrap CSS -->
-    <!-- Bootstrap 5.3 loaded via header.php -->
-
-    <!-- Select2 CSS loaded via header.php -->
-
-    <!-- Include Select2 JS -->
+    <title>Edit Holding Cage | <?= htmlspecialchars($labName); ?></title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
-
     <style>
-        .container {
-            max-width: 900px;
-            background-color: var(--bs-tertiary-bg);
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .form-label {
-            font-weight: bold;
-        }
-
-        .btn-primary {
-            margin-right: 10px;
-        }
-
-        .table-wrapper {
-            margin-bottom: 50px;
-            overflow-x: auto;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .action-buttons {
-            display: flex;
-        }
-
-        .table-wrapper th,
-        .table-wrapper td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .btn-icon {
-            width: 30px;
-            height: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-        }
-
-        .btn-icon i {
-            margin: 0;
-        }
-
-        .fixed-width th,
-        .fixed-width td {
-            width: 30%;
-        }
-
-        .fixed-width th:nth-child(2),
-        .fixed-width td:nth-child(2) {
-            width: 70%;
-        }
-
-        .required-asterisk {
-            color: red;
-        }
-
-        .warning-text {
-            color: var(--bs-danger);
-        }
-
-        .select2-container .select2-selection--single {
-            height: 35px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            padding-right: 10px;
-            padding-left: 10px;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
-            height: 35px;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            /* Adjust the gap as needed */
-            margin-top: 10px;
-        }
-
-        @media (max-width: 768px) {
-
-            .table-wrapper th,
-            .table-wrapper td {
-                padding: 12px 8px;
-                text-align: center;
-            }
-        }
+        .container { max-width: 900px; background-color: var(--bs-tertiary-bg); padding: 20px; border-radius: 8px; margin: auto; }
+        .form-label { font-weight: bold; }
+        .required-asterisk { color: red; }
+        .select2-container .select2-selection--single { height: 38px; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 38px; padding-left: 12px; }
     </style>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Function to get today's date in YYYY-MM-DD format
-            function getCurrentDate() {
-                const today = new Date();
-                const yyyy = today.getFullYear();
-                const mm = String(today.getMonth() + 1).padStart(2, '0');
-                const dd = String(today.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-            }
-
-            // Function to set the max date to today for all date input fields
-            function setMaxDate() {
-                const currentDate = getCurrentDate();
-                const dateFields = document.querySelectorAll('input[type="date"]');
-                dateFields.forEach(field => {
-                    field.setAttribute('max', currentDate);
-                });
-            }
-
-            // Initial call to set max date on page load
-            setMaxDate();
-        });
-
-        // Function to go back to the previous page
-        function goBack() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const page = urlParams.get('page') || 1;
-            const search = urlParams.get('search') || '';
-            window.location.href = 'hc_dash.php?page=' + page + '&search=' + encodeURIComponent(search);
-        }
-
-        // Function to dynamically add new mouse fields
-        function addMouseField() {
-            const mouseContainer = document.getElementById('mouse_fields_container');
-            const mouseCount = mouseContainer.childElementCount + 1;
-
-            const mouseFieldHTML = `
-                <div id="mouse_fields_${mouseCount}" class="mouse-field">
-                    <hr class="mt-3 mb-3" style="border-top: 2px solid var(--bs-border-color);">
-                    <h6 class="text-muted mb-3">Mouse #${mouseCount}</h6>
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="mouse_id_${mouseCount}" class="form-label">Mouse ID</label>
-                            <input type="text" class="form-control" id="mouse_id_${mouseCount}" name="mouse_id[]" value="">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="genotype_${mouseCount}" class="form-label">Genotype</label>
-                            <input type="text" class="form-control" id="genotype_${mouseCount}" name="genotype[]" value="">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="notes_${mouseCount}" class="form-label">Maintenance Notes</label>
-                            <textarea class="form-control" id="notes_${mouseCount}" name="notes[]" oninput="adjustTextareaHeight(this)"></textarea>
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="markForDeletion(${mouseCount}, null)"><i class="fas fa-trash"></i></button>
-                </div>`;
-
-            mouseContainer.insertAdjacentHTML('beforeend', mouseFieldHTML);
-        }
-
-        // Function to mark mouse fields for deletion
-        function markForDeletion(mouseIndex, mouseId) {
-            const mouseField = document.getElementById(`mouse_fields_${mouseIndex}`);
-            mouseField.style.display = 'none'; // Hide the field visually
-
-            // Add the mouse ID to the hidden input for deletion tracking
-            if (mouseId !== null) {
-                const miceToDeleteInput = document.getElementById('mice_to_delete');
-                let miceToDelete = miceToDeleteInput.value ? miceToDeleteInput.value.split(',') : [];
-                miceToDelete.push(mouseId);
-                miceToDeleteInput.value = miceToDelete.join(',');
-            }
-        }
-
-        // Function to adjust the height of textareas dynamically
-        function adjustTextareaHeight(element) {
-            element.style.height = "auto";
-            element.style.height = (element.scrollHeight) + "px";
-        }
-
-        // Function to validate date format & provide feedback
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            const dobInput = document.getElementById('dob');
-            const warningText = document.createElement('span');
-            warningText.style.color = 'red';
-            warningText.style.display = 'none';
-            dobInput.parentNode.appendChild(warningText);
-
-            // Function to validate date
-            function validateDate(dateString) {
-                // Allow empty dates since DOB is now optional
-                if (!dateString || dateString.trim() === '') return true;
-
-                const regex = /^\d{4}-\d{2}-\d{2}$/;
-                if (!dateString.match(regex)) return false;
-
-                const date = new Date(dateString);
-                const now = new Date();
-                const year = date.getFullYear();
-
-                // Check if the date is valid and within the range 1900-2099 and not in the future
-                return date && !isNaN(date) && year >= 1900 && date <= now;
-            }
-
-            // Listen for input changes to provide immediate feedback
-            dobInput.addEventListener('input', function() {
-                const dobValue = dobInput.value;
-                const isValidDate = validateDate(dobValue);
-                if (!isValidDate) {
-                    warningText.textContent = 'Invalid Date. Please enter a valid date.';
-                    warningText.style.display = 'block';
-                } else {
-                    warningText.textContent = '';
-                    warningText.style.display = 'none';
-                }
-            });
-
-            // Prevent form submission if the date is invalid
-            form.addEventListener('submit', function(event) {
-                const dobValue = dobInput.value;
-                if (!validateDate(dobValue)) {
-                    event.preventDefault(); // Prevent form submission
-                    warningText.textContent = 'Invalid Date. Please enter a valid date.';
-                    warningText.style.display = 'block';
-                    dobInput.focus();
-                }
-            });
-        });
-
-        $(document).ready(function() {
-            $('#user').select2({
-                placeholder: "Select User(s)",
-                allowClear: true
-            });
-        });
-
-        $(document).ready(function() {
-            $('#strain').select2({
-                placeholder: "Select Strain",
-                allowClear: true
-            });
-
-            // Show/hide custom strain input based on strain selection
-            $('#strain').on('change', function() {
-                if ($(this).val() === 'custom') {
-                    $('#custom_strain_div').show();
-                } else {
-                    $('#custom_strain_div').hide();
-                    $('#custom_strain').val('');
-                }
-            });
-
-            $('#iacuc').select2({
-                placeholder: "Select IACUC",
-                allowClear: true,
-                templateResult: function(data) {
-                    if (!data.id) {
-                        return data.text;
-                    }
-                    var $result = $('<span>' + data.text + '</span>');
-                    $result.attr('title', data.element.title);
-                    return $result;
-                }
-            });
-        });
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            form.addEventListener('submit', function(event) {
-                const piSelect = document.getElementById('pi_name');
-                const selectedPiText = piSelect.options[piSelect.selectedIndex].text;
-
-                // Check if "Unknown PI" is selected
-                if (selectedPiText.includes('Unknown PI')) {
-                    event.preventDefault(); // Prevent form submission
-                    alert('Cannot proceed with "Unknown PI". Please select a valid PI.');
-                }
-            });
-        });
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            form.addEventListener('submit', function(event) {
-                const strainSelect = document.getElementById('strain');
-                const selectedStrainText = strainSelect.options[strainSelect.selectedIndex].text;
-
-                // Check if "Unknown Strain" is selected
-                if (selectedStrainText.includes('Unknown Strain')) {
-                    event.preventDefault(); // Prevent form submission
-                    alert('Cannot proceed with "Unknown Strain". Please select a valid Strain.');
-                }
-            });
-        });
-
-        // Function to mark maintenance log for deletion and hide the row
-        function markLogForDeletion(logId) {
-            if (confirm('Are you sure you want to delete this maintenance record?')) {
-                const logIdsInput = document.getElementById('logs_to_delete');
-                let logsToDelete = logIdsInput.value ? logIdsInput.value.split(',') : [];
-                logsToDelete.push(logId);
-                logIdsInput.value = logsToDelete.join(',');
-
-                // Hide the log row from the table
-                const logRow = document.getElementById(`log-row-${logId}`);
-                if (logRow) {
-                    logRow.classList.add('log-deleted');
-                    logRow.style.display = 'none';
-                }
-                // Re-paginate after deletion
-                paginateMaintenanceLogs(1);
-            }
-        }
-
-        // Maintenance log pagination
-        var maintenanceLogPage = 1;
-        var maintenanceLogsPerPage = 5;
-
-        function paginateMaintenanceLogs(page) {
-            var rows = document.querySelectorAll('#maintenanceLogTable .maintenance-log-row:not(.log-deleted)');
-            var totalRows = rows.length;
-            var totalPages = Math.ceil(totalRows / maintenanceLogsPerPage);
-            if (page < 1) page = 1;
-            if (page > totalPages) page = totalPages;
-            maintenanceLogPage = page;
-
-            // Hide all rows, then show current page
-            document.querySelectorAll('#maintenanceLogTable .maintenance-log-row').forEach(function(row) {
-                if (!row.classList.contains('log-deleted')) {
-                    row.style.display = 'none';
-                }
-            });
-            var visibleRows = Array.from(rows);
-            var start = (page - 1) * maintenanceLogsPerPage;
-            var end = start + maintenanceLogsPerPage;
-            for (var i = start; i < end && i < visibleRows.length; i++) {
-                visibleRows[i].style.display = '';
-            }
-
-            // Build pagination links
-            var paginationEl = document.getElementById('maintenanceLogPagination');
-            if (!paginationEl) return;
-            paginationEl.innerHTML = '';
-            if (totalPages <= 1) return;
-
-            // Previous
-            var prevLi = document.createElement('li');
-            prevLi.className = 'page-item' + (page === 1 ? ' disabled' : '');
-            prevLi.innerHTML = '<a class="page-link" href="javascript:void(0);">&laquo;</a>';
-            if (page > 1) prevLi.querySelector('a').onclick = function() { paginateMaintenanceLogs(page - 1); };
-            paginationEl.appendChild(prevLi);
-
-            for (var i = 1; i <= totalPages; i++) {
-                var li = document.createElement('li');
-                li.className = 'page-item' + (i === page ? ' active' : '');
-                li.innerHTML = '<a class="page-link" href="javascript:void(0);">' + i + '</a>';
-                (function(p) { li.querySelector('a').onclick = function() { paginateMaintenanceLogs(p); }; })(i);
-                paginationEl.appendChild(li);
-            }
-
-            // Next
-            var nextLi = document.createElement('li');
-            nextLi.className = 'page-item' + (page === totalPages ? ' disabled' : '');
-            nextLi.innerHTML = '<a class="page-link" href="javascript:void(0);">&raquo;</a>';
-            if (page < totalPages) nextLi.querySelector('a').onclick = function() { paginateMaintenanceLogs(page + 1); };
-            paginationEl.appendChild(nextLi);
-        }
-
-        // Initialize pagination on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            if (document.getElementById('maintenanceLogTable')) {
-                paginateMaintenanceLogs(1);
-            }
-        });
-
-        // Information Completeness Tracking
-        $(document).ready(function() {
-            function calculateCompleteness() {
-                const fields = {
-                    critical: ['dob', 'sex'],
-                    important: ['pi_name', 'strain', 'iacuc', 'user'],
-                    useful: ['parent_cg']
-                };
-
-                let totalFields = 0;
-                let filledFields = 0;
-                let missingCritical = [];
-                let missingImportant = [];
-                let missingUseful = [];
-
-                // Count critical fields
-                fields.critical.forEach(fieldId => {
-                    totalFields++;
-                    const field = document.getElementById(fieldId);
-                    if (field && field.value && field.value.trim() !== '') {
-                        filledFields++;
-                    } else {
-                        missingCritical.push(field ? field.previousElementSibling.textContent.split(' ')[0] : fieldId);
-                    }
-                });
-
-                // Count important fields
-                fields.important.forEach(fieldId => {
-                    totalFields++;
-                    const field = document.getElementById(fieldId);
-                    if (field) {
-                        if (field.multiple) {
-                            // For Select2 multiselect
-                            const selectedValues = $(field).val();
-                            if (selectedValues && selectedValues.length > 0 && selectedValues[0] !== '') {
-                                filledFields++;
-                            } else {
-                                missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
-                            }
-                        } else if (field.value && field.value.trim() !== '') {
-                            filledFields++;
-                        } else {
-                            missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
-                        }
-                    }
-                });
-
-                // Count useful fields
-                fields.useful.forEach(fieldId => {
-                    totalFields++;
-                    const field = document.getElementById(fieldId);
-                    if (field && field.value && field.value.trim() !== '') {
-                        filledFields++;
-                    } else {
-                        missingUseful.push(field ? field.previousElementSibling.textContent.split(' ')[0] + ' ' + (field.previousElementSibling.textContent.split(' ')[1] || '') : fieldId);
-                    }
-                });
-
-                const percentage = Math.round((filledFields / totalFields) * 100);
-
-                // Update completeness bar
-                $('#completeness-bar').css('width', percentage + '%');
-                $('#completeness-bar').attr('aria-valuenow', percentage);
-                $('#completeness-bar').text(percentage + '%');
-                $('#completeness-percentage').text(percentage + '%');
-
-                // Change bar color based on completion
-                $('#completeness-bar').removeClass('bg-danger bg-warning bg-success');
-                if (percentage < 50) {
-                    $('#completeness-bar').addClass('bg-danger');
-                } else if (percentage < 80) {
-                    $('#completeness-bar').addClass('bg-warning');
-                } else {
-                    $('#completeness-bar').addClass('bg-success');
-                }
-
-                // Show missing fields
-                let missingText = '';
-                if (missingCritical.length > 0) {
-                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
-                }
-                if (missingImportant.length > 0) {
-                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
-                }
-                if (missingUseful.length > 0) {
-                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
-                }
-
-                if (percentage === 100) {
-                    missingText = '<strong class="text-success">✓ All information complete!</strong>';
-                }
-
-                $('#missing-fields').html(missingText);
-                $('#completeness-alert').show();
-            }
-
-            // Calculate on page load
-            calculateCompleteness();
-
-            // Recalculate when fields change
-            $('form input, form select, form textarea').on('change keyup', calculateCompleteness);
-            $('#user, #iacuc, #strain').on('select2:select select2:unselect', calculateCompleteness);
-        });
-
-    </script>
-
 </head>
-
 <body>
-    <div class="container content mt-4">
+<div class="container mt-4 content">
+    <h4>Edit Holding Cage <small class="text-muted"><?= htmlspecialchars($cage['cage_id']); ?></small></h4>
+    <?php include 'message.php'; ?>
+    <p class="text-muted">Mice in this cage are first-class records — manage them from <a href="hc_view.php?id=<?= rawurlencode($cage['cage_id']); ?>">the cage view</a> (each row links to mouse_view).</p>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
+        <input type="hidden" name="cage_id"    value="<?= htmlspecialchars($cage['cage_id']); ?>">
+
+        <div class="mb-3">
+            <label for="new_cage_id" class="form-label">Cage ID <span class="required-asterisk">*</span></label>
+            <input type="text" id="new_cage_id" name="new_cage_id" class="form-control" required maxlength="255"
+                   value="<?= htmlspecialchars($cage['cage_id']); ?>">
+            <small class="text-muted">Renaming propagates automatically to mice, history, breeding, files, etc.</small>
+        </div>
+
+        <div class="mb-3">
+            <label for="pi_name" class="form-label">PI Name</label>
+            <select id="pi_name" name="pi_name" class="form-control">
+                <option value="">— None —</option>
+                <?php while ($row = $piResult->fetch_assoc()): ?>
+                    <option value="<?= htmlspecialchars($row['id']); ?>" <?= $cage['pi_name'] == $row['id'] ? 'selected' : ''; ?>>
+                        <?= htmlspecialchars($row['initials'] . ' [' . $row['name'] . ']'); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+        </div>
 
         <div class="row">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4>Edit Holding Cage</h4>
-                        <div class="action-buttons">
-                            <!-- Button to go back to the previous page -->
-                            <a href="javascript:void(0);" onclick="goBack()" class="btn btn-primary btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
-                                <i class="fas fa-arrow-circle-left"></i>
-                            </a>
-                            <!-- Button to save the form -->
-                            <a href="javascript:void(0);" onclick="document.getElementById('editForm').submit();" class="btn btn-success btn-sm btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Save">
-                                <i class="fas fa-save"></i>
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="card-body">
-                    <form id="editForm" method="POST" action="hc_edit.php?id=<?= $id; ?>&<?= getCurrentUrlParams(); ?>" enctype="multipart/form-data">
-                            <p class="warning-text">Only <span class="required-asterisk">Cage ID</span> is required. Other fields can be completed here.</p>
-
-                            <!-- Information Completeness Indicator -->
-                            <div id="completeness-alert" class="alert alert-warning" style="display: none; margin-bottom: 20px;">
-                                <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
-                                <div class="progress mt-2" style="height: 20px;">
-                                    <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                                </div>
-                                <div id="missing-fields" class="mt-2"></div>
-                            </div>
-
-                            <input type="hidden" id="mice_to_delete" name="mice_to_delete" value="">
-                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-
-                            <!-- Cage Info -->
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="cage_id" class="form-label">Current Cage ID</label>
-                                    <input type="text" class="form-control" id="cage_id" name="cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" readonly>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="new_cage_id" class="form-label">New Cage ID <span class="required-asterisk">*</span></label>
-                                    <input type="text" class="form-control" id="new_cage_id" name="new_cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>" required style="border: 2px solid #0d6efd;">
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="pi_name" class="form-label">PI Name</label>
-                                    <select class="form-control" id="pi_name" name="pi_name" data-field-type="important">
-                                        <option value="">Select PI</option>
-                                        <?php while ($row = $piResult->fetch_assoc()) : ?>
-                                            <option value="<?= htmlspecialchars($row['id']); ?>" <?= ($row['id'] == $selectedPiId) ? 'selected' : ''; ?>>
-                                                <?= htmlspecialchars($row['initials']) . ' [' . htmlspecialchars($row['name']) . ']'; ?>
-                                            </option>
-                                        <?php endwhile; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="created_at" class="form-label">Date Added</label>
-                                    <input type="date" class="form-control" id="created_at" name="created_at" value="<?= htmlspecialchars(!empty($holdingcage['created_at']) ? date('Y-m-d', strtotime($holdingcage['created_at'])) : ''); ?>" data-no-max-date>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label for="room" class="form-label">Room</label>
-                                    <input type="text" class="form-control" id="room" name="room" value="<?= htmlspecialchars($holdingcage['room'] ?? ''); ?>">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="rack" class="form-label">Rack</label>
-                                    <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($holdingcage['rack'] ?? ''); ?>">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
-                                    <select class="form-control" id="strain" name="strain" data-field-type="important">
-                                        <option value="" <?= empty($holdingcage['strain']) ? 'selected' : ''; ?>>None / Not Applicable</option>
-                                        <?php
-                                        $strainExists = false;
-                                        $isCustomStrain = false;
-                                        foreach ($strainOptions as $option) {
-                                            $value = explode(" | ", $option)[0];
-                                            $selected = ($value == $holdingcage['strain']) ? 'selected' : '';
-                                            if ($value == $holdingcage['strain']) {
-                                                $strainExists = true;
-                                            }
-                                            echo "<option value='$value' $selected>$option</option>";
-                                        }
-                                        if (!$strainExists && !empty($holdingcage['strain'])) {
-                                            $isCustomStrain = true;
-                                            $currentStrainId = htmlspecialchars($holdingcage['strain']);
-                                            echo "<option value='$currentStrainId' selected>$currentStrainId (Custom)</option>";
-                                        }
-                                        ?>
-                                        <option value="custom">Custom</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="mb-3" id="custom_strain_div" style="display: <?= $isCustomStrain ? 'block' : 'none'; ?>;">
-                                <label for="custom_strain" class="form-label">Custom Strain Name</label>
-                                <input type="text" class="form-control" id="custom_strain" name="custom_strain" value="<?= $isCustomStrain ? htmlspecialchars($holdingcage['strain']) : ''; ?>">
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="iacuc" class="form-label">IACUC <span class="badge bg-info">Important</span></label>
-                                    <select class="form-control" id="iacuc" name="iacuc[]" multiple data-field-type="important">
-                                        <option value="" disabled>Select IACUC</option>
-                                        <?php
-                                        if ($iacucResult->num_rows > 0) {
-                                            while ($iacucRow = $iacucResult->fetch_assoc()) {
-                                                $iacuc_id = htmlspecialchars($iacucRow['iacuc_id']);
-                                                $iacuc_title = htmlspecialchars($iacucRow['iacuc_title']);
-                                                $truncated_title = strlen($iacuc_title) > 40 ? substr($iacuc_title, 0, 40) . '...' : $iacuc_title;
-                                                $selected = in_array($iacuc_id, $selectedIacucs) ? 'selected' : '';
-                                                echo "<option value='$iacuc_id' title='$iacuc_title' $selected>$iacuc_id | $truncated_title</option>";
-                                            }
-                                        } else {
-                                            echo "<option value='' disabled>No IACUC available</option>";
-                                        }
-                                        ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="user" class="form-label">User <span class="badge bg-info">Important</span></label>
-                                    <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
-                                        <?php
-                                        while ($userRow = $userResult->fetch_assoc()) {
-                                            $user_id = htmlspecialchars($userRow['id']);
-                                            $initials = htmlspecialchars($userRow['initials']);
-                                            $name = htmlspecialchars($userRow['name']);
-                                            $selected = in_array($user_id, $selectedUsers) ? 'selected' : '';
-                                            echo "<option value='$user_id' $selected>$initials [$name]</option>";
-                                        }
-                                        ?>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Animal Details -->
-                            <hr class="mt-2 mb-3" style="border-top: 2px solid var(--bs-border-color);">
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label for="dob" class="form-label">DOB <span class="badge bg-warning">Critical</span></label>
-                                    <input type="date" class="form-control" id="dob" name="dob" value="<?= htmlspecialchars($holdingcage['dob']); ?>" min="1900-01-01" data-field-type="critical">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
-                                    <select class="form-control" id="sex" name="sex" data-field-type="critical">
-                                        <option value="">Select Sex</option>
-                                        <option value="male" <?= $holdingcage['sex'] === 'male' ? 'selected' : ''; ?>>Male</option>
-                                        <option value="female" <?= $holdingcage['sex'] === 'female' ? 'selected' : ''; ?>>Female</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
-                                    <input type="text" class="form-control" id="parent_cg" name="parent_cg" value="<?= htmlspecialchars($holdingcage['parent_cg']); ?>" data-field-type="useful">
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="cage_genotype" class="form-label">Genotype</label>
-                                    <input type="text" class="form-control" id="cage_genotype" name="cage_genotype" value="<?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?>">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="remarks" class="form-label">Remarks</label>
-                                    <textarea class="form-control" id="remarks" name="remarks" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($holdingcage['remarks']); ?></textarea>
-                                </div>
-                            </div>
-
-                            <!-- Separator -->
-                            <hr class="mt-2 mb-3" style="border-top: 3px solid var(--bs-border-color);">
-
-                            <!-- HTML Form Section for Mouse Fields -->
-                            <div id="mouse_fields_container">
-                                <?php foreach ($mice as $i => $mouse) : ?>
-                                    <div id="mouse_fields_<?= $i + 1 ?>" class="mouse-field" data-mouse-id="<?= $mouse['id'] ?>">
-                                        <hr class="mt-3 mb-3" style="border-top: 2px solid var(--bs-border-color);">
-                                        <h6 class="text-muted mb-3">Mouse #<?= $i + 1 ?></h6>
-                                        <input type="hidden" name="existing_mouse_id[]" value="<?= htmlspecialchars($mouse['id']) ?>">
-                                        <div class="row">
-                                            <div class="col-md-4 mb-3">
-                                                <label for="mouse_id_<?= $i + 1 ?>" class="form-label">Mouse ID</label>
-                                                <input type="text" class="form-control" id="mouse_id_<?= $i + 1 ?>" name="mouse_id[]" value="<?= htmlspecialchars($mouse['mouse_id']) ?>">
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label for="genotype_<?= $i + 1 ?>" class="form-label">Genotype</label>
-                                                <input type="text" class="form-control" id="genotype_<?= $i + 1 ?>" name="genotype[]" value="<?= htmlspecialchars($mouse['genotype']) ?>">
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label for="notes_<?= $i + 1 ?>" class="form-label">Maintenance Notes</label>
-                                                <textarea class="form-control" id="notes_<?= $i + 1 ?>" name="notes[]" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($mouse['notes']) ?></textarea>
-                                            </div>
-                                        </div>
-                                        <div class="button-group">
-                                            <button type="button" class="btn btn-danger btn-sm" onclick="markForDeletion(<?= $i + 1 ?>, <?= $mouse['id'] ?>)"><i class="fas fa-trash"></i></button>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-
-                            <!-- Button to add new mouse fields -->
-                            <div class="button-group">
-                                <button type="button" class="btn btn-primary" onclick="addMouseField()">
-                                    <i class="fas fa-plus"></i> Add Mouse
-                                </button>
-                            </div>
-
-                            <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
-
-                            <!-- Display Files Section -->
-                            <div class="card mt-4">
-                                <div class="card-header">
-                                    <h4>Manage Files</h4>
-                                </div>
-                                <div class="card-body">
-                                    <div class="table-responsive">
-                                        <table class="table table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>File Name</th>
-                                                    <th>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php
-                                                while ($file = $files->fetch_assoc()) {
-                                                    $file_path = htmlspecialchars($file['file_path']);
-                                                    $file_name = htmlspecialchars($file['file_name']);
-                                                    $file_id = intval($file['id']);
-
-                                                    echo "<tr>";
-                                                    echo "<td data-label='File Name'>$file_name</td>";
-                                                    echo "<td data-label='Actions'>
-                                                    <a href='$file_path' download='$file_name' class='btn btn-sm btn-outline-primary'><i class='fas fa-cloud-download-alt fa-sm'></i></a>
-                                                    <a href='delete_file.php?url=hc_edit&id=$file_id' class='btn btn-sm btn-outline-danger' onclick='return confirm(\"Are you sure you want to delete this file?\");' aria-label='Delete $file_name'><i class='fas fa-trash fa-sm'></i></a>
-                                                    </td>";
-                                                    echo "</tr>";
-                                                }
-                                                ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Upload Files Section -->
-                            <div class="card mt-4">
-                                <div class="card-header">
-                                    <h4>Upload New File</h4>
-                                </div>
-                                <div class="card-body">
-                                    <div class="input-group mb-3">
-                                        <input type="file" class="form-control" id="fileUpload" name="fileUpload">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <br>
-                            <!-- Separator -->
-                            <hr class="mt-4 mb-4" style="border-top: 3px solid var(--bs-border-color);">
-
-
-                            <div class="card-body">
-                                <div class="card-header d-flex flex-column flex-md-row justify-content-between">
-                                    <h4>Maintenance Log for Cage ID: <?= htmlspecialchars($id ?? 'Unknown'); ?></h4>
-                                    <div class="action-icons mt-3 mt-md-0">
-                                        <!-- Maintenance button with tooltip -->
-                                        <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
-                                            <i class="fas fa-wrench"></i>
-                                        </a>
-                                    </div>
-                                </div>
-
-                                <?php
-                                // Fetch the maintenance logs for the current cage
-                                $maintenanceQuery = "
-                                    SELECT m.id, m.timestamp, u.name AS user_name, m.comments, m.user_id 
-                                    FROM maintenance m
-                                    JOIN users u ON m.user_id = u.id
-                                    WHERE m.cage_id = ?
-                                    ORDER BY m.timestamp DESC";
-                                $stmtMaintenance = $con->prepare($maintenanceQuery);
-                                $stmtMaintenance->bind_param("s", $id);
-                                $stmtMaintenance->execute();
-                                $maintenanceLogs = $stmtMaintenance->get_result();
-                                ?>
-
-                                <?php if ($maintenanceLogs->num_rows > 0) : ?>
-                                    <div class="table-responsive">
-                                        <table class="table table-hover" id="maintenanceLogTable">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width: 25%;">Date</th>
-                                                    <th style="width: 25%;">User</th>
-                                                    <th style="width: 40%;">Comment</th>
-                                                    <th style="width: 10%;">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php while ($log = $maintenanceLogs->fetch_assoc()) : ?>
-                                                    <tr id="log-row-<?= $log['id']; ?>" class="maintenance-log-row">
-                                                        <td data-label="Date" style="width: 25%;"><?= htmlspecialchars($log['timestamp'] ?? ''); ?></td>
-                                                        <td data-label="User" style="width: 25%;"><?= htmlspecialchars($log['user_name'] ?? 'Unknown'); ?></td>
-                                                        <td data-label="Comment" style="width: 40%;">
-                                                            <input type="hidden" name="log_ids[]" value="<?= htmlspecialchars($log['id']); ?>">
-                                                            <textarea name="log_comments[]" class="form-control"><?= htmlspecialchars($log['comments'] ?? 'No comment'); ?></textarea>
-                                                        </td>
-                                                        <td data-label="Action" style="width: 10%;">
-                                                            <button type="button" class="btn btn-danger btn-icon" onclick="markLogForDeletion(<?= $log['id']; ?>)">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                <?php endwhile; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <nav aria-label="Maintenance log pagination">
-                                        <ul class="pagination pagination-sm justify-content-center" id="maintenanceLogPagination"></ul>
-                                    </nav>
-                                <?php else : ?>
-                                    <p>No maintenance records found for this cage.</p>
-                                <?php endif; ?>
-                            </div>
-
-
-
-                            <!-- Hidden input field to store IDs of logs to delete -->
-                            <input type="hidden" id="logs_to_delete" name="logs_to_delete" value="">
-
-                            <br>
-                            <button type="submit" class="btn btn-primary">Save Changes</button>
-                            <button type="button" class="btn btn-secondary" onclick="goBack()">Go Back</button>
-
-                        </form>
-                    </div>
-                </div>
+            <div class="col-md-6 mb-3">
+                <label for="room" class="form-label">Room</label>
+                <input type="text" id="room" name="room" class="form-control" value="<?= htmlspecialchars($cage['room'] ?? ''); ?>">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="rack" class="form-label">Rack</label>
+                <input type="text" id="rack" name="rack" class="form-control" value="<?= htmlspecialchars($cage['rack'] ?? ''); ?>">
             </div>
         </div>
-    </div>
 
-    <br>
-    <?php include 'footer.php'; ?>
+        <div class="mb-3">
+            <label for="iacuc" class="form-label">IACUC</label>
+            <select id="iacuc" name="iacuc[]" class="form-control" multiple>
+                <?php while ($iac = $iacucResult->fetch_assoc()): ?>
+                    <option value="<?= htmlspecialchars($iac['iacuc_id']); ?>"
+                        <?= in_array($iac['iacuc_id'], $selectedIacucs, true) ? 'selected' : ''; ?>>
+                        <?= htmlspecialchars($iac['iacuc_id'] . ' | ' . $iac['iacuc_title']); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="user" class="form-label">Users</label>
+            <select id="user" name="user[]" class="form-control" multiple>
+                <?php while ($u = $userResult->fetch_assoc()):
+                    $sel = in_array($u['id'], $selectedUsers) ? 'selected' : '';
+                ?>
+                    <option value="<?= htmlspecialchars($u['id']); ?>" <?= $sel; ?>>
+                        <?= htmlspecialchars($u['initials'] . ' [' . $u['name'] . ']'); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="remarks" class="form-label">Remarks</label>
+            <textarea id="remarks" name="remarks" class="form-control" rows="3"><?= htmlspecialchars($cage['remarks'] ?? ''); ?></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="hc_view.php?id=<?= rawurlencode($cage['cage_id']); ?>" class="btn btn-secondary">Cancel</a>
+    </form>
+
+    <?php if ($files): ?>
+    <hr>
+    <h5>Attached Files</h5>
+    <ul>
+        <?php foreach ($files as $f): ?>
+            <li><a href="<?= htmlspecialchars($f['file_path']); ?>" download="<?= htmlspecialchars($f['file_name']); ?>"><?= htmlspecialchars($f['file_name']); ?></a></li>
+        <?php endforeach; ?>
+    </ul>
+    <?php endif; ?>
+</div>
+<br>
+<?php include 'footer.php'; ?>
+<script>
+$(document).ready(function () {
+    $('#pi_name').select2({ placeholder: 'Select PI', allowClear: true, width: '100%' });
+    $('#iacuc').select2({ placeholder: 'Select IACUC', allowClear: true, width: '100%' });
+    $('#user').select2({ placeholder: 'Select user(s)', allowClear: true, width: '100%' });
+});
+</script>
 </body>
-
 </html>

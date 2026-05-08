@@ -80,13 +80,21 @@ $cages = []; // Array of ['type' => 'holding'|'breeding', 'data' => [...]]
 foreach ($ids as $id) {
     $id = trim($id);
 
-    // Check if it's a holding cage
-    $hcQuery = "SELECT h.*, pi.name AS pi_name, c.quantity as qty, c.room, c.rack, h.dob, h.sex, h.parent_cg, s.str_name
-                FROM holding h
-                LEFT JOIN cages c ON h.cage_id = c.cage_id
-                LEFT JOIN users pi ON c.pi_name = pi.id
-                LEFT JOIN strains s ON h.strain = s.str_id
-                WHERE h.cage_id = ?";
+    // v2: a "holding cage" is any cage that isn't a breeding cage. Pull
+    // metadata + aggregate mouse-derived fields. The original `holding` row
+    // is gone; strain/sex/dob now belong to the mouse entities.
+    $hcQuery = "SELECT c.cage_id,
+                       pi.name AS pi_name,
+                       c.quantity AS qty, c.room, c.rack,
+                       (SELECT MIN(mi.dob) FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS dob,
+                       (SELECT GROUP_CONCAT(DISTINCT mi.sex SEPARATOR ', ') FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS sex,
+                       NULL AS parent_cg,
+                       s.str_name
+                FROM cages c
+                LEFT JOIN users pi  ON c.pi_name = pi.id
+                LEFT JOIN strains s ON s.str_id = (SELECT mi.strain FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.strain IS NOT NULL LIMIT 1)
+                WHERE c.cage_id = ?
+                  AND NOT EXISTS (SELECT 1 FROM breeding b WHERE b.cage_id = c.cage_id)";
     $stmt = $con->prepare($hcQuery);
     $stmt->bind_param("s", $id);
     $stmt->execute();
@@ -96,8 +104,8 @@ foreach ($ids as $id) {
         $cage = $hcResult->fetch_assoc();
         $stmt->close();
 
-        // Fetch mouse data for this cage, limit to first 5 records
-        $mouseQuery = "SELECT mouse_id, genotype FROM mice WHERE cage_id = ? LIMIT 5";
+        // v2: live mice currently in this cage
+        $mouseQuery = "SELECT mouse_id, genotype FROM mice WHERE current_cage_id = ? AND status = 'alive' ORDER BY mouse_id LIMIT 5";
         $stmtMouse = $con->prepare($mouseQuery);
         $stmtMouse->bind_param("s", $id);
         $stmtMouse->execute();
@@ -117,11 +125,15 @@ foreach ($ids as $id) {
     }
     $stmt->close();
 
-    // Check if it's a breeding cage
-    $bcQuery = "SELECT b.*, c.remarks AS remarks, c.room, c.rack, pi.name AS pi_name
+    // v2: per-parent dob/genotype JOIN through mice
+    $bcQuery = "SELECT b.*, c.remarks AS remarks, c.room, c.rack, pi.name AS pi_name,
+                       mm.dob AS male_dob, mm.genotype AS male_genotype,
+                       ff.dob AS female_dob, ff.genotype AS female_genotype
                 FROM breeding b
-                LEFT JOIN cages c ON b.cage_id = c.cage_id
-                LEFT JOIN users pi ON c.pi_name = pi.id
+                LEFT JOIN cages c   ON b.cage_id = c.cage_id
+                LEFT JOIN users pi  ON c.pi_name = pi.id
+                LEFT JOIN mice mm   ON mm.mouse_id = b.male_id
+                LEFT JOIN mice ff   ON ff.mouse_id = b.female_id
                 WHERE b.cage_id = ?";
     $stmt = $con->prepare($bcQuery);
     $stmt->bind_param("s", $id);

@@ -40,11 +40,24 @@ if ($row = mysqli_fetch_assoc($labResult)) {
 if (isset($_GET['id'])) {
     $id = mysqli_real_escape_string($con, $_GET['id']);
 
-    // Fetch the breeding cage record with the specified ID
-    $query = "SELECT b.*, c.remarks AS remarks, pi.initials AS pi_initials, pi.name AS pi_name, c.room, c.rack
+    // v2: per-parent dob/genotype/parent_cage are now properties of the
+    // mouse entity (mice table). LEFT JOIN to mice on male_id / female_id
+    // and surface those derived fields under the same column aliases the
+    // template expects.
+    $query = "SELECT b.*, c.remarks AS remarks,
+                     pi.initials AS pi_initials, pi.name AS pi_name,
+                     c.room, c.rack,
+                     mm.dob       AS male_dob,
+                     mm.genotype  AS male_genotype,
+                     ff.dob       AS female_dob,
+                     ff.genotype  AS female_genotype,
+                     NULL         AS male_parent_cage,
+                     NULL         AS female_parent_cage
           FROM breeding b
-          LEFT JOIN cages c ON b.cage_id = c.cage_id
-          LEFT JOIN users pi ON c.pi_name = pi.id
+          LEFT JOIN cages c   ON b.cage_id = c.cage_id
+          LEFT JOIN users pi  ON c.pi_name = pi.id
+          LEFT JOIN mice mm   ON mm.mouse_id = b.male_id
+          LEFT JOIN mice ff   ON ff.mouse_id = b.female_id
           WHERE b.cage_id = ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("s", $id);
@@ -524,8 +537,14 @@ require 'header.php';
                     <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
                 </tr>
                 <tr>
-                    <th>Male ID</th>
-                    <td id="male-id-data" data-value="<?= !empty($breedingcage['male_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_id']); ?></td>
+                    <th>Male (Sire)</th>
+                    <td id="male-id-data" data-value="<?= !empty($breedingcage['male_id']) ? '1' : ''; ?>">
+                        <?php if (!empty($breedingcage['male_id'])): ?>
+                            <a href="mouse_view.php?id=<?= rawurlencode($breedingcage['male_id']); ?>"><?= htmlspecialchars($breedingcage['male_id']); ?></a>
+                        <?php else: ?>
+                            <span class="text-muted">—</span>
+                        <?php endif; ?>
+                    </td>
                 </tr>
                 <tr>
                     <th>Male Genotype</th>
@@ -540,8 +559,14 @@ require 'header.php';
                     <td><?= htmlspecialchars($breedingcage['male_parent_cage'] ?? ''); ?></td>
                 </tr>
                 <tr>
-                    <th>Female ID</th>
-                    <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></td>
+                    <th>Female (Dam)</th>
+                    <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>">
+                        <?php if (!empty($breedingcage['female_id'])): ?>
+                            <a href="mouse_view.php?id=<?= rawurlencode($breedingcage['female_id']); ?>"><?= htmlspecialchars($breedingcage['female_id']); ?></a>
+                        <?php else: ?>
+                            <span class="text-muted">—</span>
+                        <?php endif; ?>
+                    </td>
                 </tr>
                 <tr>
                     <th>Female Genotype</th>

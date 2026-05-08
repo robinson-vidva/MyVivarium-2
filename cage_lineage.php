@@ -1,468 +1,149 @@
 <?php
 
 /**
- * Cage Lineage View
+ * Cage Lineage (v2)
  *
- * Displays parent-child cage relationships as a visual tree.
- * Uses the parent_cg column in the holding table to trace lineage.
- * Supports viewing lineage both "up" (ancestors) and "down" (descendants).
+ * The v1 page traced lineage at the cage level via `holding.parent_cg`. In v2
+ * lineage is per-mouse (mice.sire_id / dam_id) — strictly more accurate, since
+ * a single cage can contain unrelated mice and a single mouse's parents may
+ * have lived in different cages over time.
+ *
+ * This page now derives a cage's "parent cages" by looking up the cages that
+ * historically contained the sires/dams of any mouse currently in the target
+ * cage. For richer per-mouse lineage (offspring tree, sire/dam links), each
+ * mouse_view.php page already shows its own ancestors and offspring.
  */
 
 require 'session_config.php';
 require 'dbcon.php';
 
-// Check if the user is logged in
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
     exit;
 }
 
-/**
- * Determine cage type (HC or BC) by checking holding and breeding tables.
- */
-function getCageType($con, $cageId) {
-    $hcStmt = $con->prepare("SELECT 1 FROM holding WHERE cage_id = ?");
-    $hcStmt->bind_param("s", $cageId);
-    $hcStmt->execute();
-    if ($hcStmt->get_result()->num_rows > 0) {
-        $hcStmt->close();
-        return 'HC';
-    }
-    $hcStmt->close();
+$cageId = trim($_GET['cage_id'] ?? '');
 
-    $bcStmt = $con->prepare("SELECT 1 FROM breeding WHERE cage_id = ?");
-    $bcStmt->bind_param("s", $cageId);
-    $bcStmt->execute();
-    if ($bcStmt->get_result()->num_rows > 0) {
-        $bcStmt->close();
-        return 'BC';
-    }
-    $bcStmt->close();
+// Resolve "parent cages": for each mouse currently in $cageId, find its
+// sire/dam, then look at where those parents were last housed.
+$parents = [];
+$descendants = [];
+$miceInCage = [];
 
-    return 'Unknown';
-}
-
-/**
- * Get cage info (strain name and status) for a given cage ID.
- */
-function getCageInfo($con, $cageId) {
-    // Try holding table first
-    $stmt = $con->prepare("SELECT h.cage_id, h.strain, h.parent_cg, s.str_name, c.status
-                           FROM holding h
-                           LEFT JOIN cages c ON h.cage_id = c.cage_id
-                           LEFT JOIN strains s ON h.strain = s.str_id
-                           WHERE h.cage_id = ?");
+if ($cageId !== '') {
+    $stmt = $con->prepare("SELECT mouse_id, sex, dob, sire_id, dam_id FROM mice WHERE current_cage_id = ?");
     $stmt->bind_param("s", $cageId);
     $stmt->execute();
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $stmt->close();
-        return $row;
-    }
+    $miceInCage = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    // Try breeding table (breeding has 'cross' instead of 'strain', and no parent_cg)
-    $stmt2 = $con->prepare("SELECT b.cage_id, b.`cross`, c.status
-                            FROM breeding b
-                            LEFT JOIN cages c ON b.cage_id = c.cage_id
-                            WHERE b.cage_id = ?");
-    $stmt2->bind_param("s", $cageId);
-    $stmt2->execute();
-    $result2 = $stmt2->get_result();
-    if ($row2 = $result2->fetch_assoc()) {
-        $stmt2->close();
-        $row2['strain'] = null;
-        $row2['str_name'] = $row2['cross'] ?? null;  // Show cross info as the label
-        $row2['parent_cg'] = null;
-        unset($row2['cross']);
-        return $row2;
-    }
-    $stmt2->close();
+    $parentSql = "
+        SELECT DISTINCT p.mouse_id, p.sex, p.current_cage_id, p.dob, p.status
+          FROM mice m
+          JOIN mice p ON p.mouse_id IN (m.sire_id, m.dam_id)
+         WHERE m.current_cage_id = ?";
+    $ps = $con->prepare($parentSql);
+    $ps->bind_param("s", $cageId);
+    $ps->execute();
+    $parents = $ps->get_result()->fetch_all(MYSQLI_ASSOC);
+    $ps->close();
 
-    return null;
-}
-
-/**
- * Recursively build descendant tree for a given cage ID.
- */
-function buildDescendantTree($con, $cageId, $depth = 0, $maxDepth = 10) {
-    if ($depth > $maxDepth) return [];
-
-    $children = [];
-    $stmt = $con->prepare("SELECT h.cage_id, h.strain, h.parent_cg, s.str_name, c.status
-                           FROM holding h
-                           LEFT JOIN cages c ON h.cage_id = c.cage_id
-                           LEFT JOIN strains s ON h.strain = s.str_id
-                           WHERE h.parent_cg = ?");
-    $stmt->bind_param("s", $cageId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $row['children'] = buildDescendantTree($con, $row['cage_id'], $depth + 1, $maxDepth);
-        $children[] = $row;
-    }
-    $stmt->close();
-    return $children;
-}
-
-/**
- * Find all ancestors of a given cage by following parent_cg up.
- */
-function findAncestors($con, $cageId, $maxDepth = 20) {
-    $ancestors = [];
-    $currentId = $cageId;
-    $visited = [];
-
-    for ($i = 0; $i < $maxDepth; $i++) {
-        // Get parent_cg for current cage from holding table
-        $stmt = $con->prepare("SELECT parent_cg FROM holding WHERE cage_id = ?");
-        $stmt->bind_param("s", $currentId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        if (!$row || empty($row['parent_cg'])) {
-            break;
-        }
-
-        $parentId = $row['parent_cg'];
-
-        // Prevent infinite loops
-        if (in_array($parentId, $visited)) {
-            break;
-        }
-        $visited[] = $parentId;
-
-        $parentInfo = getCageInfo($con, $parentId);
-        if ($parentInfo) {
-            $ancestors[] = $parentInfo;
-        } else {
-            // Parent cage exists as reference but not found in tables
-            $ancestors[] = [
-                'cage_id' => $parentId,
-                'strain' => null,
-                'str_name' => null,
-                'status' => null,
-                'parent_cg' => null
-            ];
-        }
-
-        $currentId = $parentId;
-    }
-
-    return array_reverse($ancestors);
-}
-
-/**
- * Render a tree node and its children recursively as HTML.
- */
-function renderTree($node, $con, $isRoot = false) {
-    $type = getCageType($con, $node['cage_id']);
-    $viewUrl = ($type === 'HC') ? 'hc_view.php' : (($type === 'BC') ? 'bc_view.php' : '#');
-    $status = $node['status'] ?? 'active';
-    $statusClass = ($status === 'archived') ? 'archived' : 'active';
-    $statusBadge = ($status === 'archived')
-        ? '<span class="badge bg-danger">Archived</span>'
-        : '<span class="badge bg-success">Active</span>';
-    $rootClass = $isRoot ? ' tree-root' : '';
-
-    echo '<div class="tree-node">';
-    echo '<div class="tree-node-content ' . htmlspecialchars($statusClass) . htmlspecialchars($rootClass) . '">';
-    echo '<a href="' . htmlspecialchars($viewUrl) . '?id=' . rawurlencode($node['cage_id']) . '">' . htmlspecialchars($node['cage_id']) . '</a>';
-    echo ' <span class="badge bg-secondary">' . htmlspecialchars($type) . '</span> ';
-    echo $statusBadge;
-    if (!empty($node['str_name'])) {
-        echo ' <small class="text-muted">(' . htmlspecialchars($node['str_name']) . ')</small>';
-    }
-    echo '</div>';
-
-    if (!empty($node['children'])) {
-        foreach ($node['children'] as $child) {
-            renderTree($child, $con, false);
-        }
-    }
-    echo '</div>';
-}
-
-// Handle search input
-$searchCageId = isset($_GET['cage_id']) ? trim($_GET['cage_id']) : '';
-$direction = isset($_GET['direction']) ? $_GET['direction'] : 'both';
-
-// Fetch all cage IDs for the dropdown
-$allCagesQuery = "SELECT cage_id FROM cages ORDER BY cage_id";
-$allCagesResult = mysqli_query($con, $allCagesQuery);
-$allCageIds = [];
-while ($row = mysqli_fetch_assoc($allCagesResult)) {
-    $allCageIds[] = $row['cage_id'];
+    // Descendant cages: cages that contain offspring of any mouse currently in this cage
+    $descSql = "
+        SELECT DISTINCT child.current_cage_id AS cage_id, COUNT(*) AS n_offspring
+          FROM mice parent
+          JOIN mice child ON (child.sire_id = parent.mouse_id OR child.dam_id = parent.mouse_id)
+         WHERE parent.current_cage_id = ?
+           AND child.current_cage_id IS NOT NULL
+           AND child.current_cage_id != parent.current_cage_id
+         GROUP BY child.current_cage_id";
+    $ds = $con->prepare($descSql);
+    $ds->bind_param("s", $cageId);
+    $ds->execute();
+    $descendants = $ds->get_result()->fetch_all(MYSQLI_ASSOC);
+    $ds->close();
 }
 
 require 'header.php';
 ?>
-
 <!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cage Lineage | <?php echo htmlspecialchars($labName); ?></title>
-
-    <!-- Select2 CSS loaded via header.php -->
-    <!-- Include Select2 JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
-
+    <title>Cage Lineage | <?= htmlspecialchars($labName); ?></title>
     <style>
-        .container {
-            max-width: 900px;
-            padding: 20px 15px;
-            margin: auto;
-        }
-
-        .tree-node {
-            margin-left: 30px;
-            border-left: 2px solid var(--bs-border-color);
-            padding-left: 15px;
-            margin-bottom: 10px;
-        }
-
-        .tree-node-content {
-            padding: 8px 15px;
-            background: var(--bs-tertiary-bg);
-            border-radius: 6px;
-            border: 1px solid var(--bs-border-color);
-            display: inline-block;
-        }
-
-        .tree-node-content.active {
-            border-left: 3px solid #28a745;
-        }
-
-        .tree-node-content.archived {
-            border-left: 3px solid #dc3545;
-            opacity: 0.7;
-        }
-
-        .tree-root {
-            font-weight: bold;
-        }
-
-        .lineage-section {
-            margin-top: 20px;
-            padding: 15px;
-            background: var(--bs-body-bg);
-            border-radius: 8px;
-            border: 1px solid var(--bs-border-color);
-        }
-
-        .lineage-section h5 {
-            margin-bottom: 15px;
-        }
-
-        .search-form {
-            margin-bottom: 20px;
-        }
-
-        .highlight-cage {
-            background-color: #fff3cd !important;
-            border: 2px solid #ffc107 !important;
-        }
-
-        .select2-container .select2-selection--single {
-            height: 38px;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            line-height: 38px;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
-            height: 38px;
-        }
+        .container { max-width: 900px; padding: 20px; margin: auto; background: var(--bs-tertiary-bg); border-radius: 8px; margin-top: 20px; }
+        .lineage-section { background: var(--bs-body-bg); padding: 16px; border-radius: 6px; margin-bottom: 16px; }
     </style>
 </head>
-
 <body>
-    <div class="container content mt-4">
-        <div class="card">
-            <div class="card-header">
-                <h1 class="mb-0">Cage Lineage Viewer</h1>
-            </div>
-            <div class="card-body">
-                <!-- Search Form -->
-                <form method="GET" action="cage_lineage.php" class="search-form">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-md-5">
-                            <label for="cage_id" class="form-label"><strong>Cage ID:</strong></label>
-                            <select class="form-control" id="cage_id" name="cage_id" required>
-                                <option value="">Select a cage</option>
-                                <?php foreach ($allCageIds as $cid) : ?>
-                                    <option value="<?= htmlspecialchars($cid); ?>" <?= ($searchCageId === $cid) ? 'selected' : ''; ?>><?= htmlspecialchars($cid); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="direction" class="form-label"><strong>Direction:</strong></label>
-                            <select class="form-control" id="direction" name="direction">
-                                <option value="both" <?php echo ($direction === 'both') ? 'selected' : ''; ?>>Both (Ancestors &amp; Descendants)</option>
-                                <option value="up" <?php echo ($direction === 'up') ? 'selected' : ''; ?>>Up (Ancestors Only)</option>
-                                <option value="down" <?php echo ($direction === 'down') ? 'selected' : ''; ?>>Down (Descendants Only)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <button type="submit" class="btn btn-primary w-100">View Lineage</button>
-                        </div>
-                    </div>
-                </form>
+<div class="container content">
+    <h4>Cage Lineage</h4>
+    <p class="text-muted">Lineage is now per-mouse (sire/dam). For full ancestor + offspring trees of an individual mouse, open <strong>Mice → mouse view</strong>. This page derives cage-level lineage from the mice currently inside the cage.</p>
 
-                <?php if (!empty($searchCageId)) : ?>
-                    <?php
-                    // Check if the cage exists
-                    $cageInfo = getCageInfo($con, $searchCageId);
-                    if (!$cageInfo) :
-                    ?>
-                        <div class="alert alert-warning">
-                            Cage ID <strong><?php echo htmlspecialchars($searchCageId); ?></strong> was not found.
-                        </div>
-                    <?php else : ?>
-                        <?php
-                        $cageType = getCageType($con, $searchCageId);
-                        $cageStatus = $cageInfo['status'] ?? 'active';
-                        ?>
-                        <div class="alert alert-info">
-                            Showing lineage for cage <strong><?php echo htmlspecialchars($searchCageId); ?></strong>
-                            <span class="badge bg-secondary"><?php echo htmlspecialchars($cageType); ?></span>
-                            <?php if (!empty($cageInfo['str_name'])) : ?>
-                                - <?php echo htmlspecialchars($cageInfo['str_name']); ?>
-                            <?php endif; ?>
-                        </div>
-
-                        <?php if ($direction === 'up' || $direction === 'both') : ?>
-                            <div class="lineage-section">
-                                <h5><i class="fas fa-arrow-up"></i> Ancestors</h5>
-                                <?php
-                                $ancestors = findAncestors($con, $searchCageId);
-                                if (!empty($ancestors)) :
-                                    // Build a nested tree structure from ancestors (root first)
-                                    // Render ancestors as a chain: root -> child -> ... -> search cage
-                                    $rootAncestor = $ancestors[0];
-                                    $rootAncestor['children'] = [];
-
-                                    // Chain ancestors together
-                                    $currentNode = &$rootAncestor;
-                                    for ($i = 1; $i < count($ancestors); $i++) {
-                                        $ancestors[$i]['children'] = [];
-                                        $currentNode['children'] = [$ancestors[$i]];
-                                        $currentNode = &$currentNode['children'][0];
-                                    }
-                                    // Add the search cage at the end
-                                    $searchNode = $cageInfo;
-                                    $searchNode['children'] = [];
-                                    $currentNode['children'] = [$searchNode];
-                                    unset($currentNode);
-
-                                    renderTree($rootAncestor, $con, true);
-                                else :
-                                ?>
-                                    <p class="text-muted">No ancestors found. This cage is a root cage (no parent_cg set).</p>
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if ($direction === 'down' || $direction === 'both') : ?>
-                            <div class="lineage-section">
-                                <h5><i class="fas fa-arrow-down"></i> Descendants</h5>
-                                <?php
-                                $descendants = buildDescendantTree($con, $searchCageId);
-                                if (!empty($descendants)) :
-                                    $rootNode = $cageInfo;
-                                    $rootNode['children'] = $descendants;
-                                    renderTree($rootNode, $con, true);
-                                else :
-                                ?>
-                                    <p class="text-muted">No descendant cages found.</p>
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-
-                    <?php endif; ?>
-
-                <?php else : ?>
-                    <!-- Show overview of all parent-child relationships -->
-                    <div class="lineage-section">
-                        <h5>All Cages with Parent Relationships</h5>
-                        <?php
-                        $relQuery = "SELECT h.cage_id, h.parent_cg, h.strain, s.str_name, c.status
-                                     FROM holding h
-                                     LEFT JOIN cages c ON h.cage_id = c.cage_id
-                                     LEFT JOIN strains s ON h.strain = s.str_id
-                                     WHERE h.parent_cg IS NOT NULL AND h.parent_cg != ''
-                                     ORDER BY h.parent_cg, h.cage_id";
-                        $relResult = mysqli_query($con, $relQuery);
-
-                        if ($relResult && mysqli_num_rows($relResult) > 0) :
-                            // Build adjacency list to find root cages
-                            $childCages = [];
-                            $allRelations = [];
-                            while ($rel = mysqli_fetch_assoc($relResult)) {
-                                $allRelations[] = $rel;
-                                $childCages[$rel['cage_id']] = $rel['parent_cg'];
-                            }
-
-                            // Find root cages (parents that are not children of any other cage in our set)
-                            $parentIds = array_unique(array_values($childCages));
-                            $rootCages = [];
-                            foreach ($parentIds as $pid) {
-                                if (!isset($childCages[$pid])) {
-                                    $rootCages[] = $pid;
-                                }
-                            }
-                            $rootCages = array_unique($rootCages);
-
-                            if (!empty($rootCages)) :
-                                foreach ($rootCages as $rootId) :
-                                    $rootInfo = getCageInfo($con, $rootId);
-                                    if ($rootInfo) {
-                                        $rootInfo['children'] = buildDescendantTree($con, $rootId);
-                                        renderTree($rootInfo, $con, true);
-                                    } else {
-                                        // Root cage info not found, still render descendants
-                                        $fakeRoot = [
-                                            'cage_id' => $rootId,
-                                            'strain' => null,
-                                            'str_name' => null,
-                                            'status' => null,
-                                            'children' => buildDescendantTree($con, $rootId)
-                                        ];
-                                        renderTree($fakeRoot, $con, true);
-                                    }
-                                    echo '<hr>';
-                                endforeach;
-                            else :
-                        ?>
-                                <p class="text-muted">No root cages found in the lineage data.</p>
-                            <?php endif; ?>
-                        <?php else : ?>
-                            <p class="text-muted">No parent-child cage relationships found. Cages need to have the <em>Parent Cage</em> field set to appear here.</p>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
+    <form method="GET" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="cage_id" class="form-control" placeholder="Enter Cage ID" value="<?= htmlspecialchars($cageId); ?>">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Lookup</button>
         </div>
-    </div>
+    </form>
 
-    <script>
-        $(document).ready(function() {
-            $('#cage_id').select2({
-                placeholder: "Select a cage",
-                allowClear: true
-            });
-        });
-    </script>
+    <?php if ($cageId === ''): ?>
+        <p class="text-muted">Enter a cage ID above to see its lineage.</p>
+    <?php else: ?>
+        <div class="lineage-section">
+            <h5><i class="fas fa-paw"></i> Mice in <?= htmlspecialchars($cageId); ?> (<?= count($miceInCage); ?>)</h5>
+            <?php if (!$miceInCage): ?>
+                <p class="text-muted mb-0">No mice currently in this cage.</p>
+            <?php else: ?>
+                <ul>
+                    <?php foreach ($miceInCage as $m): ?>
+                        <li><a href="mouse_view.php?id=<?= rawurlencode($m['mouse_id']); ?>"><?= htmlspecialchars($m['mouse_id']); ?></a> — <?= htmlspecialchars(ucfirst($m['sex'])); ?>, DOB <?= htmlspecialchars($m['dob'] ?? '—'); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
 
-    <br>
-    <?php include 'footer.php'; ?>
+        <div class="lineage-section">
+            <h5><i class="fas fa-arrow-up"></i> Parents (sires & dams of mice in this cage)</h5>
+            <?php if (!$parents): ?>
+                <p class="text-muted mb-0">No registered parents (founders or external sources).</p>
+            <?php else: ?>
+                <ul>
+                    <?php foreach ($parents as $p): ?>
+                        <li>
+                            <a href="mouse_view.php?id=<?= rawurlencode($p['mouse_id']); ?>"><?= htmlspecialchars($p['mouse_id']); ?></a>
+                            (<?= htmlspecialchars(ucfirst($p['sex'])); ?>)
+                            <?php if ($p['current_cage_id']): ?>
+                                — last in cage
+                                <a href="cage_lineage.php?cage_id=<?= rawurlencode($p['current_cage_id']); ?>"><?= htmlspecialchars($p['current_cage_id']); ?></a>
+                            <?php else: ?>
+                                — <em><?= htmlspecialchars($p['status']); ?></em>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+
+        <div class="lineage-section">
+            <h5><i class="fas fa-arrow-down"></i> Descendant Cages</h5>
+            <?php if (!$descendants): ?>
+                <p class="text-muted mb-0">No descendant cages (no offspring of these mice are housed elsewhere).</p>
+            <?php else: ?>
+                <ul>
+                    <?php foreach ($descendants as $d): ?>
+                        <li>
+                            <a href="cage_lineage.php?cage_id=<?= rawurlencode($d['cage_id']); ?>"><?= htmlspecialchars($d['cage_id']); ?></a>
+                            — <?= (int)$d['n_offspring']; ?> offspring
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+</div>
+<br>
+<?php include 'footer.php'; ?>
 </body>
-
 </html>

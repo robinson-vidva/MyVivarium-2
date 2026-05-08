@@ -38,12 +38,21 @@ if ($row = mysqli_fetch_assoc($labResult)) {
 if (isset($_GET['id'])) {
     $id = mysqli_real_escape_string($con, $_GET['id']);
 
-    $query = "SELECT h.*, pi.initials AS pi_initials, pi.name AS pi_name, s.*, c.quantity, c.remarks, c.room, c.rack
-              FROM holding h
-              LEFT JOIN cages c ON h.cage_id = c.cage_id
-              LEFT JOIN users pi ON c.pi_name = pi.id
-              LEFT JOIN strains s ON h.strain = s.str_id
-              WHERE h.cage_id = ?";
+    // v2: cage is the canonical container; mice are independent. We pull cage
+    // metadata directly from `cages` and aggregate mouse-level facts (strain,
+    // sex, dob) from the mice currently in the cage.
+    $query = "SELECT c.cage_id,
+                     pi.initials AS pi_initials, pi.name AS pi_name,
+                     c.quantity, c.remarks, c.room, c.rack,
+                     (SELECT COUNT(*) FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS live_count,
+                     (SELECT MIN(mi.dob) FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS dob,
+                     (SELECT GROUP_CONCAT(DISTINCT mi.sex SEPARATOR ', ') FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS sex,
+                     (SELECT GROUP_CONCAT(DISTINCT mi.strain SEPARATOR ', ') FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive' AND mi.strain IS NOT NULL) AS strain_ids,
+                     s.str_id, s.str_name, s.str_aka, s.str_url, s.str_rrid, s.str_notes
+              FROM cages c
+              LEFT JOIN users pi   ON c.pi_name = pi.id
+              LEFT JOIN strains s  ON s.str_id = (SELECT mi.strain FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.strain IS NOT NULL LIMIT 1)
+              WHERE c.cage_id = ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("s", $id);
     $stmt->execute();
@@ -65,21 +74,14 @@ if (isset($_GET['id'])) {
         }
 
         if (is_null($holdingcage['pi_name'])) {
-            $queryBasic = "SELECT * FROM holding WHERE `cage_id` = ?";
-            $stmtBasic = $con->prepare($queryBasic);
-            $stmtBasic->bind_param("s", $id);
-            $stmtBasic->execute();
-            $resultBasic = $stmtBasic->get_result();
-            if (mysqli_num_rows($resultBasic) === 1) {
-                $holdingcage = mysqli_fetch_assoc($resultBasic);
-                $holdingcage['pi_initials'] = 'NA';
-                $holdingcage['pi_name'] = 'NA';
-            } else {
-                $_SESSION['message'] = 'Error fetching the cage details.';
-                header("Location: hc_dash.php");
-                exit();
-            }
+            // No PI assigned — that's fine in v2, just display NA placeholders.
+            $holdingcage['pi_initials'] = 'NA';
+            $holdingcage['pi_name'] = 'NA';
         }
+        // Default fields the old `holding` table contributed but the cage no
+        // longer owns (strain/genotype/dob/sex/parent_cg are now per-mouse).
+        $holdingcage['genotype']   = $holdingcage['genotype']   ?? '';
+        $holdingcage['parent_cg']  = $holdingcage['parent_cg']  ?? '';
 
         $iacucQuery = "SELECT GROUP_CONCAT(iacuc_id SEPARATOR ', ') AS iacuc_ids FROM cage_iacuc WHERE cage_id = ?";
         $stmtIacuc = $con->prepare($iacucQuery);
@@ -139,7 +141,10 @@ if (isset($_GET['id'])) {
         $userDisplayString = implode(', ', $userDisplay);
         $stmtUser->close();
 
-        $mouseQuery = "SELECT * FROM mice WHERE cage_id = ?";
+        // v2: fetch mice as first-class entities currently assigned to this cage
+        $mouseQuery = "SELECT mouse_id, sex, dob, genotype, ear_code, status, notes
+                         FROM mice WHERE current_cage_id = ?
+                         ORDER BY status = 'alive' DESC, mouse_id ASC";
         $stmtMouse = $con->prepare($mouseQuery);
         $stmtMouse->bind_param("s", $id);
         $stmtMouse->execute();
@@ -568,11 +573,16 @@ require 'header.php';
             </table>
         </div>
 
-        <!-- Mice Section -->
+        <!-- Mice Section (v2: first-class entities currently in this cage) -->
         <div class="section-card">
             <div class="section-header">
                 <i class="fas fa-paw"></i>
                 <h5>Mice (<?= count($mice); ?>)</h5>
+                <div class="action-buttons">
+                    <a href="mouse_addn.php?cage_id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-primary btn-sm" title="Register Mouse in this Cage">
+                        <i class="fas fa-plus"></i>
+                    </a>
+                </div>
             </div>
             <?php if (!empty($mice)) : ?>
                 <div class="table-responsive">
@@ -580,22 +590,32 @@ require 'header.php';
                         <thead>
                             <tr>
                                 <th>Mouse ID</th>
+                                <th>Sex</th>
+                                <th>DOB</th>
                                 <th>Genotype</th>
-                                <th>Notes</th>
-                                <th style="width: 80px;">Actions</th>
+                                <th>Status</th>
+                                <th style="width: 130px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($mice as $mouse) : ?>
+                            <?php foreach ($mice as $mouse):
+                                $statusBadge = [
+                                    'alive'           => 'bg-success',
+                                    'sacrificed'      => 'bg-secondary',
+                                    'archived'        => 'bg-dark',
+                                    'transferred_out' => 'bg-warning text-dark',
+                                ][$mouse['status']] ?? 'bg-light text-dark';
+                            ?>
                                 <tr>
-                                    <td data-label="Mouse ID"><?= htmlspecialchars($mouse['mouse_id']); ?></td>
-                                    <td data-label="Genotype"><?= htmlspecialchars($mouse['genotype']); ?></td>
-                                    <td data-label="Notes"><?= htmlspecialchars($mouse['notes']); ?></td>
+                                    <td data-label="Mouse ID"><a href="mouse_view.php?id=<?= rawurlencode($mouse['mouse_id']); ?>"><strong><?= htmlspecialchars($mouse['mouse_id']); ?></strong></a></td>
+                                    <td data-label="Sex"><?= htmlspecialchars(ucfirst($mouse['sex'])); ?></td>
+                                    <td data-label="DOB"><?= htmlspecialchars($mouse['dob'] ?? '—'); ?></td>
+                                    <td data-label="Genotype"><?= htmlspecialchars($mouse['genotype'] ?? ''); ?></td>
+                                    <td data-label="Status"><span class="badge <?= $statusBadge; ?>"><?= htmlspecialchars($mouse['status']); ?></span></td>
                                     <td data-label="Actions">
                                         <div class="action-buttons">
-                                            <button class="btn btn-sm btn-info" onclick="openTransferModal(<?= (int)$mouse['id']; ?>, <?= htmlspecialchars(json_encode($mouse['mouse_id'])); ?>)" title="Transfer Mouse">
-                                                <i class="fas fa-exchange-alt"></i>
-                                            </button>
+                                            <a href="mouse_view.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
+                                            <a href="mouse_edit.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
                                         </div>
                                     </td>
                                 </tr>
@@ -604,7 +624,7 @@ require 'header.php';
                     </table>
                 </div>
             <?php else : ?>
-                <p class="text-muted mb-0">No mice records found for this cage.</p>
+                <p class="text-muted mb-0">No mice in this cage. <a href="mouse_addn.php?cage_id=<?= rawurlencode($holdingcage['cage_id']); ?>">Register the first one</a>.</p>
             <?php endif; ?>
         </div>
 
@@ -740,42 +760,8 @@ require 'header.php';
         <button type="button" class="btn btn-secondary" onclick="closeQrCodePopup()">Close</button>
     </div>
 
-    <!-- Mouse Transfer Modal -->
-    <div class="popup-overlay" id="transferOverlay" onclick="closeTransferModal()"></div>
-    <div class="popup-form" id="transferForm" style="max-width: 500px;">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="mb-0">Transfer Mouse</h4>
-            <button type="button" class="btn-close" onclick="closeTransferModal()" aria-label="Close"></button>
-        </div>
-        <form method="POST" action="mouse_transfer.php">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-            <input type="hidden" id="transfer_mouse_db_id" name="mouse_db_id">
-            <input type="hidden" name="source_cage_id" value="<?= htmlspecialchars($holdingcage['cage_id']); ?>">
-            <div class="mb-3">
-                <label class="form-label"><strong>Mouse ID:</strong></label>
-                <p id="transfer_mouse_id_display"></p>
-            </div>
-            <div class="mb-3">
-                <label for="target_cage_id" class="form-label"><strong>Transfer to Cage:</strong></label>
-                <?php if (!empty($targetCages)) : ?>
-                    <select class="form-control" id="target_cage_id" name="target_cage_id" required>
-                        <option value="">Select Target Cage</option>
-                        <?php foreach ($targetCages as $cageId) : ?>
-                            <option value="<?= htmlspecialchars($cageId); ?>"><?= htmlspecialchars($cageId); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                <?php else : ?>
-                    <div class="alert alert-warning mb-0">No other active cages available for transfer.</div>
-                <?php endif; ?>
-            </div>
-            <div class="d-flex gap-2">
-                <?php if (!empty($targetCages)) : ?>
-                    <button type="submit" class="btn btn-primary">Transfer</button>
-                <?php endif; ?>
-                <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
-            </div>
-        </form>
-    </div>
+    <!-- v2: mouse moves are initiated from mouse_view.php (so the cage history log stays consistent). -->
+
 
     <script>
         // Information Completeness Calculation

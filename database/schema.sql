@@ -70,35 +70,104 @@ CREATE TABLE `strains` (
   KEY `idx_strains_str_id` (`str_id`)
 );
 
--- Table for storing holding information related to cages and strains
-CREATE TABLE `holding` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `cage_id` varchar(255) NOT NULL,
-  `strain` varchar(255) DEFAULT NULL,
+-- =============================================================================
+-- Canonical mouse entity (v2)
+-- =============================================================================
+-- A mouse is a first-class, long-lived entity. Identity (`mouse_id`) survives
+-- cage moves, parent lookups, and lifecycle transitions. Replaces the v1
+-- `holding` and per-cage `mice` tables, both of which were cage-scoped rows
+-- without independent identity.
+--
+-- mouse_id: user-supplied, globally unique, EDITABLE (rename via ON UPDATE
+--           CASCADE — self-FK + breeding FKs follow). Suggested default
+--           composite (e.g., {cage_id}_{ear_code}) is generated client-side
+--           but may be overridden.
+-- dob/sex:  required for NEW entries (enforced in the app layer); nullable in
+--           the schema so legacy rows imported from v1 without these values
+--           can land truthfully rather than via sentinel dates.
+-- parents:  hybrid model — `sire_id`/`dam_id` are FKs (NULL allowed for
+--           founders); `sire_external_ref`/`dam_external_ref` carry free-text
+--           descriptors for parents that live outside this system.
+-- status:   alive → sacrificed | transferred_out | archived. `archived` is the
+--           soft-delete equivalent. Hard delete is admin-only and writes to
+--           activity_log first.
+CREATE TABLE `mice` (
+  `mouse_id` varchar(255) NOT NULL,
+  `sex` enum('male','female','unknown') NOT NULL DEFAULT 'unknown',
   `dob` date DEFAULT NULL,
-  `sex` enum('male', 'female') DEFAULT NULL,
-  `parent_cg` varchar(255) DEFAULT NULL,
+  `current_cage_id` varchar(255) DEFAULT NULL,
+  `strain` varchar(255) DEFAULT NULL,
   `genotype` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE,
-  FOREIGN KEY (`strain`) REFERENCES `strains` (`str_id`) ON DELETE SET NULL
+  `ear_code` varchar(64) DEFAULT NULL,
+  `sire_id` varchar(255) DEFAULT NULL,
+  `dam_id` varchar(255) DEFAULT NULL,
+  `sire_external_ref` varchar(255) DEFAULT NULL,
+  `dam_external_ref` varchar(255) DEFAULT NULL,
+  `status` enum('alive','sacrificed','transferred_out','archived') NOT NULL DEFAULT 'alive',
+  `sacrificed_at` date DEFAULT NULL,
+  `sacrifice_reason` varchar(255) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`mouse_id`),
+  KEY `idx_mice_cage` (`current_cage_id`),
+  KEY `idx_mice_status` (`status`),
+  KEY `idx_mice_sire` (`sire_id`),
+  KEY `idx_mice_dam` (`dam_id`),
+  KEY `idx_mice_strain` (`strain`),
+  CONSTRAINT `fk_mice_cage`   FOREIGN KEY (`current_cage_id`) REFERENCES `cages`   (`cage_id`)  ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_mice_strain` FOREIGN KEY (`strain`)          REFERENCES `strains` (`str_id`)   ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_mice_sire`   FOREIGN KEY (`sire_id`)         REFERENCES `mice`    (`mouse_id`) ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_mice_dam`    FOREIGN KEY (`dam_id`)          REFERENCES `mice`    (`mouse_id`) ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_mice_creator` FOREIGN KEY (`created_by`)     REFERENCES `users`   (`id`)       ON DELETE SET NULL
 );
 
--- Table for storing breeding information
+-- =============================================================================
+-- Mouse cage-move history
+-- =============================================================================
+-- Append-only log of every cage assignment for a mouse. The "current" cage is
+-- the row where moved_out_at IS NULL. `mice.current_cage_id` is a denormalized
+-- pointer to that row's cage_id, kept in sync by the application layer.
+--
+-- cage_id NULL is legal: represents an interval where the mouse has no cage
+-- (sacrificed, transferred out, awaiting placement).
+CREATE TABLE `mouse_cage_history` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `mouse_id` varchar(255) NOT NULL,
+  `cage_id` varchar(255) DEFAULT NULL,
+  `moved_in_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `moved_out_at` timestamp NULL DEFAULT NULL,
+  `reason` varchar(255) DEFAULT NULL,
+  `moved_by` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_mch_mouse` (`mouse_id`, `moved_in_at`),
+  KEY `idx_mch_cage` (`cage_id`),
+  KEY `idx_mch_open` (`mouse_id`, `moved_out_at`),
+  CONSTRAINT `fk_mch_mouse`  FOREIGN KEY (`mouse_id`) REFERENCES `mice`  (`mouse_id`) ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT `fk_mch_cage`   FOREIGN KEY (`cage_id`)  REFERENCES `cages` (`cage_id`)  ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_mch_user`   FOREIGN KEY (`moved_by`) REFERENCES `users` (`id`)       ON DELETE SET NULL
+);
+
+-- =============================================================================
+-- Breeding cages (v2)
+-- =============================================================================
+-- male_id / female_id are FK references into `mice`. Per-parent dob/genotype/
+-- parent_cage columns from v1 are removed — those facts now live on the mouse
+-- entity and are looked up via JOIN. NULL FKs allowed when the parent isn't
+-- yet in the system; populate as soon as the mouse is registered.
 CREATE TABLE `breeding` (
   `id` int NOT NULL AUTO_INCREMENT,
   `cage_id` varchar(255) NOT NULL,
   `cross` varchar(255) DEFAULT NULL,
   `male_id` varchar(255) DEFAULT NULL,
   `female_id` varchar(255) DEFAULT NULL,
-  `male_dob` date DEFAULT NULL,
-  `female_dob` date DEFAULT NULL,
-  `male_genotype` varchar(255) DEFAULT NULL,
-  `male_parent_cage` varchar(255) DEFAULT NULL,
-  `female_genotype` varchar(255) DEFAULT NULL,
-  `female_parent_cage` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE
+  KEY `idx_breeding_male` (`male_id`),
+  KEY `idx_breeding_female` (`female_id`),
+  CONSTRAINT `fk_breeding_cage`   FOREIGN KEY (`cage_id`)    REFERENCES `cages` (`cage_id`)  ON UPDATE CASCADE,
+  CONSTRAINT `fk_breeding_male`   FOREIGN KEY (`male_id`)    REFERENCES `mice`  (`mouse_id`) ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT `fk_breeding_female` FOREIGN KEY (`female_id`)  REFERENCES `mice`  (`mouse_id`) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
 -- Table for storing litter information
@@ -137,17 +206,6 @@ CREATE TABLE `notes` (
   PRIMARY KEY (`id`),
   FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE,
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-);
-
--- Table for storing mouse information related to cages
-CREATE TABLE `mice` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `cage_id` varchar(255) NOT NULL,
-  `mouse_id` varchar(255) NOT NULL,
-  `genotype` varchar(255) NOT NULL,
-  `notes` text DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE
 );
 
 -- Table for storing tasks information

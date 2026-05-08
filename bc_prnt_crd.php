@@ -38,10 +38,15 @@ if (isset($_GET['id'])) {
 
     foreach ($ids as $id) {
         // Fetch the breeding cage record with the specified ID, including PI name details
-        $query = "SELECT b.*, c.remarks AS remarks, c.room, c.rack, pi.name AS pi_name
+        // v2: per-parent dob/genotype come from the mice the breeding row points at.
+        $query = "SELECT b.*, c.remarks AS remarks, c.room, c.rack, pi.name AS pi_name,
+                         mm.dob AS male_dob, mm.genotype AS male_genotype,
+                         ff.dob AS female_dob, ff.genotype AS female_genotype
         FROM breeding b
-        LEFT JOIN cages c ON b.cage_id = c.cage_id
-        LEFT JOIN users pi ON c.pi_name = pi.id
+        LEFT JOIN cages c   ON b.cage_id = c.cage_id
+        LEFT JOIN users pi  ON c.pi_name = pi.id
+        LEFT JOIN mice mm   ON mm.mouse_id = b.male_id
+        LEFT JOIN mice ff   ON ff.mouse_id = b.female_id
         WHERE b.cage_id = ?";
         $stmt = $con->prepare($query);
         $stmt->bind_param("s", $id);

@@ -1,813 +1,249 @@
 <?php
 
 /**
- * Add New Holding Cage Script
- * 
- * This script handles the creation of new holding cages and includes functionalities to dynamically add or remove mouse data.
- * 
+ * Add New Holding Cage
+ *
+ * v2: cage-only form. Mice are now first-class entities and registered via
+ * mouse_addn.php (which itself can create a cage inline via Aaron's
+ * "+ Add new cage" dropdown UX). This form only manages cage metadata
+ * (PI, room, rack, IACUC, users, remarks) — no per-mouse fields, no
+ * `holding` table (dropped in the v2 migration).
+ *
+ * After creating the cage, the user is offered a quick link to add mice
+ * directly into the new cage.
  */
 
-// Start a new session or resume the existing session
 require 'session_config.php';
-
-// Include the database connection file
 require 'dbcon.php';
-
-// Include the activity log helper
 require_once 'log_activity.php';
 
-// Check if the user is not logged in, redirect them to index.php with the current URL for redirection after login
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
-    exit; // Exit to ensure no further code is executed
+    exit;
 }
 
-// Generate a CSRF token if it doesn't exist
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Get current user's ID for auto-selection
-$currentUserQuery = "SELECT id FROM users WHERE username = ?";
-$currentUserStmt = $con->prepare($currentUserQuery);
-$currentUserStmt->bind_param("s", $_SESSION['username']);
-$currentUserStmt->execute();
-$currentUserResult = $currentUserStmt->get_result();
-$currentUser = $currentUserResult->fetch_assoc();
-$currentUserId = $currentUser['id'] ?? null;
-$currentUserStmt->close();
+// Current user (for default user-assignment selection)
+$currentUserId = null;
+if ($r = $con->prepare("SELECT id FROM users WHERE username = ?")) {
+    $r->bind_param("s", $_SESSION['username']);
+    $r->execute();
+    $row = $r->get_result()->fetch_assoc();
+    $currentUserId = $row['id'] ?? null;
+    $r->close();
+}
 
-// Query to retrieve users with initials and names
-$userQuery = "SELECT id, initials, name FROM users WHERE status = 'approved'";
-$userResult = $con->query($userQuery);
+$userResult  = $con->query("SELECT id, initials, name FROM users WHERE status = 'approved'");
+$piResult    = $con->query("SELECT id, initials, name FROM users WHERE position = 'Principal Investigator' AND status = 'approved'");
+$iacucResult = $con->query("SELECT iacuc_id, iacuc_title FROM iacuc");
 
-// Query to retrieve options where role is 'Principal Investigator'
-$piQuery = "SELECT id, initials, name FROM users WHERE position = 'Principal Investigator' AND status = 'approved'";
-$piResult = $con->query($piQuery);
-
-// Store PI results in array for auto-selection logic
 $piOptions = [];
-while ($row = $piResult->fetch_assoc()) {
-    $piOptions[] = $row;
-}
-$piResult->data_seek(0); // Reset pointer for form display
+while ($row = $piResult->fetch_assoc()) $piOptions[] = $row;
 
-// Query to retrieve IACUC values
-$iacucQuery = "SELECT iacuc_id, iacuc_title FROM iacuc";
-$iacucResult = $con->query($iacucQuery);
-
-// Query to retrieve strain details including common names
-$strainQuery = "SELECT str_id, str_name, str_aka FROM strains";
-$strainResult = $con->query($strainQuery);
-
-// Initialize an array to hold all options
-$strainOptions = [];
-
-// Process each row to generate options
-while ($strainRow = $strainResult->fetch_assoc()) {
-    $str_id = htmlspecialchars($strainRow['str_id'] ?? 'Unknown');
-    $str_name = htmlspecialchars($strainRow['str_name'] ?? 'Unnamed Strain');
-    $str_aka = $strainRow['str_aka'] ? htmlspecialchars($strainRow['str_aka']) : '';
-
-    // Add the main strain option
-    $strainOptions[] = "$str_id | $str_name";
-
-    // Explode the common names if they exist
-    if (!empty($str_aka)) {
-        $akaNames = explode(', ', $str_aka);
-        foreach ($akaNames as $aka) {
-            $strainOptions[] = "$str_id | " . htmlspecialchars(trim($aka));
-        }
-    }
-}
-
-// Sort the options based on str_id
-sort($strainOptions, SORT_STRING);
-
-// Clone cage data if clone parameter is provided
-$cloneData = null;
+// Optional clone-from-cage (cage metadata only, mice are now independent and don't auto-clone)
+$cloneData  = null;
 $cloneUsers = [];
 $cloneIacuc = [];
-$cloneMice = [];
 if (isset($_GET['clone'])) {
     $cloneId = trim($_GET['clone']);
+    $cs = $con->prepare("SELECT cage_id, pi_name, remarks, room, rack FROM cages WHERE cage_id = ?");
+    $cs->bind_param("s", $cloneId);
+    $cs->execute();
+    $cr = $cs->get_result();
+    if ($cr->num_rows === 1) $cloneData = $cr->fetch_assoc();
+    $cs->close();
 
-    // Fetch cage + holding data
-    $cloneQuery = "SELECT h.*, c.pi_name, c.remarks, c.room, c.rack
-                   FROM holding h
-                   LEFT JOIN cages c ON h.cage_id = c.cage_id
-                   WHERE h.cage_id = ?";
-    $cloneStmt = $con->prepare($cloneQuery);
-    $cloneStmt->bind_param("s", $cloneId);
-    $cloneStmt->execute();
-    $cloneResult = $cloneStmt->get_result();
-    if ($cloneResult->num_rows === 1) {
-        $cloneData = $cloneResult->fetch_assoc();
-    }
-    $cloneStmt->close();
-
-    // Fetch associated users
     if ($cloneData) {
-        $cuQuery = "SELECT user_id FROM cage_users WHERE cage_id = ?";
-        $cuStmt = $con->prepare($cuQuery);
-        $cuStmt->bind_param("s", $cloneId);
-        $cuStmt->execute();
-        $cuResult = $cuStmt->get_result();
-        while ($row = $cuResult->fetch_assoc()) {
-            $cloneUsers[] = $row['user_id'];
-        }
-        $cuStmt->close();
+        $cu = $con->prepare("SELECT user_id FROM cage_users WHERE cage_id = ?");
+        $cu->bind_param("s", $cloneId); $cu->execute();
+        while ($row = $cu->get_result()->fetch_assoc()) $cloneUsers[] = $row['user_id'];
+        $cu->close();
 
-        // Fetch associated IACUC
-        $ciQuery = "SELECT iacuc_id FROM cage_iacuc WHERE cage_id = ?";
-        $ciStmt = $con->prepare($ciQuery);
-        $ciStmt->bind_param("s", $cloneId);
-        $ciStmt->execute();
-        $ciResult = $ciStmt->get_result();
-        while ($row = $ciResult->fetch_assoc()) {
-            $cloneIacuc[] = $row['iacuc_id'];
-        }
-        $ciStmt->close();
-
-        // Fetch mice data
-        $miceQuery = "SELECT mouse_id, genotype, notes FROM mice WHERE cage_id = ?";
-        $miceStmt = $con->prepare($miceQuery);
-        $miceStmt->bind_param("s", $cloneId);
-        $miceStmt->execute();
-        $cloneMice = $miceStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $miceStmt->close();
+        $ci = $con->prepare("SELECT iacuc_id FROM cage_iacuc WHERE cage_id = ?");
+        $ci->bind_param("s", $cloneId); $ci->execute();
+        while ($row = $ci->get_result()->fetch_assoc()) $cloneIacuc[] = $row['iacuc_id'];
+        $ci->close();
     }
 }
 
-// Check if the form is submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    // Validate CSRF token
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die('CSRF token validation failed');
     }
 
-    // Retrieve form data (only cage_id is required)
     $cage_id = trim($_POST['cage_id']);
     $pi_name = !empty($_POST['pi_name']) ? trim($_POST['pi_name']) : null;
-    $room = !empty($_POST['room']) ? trim($_POST['room']) : null;
-    $rack = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
-    $strain = !empty($_POST['strain']) ? trim($_POST['strain']) : null;
-    if ($strain === 'custom') {
-        $strain = !empty($_POST['custom_strain']) ? trim($_POST['custom_strain']) : null;
+    $room    = !empty($_POST['room']) ? trim($_POST['room']) : null;
+    $rack    = !empty($_POST['rack']) ? trim($_POST['rack']) : null;
+    $iacuc   = isset($_POST['iacuc']) ? (array)$_POST['iacuc'] : [];
+    $users   = isset($_POST['user'])  ? (array)$_POST['user']  : [];
+    $remarks = trim($_POST['remarks'] ?? '');
+
+    $check = $con->prepare("SELECT 1 FROM cages WHERE cage_id = ?");
+    $check->bind_param("s", $cage_id);
+    $check->execute();
+    if ($check->get_result()->num_rows > 0) {
+        $_SESSION['message'] = "Cage ID '" . htmlspecialchars($cage_id) . "' already exists.";
+        header("Location: hc_addn.php"); exit;
     }
-    $cage_genotype = !empty($_POST['cage_genotype']) ? trim($_POST['cage_genotype']) : null;
-    $iacuc = isset($_POST['iacuc']) ? trim(implode(',', $_POST['iacuc'])) : '';
-    $user = isset($_POST['user']) ? implode(',', array_map('trim', $_POST['user'])) : '';
-    $dob = !empty($_POST['dob']) ? trim($_POST['dob']) : null;
-    $sex = !empty($_POST['sex']) ? strtolower(trim($_POST['sex'])) : null;
-    $parent_cg = !empty($_POST['parent_cg']) ? trim($_POST['parent_cg']) : null;
-    $remarks = trim($_POST['remarks']);
-    $mouse_data = [];
+    $check->close();
 
-    // Collect mouse data
-    $mouse_ids = $_POST['mouse_id'] ?? [];
-    $genotypes = $_POST['genotype'] ?? [];
-    $notes = $_POST['notes'] ?? [];
+    mysqli_begin_transaction($con);
+    try {
+        $ins = $con->prepare("INSERT INTO cages (cage_id, pi_name, quantity, remarks, room, rack) VALUES (?, ?, 0, ?, ?, ?)");
+        $ins->bind_param("sisss", $cage_id, $pi_name, $remarks, $room, $rack);
+        $ins->execute();
+        $ins->close();
 
-    for ($i = 0; $i < count($mouse_ids); $i++) {
-        $mouse_id = $mouse_ids[$i];
-        $genotype = $genotypes[$i];
-        $note = $notes[$i];
-
-        if (!empty(trim($mouse_id))) {
-            $mouse_data[] = [
-                'mouse_id' => trim($mouse_id),
-                'genotype' => trim($genotype),
-                'notes' => trim($note)
-            ];
+        foreach (array_filter($iacuc) as $iac) {
+            $s = $con->prepare("INSERT INTO cage_iacuc (cage_id, iacuc_id) VALUES (?, ?)");
+            $s->bind_param("ss", $cage_id, $iac); $s->execute(); $s->close();
         }
-    }
-
-    $qty = count($mouse_data); // Calculate the quantity based on the number of mouse records
-
-    // Check if the cage_id already exists in the cages table
-    $check_query = "SELECT * FROM cages WHERE cage_id = ?";
-    $check_stmt = $con->prepare($check_query);
-    $check_stmt->bind_param("s", $cage_id);
-    $check_stmt->execute();
-    $check_result = $check_stmt->get_result();
-
-    if (mysqli_num_rows($check_result) > 0) {
-        // Cage_id already exists, throw an error
-        $_SESSION['message'] = "Cage ID '" . htmlspecialchars($cage_id) . "' already exists. Please use a different Cage ID.";
-    } else {
-        // Start a transaction
-        mysqli_begin_transaction($con);
-
-        try {
-            // Insert data into cages table (pi_name can be NULL)
-            $query1 = "INSERT INTO cages (cage_id, pi_name, quantity, remarks, room, rack) VALUES (?, ?, ?, ?, ?, ?)";
-            $stmt = $con->prepare($query1);
-            $stmt->bind_param("sissss", $cage_id, $pi_name, $qty, $remarks, $room, $rack);
-            $stmt->execute();
-
-            // Insert data into holding table (strain, dob, sex, parent_cg can be NULL)
-            $query2 = "INSERT INTO holding (cage_id, strain, dob, sex, parent_cg, genotype) VALUES (?, ?, ?, ?, ?, ?)";
-            $stmt2 = $con->prepare($query2);
-            $stmt2->bind_param("ssssss", $cage_id, $strain, $dob, $sex, $parent_cg, $cage_genotype);
-            $stmt2->execute();
-
-            // Insert mouse data into mouse table
-            foreach ($mouse_data as $mouse) {
-                $query3 = "INSERT INTO mice (cage_id, mouse_id, genotype, notes) VALUES (?, ?, ?, ?)";
-                $stmt3 = $con->prepare($query3);
-                $stmt3->bind_param("ssss", $cage_id, $mouse['mouse_id'], $mouse['genotype'], $mouse['notes']);
-                $stmt3->execute();
-            }
-
-            // Insert data into cage_iacuc table
-            if (!empty($iacuc)) {
-                $iacuc_codes = explode(',', $iacuc);
-                foreach ($iacuc_codes as $iacuc_code) {
-                    $query4 = "INSERT INTO cage_iacuc (cage_id, iacuc_id) VALUES (?, ?)";
-                    $stmt4 = $con->prepare($query4);
-                    $stmt4->bind_param("ss", $cage_id, $iacuc_code);
-                    $stmt4->execute();
-                }
-            }
-
-            // Insert data into cage_users table
-            if (!empty($user)) {
-                $user_ids = explode(',', $user);
-                foreach ($user_ids as $user_id) {
-                    $query5 = "INSERT INTO cage_users (cage_id, user_id) VALUES (?, ?)";
-                    $stmt5 = $con->prepare($query5);
-                    $stmt5->bind_param("si", $cage_id, $user_id);
-                    $stmt5->execute();
-                }
-
-                // Notify all assigned users about the new cage
-                try {
-                $creatorName = $_SESSION['name'] ?? 'Someone';
-                foreach ($user_ids as $uid) {
-                    $uid = intval($uid);
-                    if ($uid > 0) {
-                        $nTitle = "Added to Cage: $cage_id";
-                        $nMessage = "$creatorName added you to holding cage $cage_id";
-                        $nLink = "hc_view.php?id=" . urlencode($cage_id);
-                        $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
-                        $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
-                        $nStmt->execute();
-                        $nStmt->close();
-                    }
-                }
-                } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
-            }
-
-            // Commit the transaction
-            mysqli_commit($con);
-
-            log_activity($con, 'create', 'cage', $cage_id, 'Created holding cage');
-
-            $_SESSION['message'] = "New holding cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' added successfully. <a href='hc_view.php?id=" . urlencode($cage_id) . "'>View cage</a>";
-        } catch (Exception $e) {
-            // Rollback the transaction in case of an error
-            mysqli_rollback($con);
-            $_SESSION['message'] = "Failed to add new holding cage.";
+        foreach (array_filter($users) as $uid) {
+            $s = $con->prepare("INSERT INTO cage_users (cage_id, user_id) VALUES (?, ?)");
+            $s->bind_param("si", $cage_id, $uid); $s->execute(); $s->close();
         }
 
-        // Close the prepared statement
-        $stmt->close();
-        if (isset($stmt2)) $stmt2->close();
-        if (isset($stmt3)) $stmt3->close();
-        if (isset($stmt4)) $stmt4->close();
-        if (isset($stmt5)) $stmt5->close();
+        // Notify users newly assigned
+        $creatorName = $_SESSION['name'] ?? 'Someone';
+        foreach (array_filter($users) as $uid) {
+            $uid = (int)$uid;
+            if ($uid <= 0) continue;
+            $title   = "Added to Cage: $cage_id";
+            $message = "$creatorName added you to holding cage $cage_id";
+            $link    = "hc_view.php?id=" . urlencode($cage_id);
+            $n = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+            $n->bind_param("isss", $uid, $title, $message, $link);
+            $n->execute(); $n->close();
+        }
+
+        mysqli_commit($con);
+        log_activity($con, 'create', 'cage', $cage_id, 'Created holding cage');
+
+        $_SESSION['message'] = "Cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' created. "
+            . "<a href='mouse_addn.php?cage_id=" . urlencode($cage_id) . "'>Add mice to this cage</a> "
+            . "or <a href='hc_view.php?id=" . urlencode($cage_id) . "'>view it</a>.";
+    } catch (Exception $e) {
+        mysqli_rollback($con);
+        $_SESSION['message'] = 'Failed to create cage: ' . htmlspecialchars($e->getMessage());
     }
 
-    // Redirect back to the main page
     header("Location: hc_dash.php");
-    exit();
+    exit;
 }
 
 require 'header.php';
 ?>
-
 <!doctype html>
 <html lang="en">
-
 <head>
-    <title>Add New Holding Cage | <?php echo htmlspecialchars($labName); ?></title>
-
-    <!-- Include Bootstrap CSS -->
-    <!-- Bootstrap 5.3 loaded via header.php -->
-
-    <!-- Select2 CSS loaded via header.php -->
-
-    <!-- Include Select2 JS -->
+    <title>Add New Holding Cage | <?= htmlspecialchars($labName); ?></title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-beta.1/js/select2.min.js"></script>
-
     <style>
-        .container {
-            max-width: 900px;
-            background-color: var(--bs-tertiary-bg);
-            padding: 20px;
-            border-radius: 8px;
-            margin: auto;
-        }
-
-        .form-label {
-            font-weight: bold;
-        }
-
-        .required-asterisk {
-            color: red;
-        }
-
-        .warning-text {
-            color: var(--bs-danger);
-        }
-
-        .select2-container .select2-selection--single {
-            height: 35px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            padding-right: 10px;
-            padding-left: 10px;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
-            height: 35px;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            /* Adjust the gap as needed */
-            margin-top: 10px;
-        }
+        .container { max-width: 900px; background-color: var(--bs-tertiary-bg); padding: 20px; border-radius: 8px; margin: auto; }
+        .form-label { font-weight: bold; }
+        .required-asterisk { color: red; }
+        .select2-container .select2-selection--single { height: 38px; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 38px; padding-left: 12px; }
     </style>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Function to get today's date in YYYY-MM-DD format
-            function getCurrentDate() {
-                const today = new Date();
-                const yyyy = today.getFullYear();
-                const mm = String(today.getMonth() + 1).padStart(2, '0');
-                const dd = String(today.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-            }
-
-            // Function to set the max date to today for all date input fields
-            function setMaxDate() {
-                const currentDate = getCurrentDate();
-                const dateFields = document.querySelectorAll('input[type="date"]');
-                dateFields.forEach(field => {
-                    field.setAttribute('max', currentDate);
-                });
-            }
-
-            // Initial call to set max date on page load
-            setMaxDate();
-        });
-
-        // Function to go back to the previous page
-        function goBack() {
-            window.history.back();
-        }
-
-        // Define a counter to keep track of the mouse fields
-        let mouseFieldCounter = 0;
-
-        // Function to dynamically add new mouse fields
-        function addMouseField() {
-            const mouseContainer = document.getElementById('mouse_fields_container');
-
-            // Increment the counter
-            mouseFieldCounter++;
-
-            // Create new mouse field HTML
-            const mouseFieldHTML = `
-    <div id="mouse_fields_${mouseFieldCounter}" class="mouse-field">
-        <br>
-        <h4>Mouse #${mouseFieldCounter}</h4>
-        <div class="mb-3">
-            <label for="mouse_id_${mouseFieldCounter}" class="form-label">Mouse ID</label>
-            <input type="text" class="form-control" id="mouse_id_${mouseFieldCounter}" name="mouse_id[]">
-        </div>
-
-        <div class="mb-3">
-            <label for="genotype_${mouseFieldCounter}" class="form-label">Genotype</label>
-            <input type="text" class="form-control" id="genotype_${mouseFieldCounter}" name="genotype[]">
-        </div>
-
-        <div class="mb-3">
-            <label for="notes_${mouseFieldCounter}" class="form-label">Maintenance Notes</label>
-            <textarea class="form-control" id="notes_${mouseFieldCounter}" name="notes[]" oninput="adjustTextareaHeight(this)"></textarea>
-        </div>
-
-        <div class="button-group">
-            <button type="button" class="btn btn-danger btn-icon" onclick="removeMouseField(${mouseFieldCounter})">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-    </div>`;
-
-            // Add new mouse field to the container
-            mouseContainer.insertAdjacentHTML('beforeend', mouseFieldHTML);
-        }
-
-        // Function to remove mouse fields
-        function removeMouseField(mouseIndex) {
-            const mouseField = document.getElementById(`mouse_fields_${mouseIndex}`);
-            if (mouseField) {
-                mouseField.remove(); // Remove the field from the DOM
-            }
-        }
-
-        // Function to adjust the height of textareas dynamically
-        function adjustTextareaHeight(element) {
-            element.style.height = "auto";
-            element.style.height = (element.scrollHeight) + "px";
-        }
-
-        // Function to validate date format & provide feedback
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            const dobInput = document.getElementById('dob');
-            const warningText = document.createElement('span');
-            warningText.style.color = 'red';
-            warningText.style.display = 'none';
-            dobInput.parentNode.appendChild(warningText);
-
-            // Function to validate date
-            function validateDate(dateString) {
-                // Allow empty dates since DOB is now optional
-                if (!dateString || dateString.trim() === '') return true;
-
-                const regex = /^\d{4}-\d{2}-\d{2}$/;
-                if (!dateString.match(regex)) return false;
-
-                const date = new Date(dateString);
-                const now = new Date();
-                const year = date.getFullYear();
-
-                // Check if the date is valid and within the range 1900-2099 and not in the future
-                return date && !isNaN(date) && year >= 1900 && date <= now;
-            }
-
-            // Listen for input changes to provide immediate feedback
-            dobInput.addEventListener('input', function() {
-                const dobValue = dobInput.value;
-                const isValidDate = validateDate(dobValue);
-                if (!isValidDate) {
-                    warningText.textContent = 'Invalid Date. Please enter a valid date.';
-                    warningText.style.display = 'block';
-                } else {
-                    warningText.textContent = '';
-                    warningText.style.display = 'none';
-                }
-            });
-
-            // Prevent form submission if the date is invalid
-            form.addEventListener('submit', function(event) {
-                const dobValue = dobInput.value;
-                if (!validateDate(dobValue)) {
-                    event.preventDefault(); // Prevent form submission
-                    warningText.textContent = 'Invalid Date. Please enter a valid date.';
-                    warningText.style.display = 'block';
-                    dobInput.focus();
-                }
-            });
-        });
-
-        $(document).ready(function() {
-            $('#user').select2({
-                placeholder: "Select User(s)",
-                allowClear: true
-            });
-
-            $('#strain').select2({
-                placeholder: "Select Strain",
-                allowClear: true
-            });
-
-            // Show/hide custom strain input based on strain selection
-            $('#strain').on('change', function() {
-                if ($(this).val() === 'custom') {
-                    $('#custom_strain_div').show();
-                } else {
-                    $('#custom_strain_div').hide();
-                    $('#custom_strain').val('');
-                }
-            });
-
-            $('#iacuc').select2({
-                placeholder: "Select IACUC",
-                allowClear: true,
-                templateResult: function(data) {
-                    if (!data.id) {
-                        return data.text;
-                    }
-                    var $result = $('<span>' + data.text + '</span>');
-                    $result.attr('title', data.element.title);
-                    return $result;
-                }
-            });
-
-            // Information Completeness Tracking
-            function calculateCompleteness() {
-                const fields = {
-                    critical: ['dob', 'sex'],
-                    important: ['pi_name', 'strain', 'iacuc', 'user'],
-                    useful: ['parent_cg']
-                };
-
-                let totalFields = 0;
-                let filledFields = 0;
-                let missingCritical = [];
-                let missingImportant = [];
-                let missingUseful = [];
-
-                // Count critical fields
-                fields.critical.forEach(fieldId => {
-                    totalFields++;
-                    const field = document.getElementById(fieldId);
-                    if (field && field.value && field.value.trim() !== '') {
-                        filledFields++;
-                    } else {
-                        missingCritical.push(field ? field.previousElementSibling.textContent.split(' ')[0] : fieldId);
-                    }
-                });
-
-                // Count important fields
-                fields.important.forEach(fieldId => {
-                    totalFields++;
-                    const field = document.getElementById(fieldId);
-                    if (field) {
-                        if (field.multiple) {
-                            // For Select2 multiselect
-                            const selectedValues = $(field).val();
-                            if (selectedValues && selectedValues.length > 0 && selectedValues[0] !== '') {
-                                filledFields++;
-                            } else {
-                                missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
-                            }
-                        } else if (field.value && field.value.trim() !== '') {
-                            filledFields++;
-                        } else {
-                            missingImportant.push(field.previousElementSibling.textContent.split(' ')[0]);
-                        }
-                    }
-                });
-
-                // Count useful fields
-                fields.useful.forEach(fieldId => {
-                    totalFields++;
-                    const field = document.getElementById(fieldId);
-                    if (field && field.value && field.value.trim() !== '') {
-                        filledFields++;
-                    } else {
-                        missingUseful.push(field ? field.previousElementSibling.textContent.split(' ')[0] : fieldId);
-                    }
-                });
-
-                const percentage = Math.round((filledFields / totalFields) * 100);
-
-                // Update completeness bar
-                $('#completeness-bar').css('width', percentage + '%');
-                $('#completeness-bar').attr('aria-valuenow', percentage);
-                $('#completeness-bar').text(percentage + '%');
-                $('#completeness-percentage').text(percentage + '%');
-
-                // Change bar color based on completion
-                $('#completeness-bar').removeClass('bg-danger bg-warning bg-success');
-                if (percentage < 50) {
-                    $('#completeness-bar').addClass('bg-danger');
-                } else if (percentage < 80) {
-                    $('#completeness-bar').addClass('bg-warning');
-                } else {
-                    $('#completeness-bar').addClass('bg-success');
-                }
-
-                // Show missing fields
-                let missingText = '';
-                if (missingCritical.length > 0) {
-                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
-                }
-                if (missingImportant.length > 0) {
-                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
-                }
-                if (missingUseful.length > 0) {
-                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
-                }
-
-                if (percentage === 100) {
-                    missingText = '<strong class="text-success">✓ All information complete!</strong>';
-                }
-
-                $('#missing-fields').html(missingText);
-                $('#completeness-alert').show();
-            }
-
-            // Calculate on page load
-            calculateCompleteness();
-
-            // Recalculate when fields change
-            $('form input, form select, form textarea').on('change keyup', calculateCompleteness);
-            $('#user, #iacuc, #strain').on('select2:select select2:unselect', calculateCompleteness);
-        });
-    </script>
-
 </head>
-
 <body>
-    <div class="container mt-4 content">
+<div class="container mt-4 content">
+    <h4>Add New Holding Cage<?php if ($cloneData): ?> <small class="text-muted">(Cloning from <?= htmlspecialchars($_GET['clone']); ?>)</small><?php endif; ?></h4>
+    <?php include 'message.php'; ?>
+    <p class="text-muted">This creates the cage container only. Mice are independent records — register them via <a href="mouse_addn.php">Add Mouse</a> after.</p>
 
-        <h4>Add New Holding Cage<?php if ($cloneData): ?> <small class="text-muted">(Cloning from <?= htmlspecialchars($_GET['clone']); ?>)</small><?php endif; ?></h4>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
 
-        <?php include('message.php'); ?>
-
-        <p class="warning-text">Only <span class="required-asterisk">Cage ID</span> is required. Other fields can be added later.</p>
-
-        <div id="completeness-alert" class="alert alert-warning" style="display: none;">
-            <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
-            <div class="progress mt-2" style="height: 20px;">
-                <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-            </div>
-            <div id="missing-fields" class="mt-2"></div>
+        <div class="mb-3">
+            <label for="cage_id" class="form-label">Cage ID <span class="required-asterisk">*</span></label>
+            <input type="text" id="cage_id" name="cage_id" class="form-control" required maxlength="255">
         </div>
 
-        <form method="POST" id="cage-form">
-
-            <!-- CSRF token field -->
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-
-            <div class="mb-3">
-                <label for="cage_id" class="form-label">Cage ID <span class="required-asterisk">*</span></label>
-                <input type="text" class="form-control" id="cage_id" name="cage_id" required>
-            </div>
-
-            <div class="mb-3">
-                <label for="pi_name" class="form-label">PI Name</label>
-                <select class="form-control" id="pi_name" name="pi_name" data-field-type="important">
-                    <option value="">Select PI</option>
-                    <?php
-                    // Populate dropdown with options from the database
-                    // Auto-select if only one PI exists, or use cloneData if cloning
-                    $isFirst = true;
-                    $shouldAutoSelect = (count($piOptions) === 1);
-                    foreach ($piOptions as $row) {
-                        $pi_id = htmlspecialchars($row['id']);
-                        $pi_initials = htmlspecialchars($row['initials']);
-                        $pi_name = htmlspecialchars($row['name']);
-                        if ($cloneData) {
-                            $selected = ($cloneData['pi_name'] == $row['id']) ? 'selected' : '';
-                        } else {
-                            $selected = ($shouldAutoSelect || ($isFirst && count($piOptions) > 0)) ? 'selected' : '';
-                        }
-                        echo "<option value='$pi_id' $selected>$pi_initials [$pi_name]</option>";
-                        $isFirst = false;
+        <div class="mb-3">
+            <label for="pi_name" class="form-label">PI Name</label>
+            <select id="pi_name" name="pi_name" class="form-control">
+                <option value="">Select PI</option>
+                <?php
+                $autoSelect = (count($piOptions) === 1);
+                foreach ($piOptions as $row):
+                    $selected = '';
+                    if ($cloneData) {
+                        $selected = ($cloneData['pi_name'] == $row['id']) ? 'selected' : '';
+                    } elseif ($autoSelect) {
+                        $selected = 'selected';
                     }
-                    ?>
-                </select>
-            </div>
+                ?>
+                    <option value="<?= htmlspecialchars($row['id']); ?>" <?= $selected; ?>>
+                        <?= htmlspecialchars($row['initials'] . ' [' . $row['name'] . ']'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
 
-            <div class="mb-3">
+        <div class="row">
+            <div class="col-md-6 mb-3">
                 <label for="room" class="form-label">Room</label>
-                <input type="text" class="form-control" id="room" name="room" value="<?= htmlspecialchars($cloneData['room'] ?? ''); ?>">
+                <input type="text" id="room" name="room" class="form-control" value="<?= htmlspecialchars($cloneData['room'] ?? ''); ?>">
             </div>
-
-            <div class="mb-3">
+            <div class="col-md-6 mb-3">
                 <label for="rack" class="form-label">Rack</label>
-                <input type="text" class="form-control" id="rack" name="rack" value="<?= htmlspecialchars($cloneData['rack'] ?? ''); ?>">
+                <input type="text" id="rack" name="rack" class="form-control" value="<?= htmlspecialchars($cloneData['rack'] ?? ''); ?>">
             </div>
+        </div>
 
-            <div class="mb-3">
-                <label for="strain" class="form-label">Strain <span class="badge bg-info">Important</span></label>
-                <select class="form-control" id="strain" name="strain" data-field-type="important">
-                    <option value="">None / Not Applicable</option>
-                    <?php
-                    // Populate the dropdown with all the options generated
-                    foreach ($strainOptions as $option) {
-                        $strOptId = explode(" | ", $option)[0];
-                        $strSelected = ($cloneData && $strOptId == $cloneData['strain']) ? 'selected' : '';
-                        echo "<option value='$strOptId' $strSelected>$option</option>";
+        <div class="mb-3">
+            <label for="iacuc" class="form-label">IACUC</label>
+            <select id="iacuc" name="iacuc[]" class="form-control" multiple>
+                <?php while ($iac = $iacucResult->fetch_assoc()): ?>
+                    <option value="<?= htmlspecialchars($iac['iacuc_id']); ?>"
+                        <?= in_array($iac['iacuc_id'], $cloneIacuc, true) ? 'selected' : ''; ?>>
+                        <?= htmlspecialchars($iac['iacuc_id'] . ' | ' . $iac['iacuc_title']); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="user" class="form-label">Users</label>
+            <select id="user" name="user[]" class="form-control" multiple>
+                <?php while ($u = $userResult->fetch_assoc()):
+                    if ($cloneData) {
+                        $sel = in_array($u['id'], $cloneUsers, true) ? 'selected' : '';
+                    } else {
+                        $sel = ($currentUserId && $u['id'] == $currentUserId) ? 'selected' : '';
                     }
-                    ?>
-                    <option value="custom">Custom</option>
-                </select>
-            </div>
+                ?>
+                    <option value="<?= htmlspecialchars($u['id']); ?>" <?= $sel; ?>>
+                        <?= htmlspecialchars($u['initials'] . ' [' . $u['name'] . ']'); ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+        </div>
 
-            <div class="mb-3" id="custom_strain_div" style="display: none;">
-                <label for="custom_strain" class="form-label">Custom Strain Name</label>
-                <input type="text" class="form-control" id="custom_strain" name="custom_strain">
-            </div>
+        <div class="mb-3">
+            <label for="remarks" class="form-label">Remarks</label>
+            <textarea id="remarks" name="remarks" class="form-control" rows="3"><?= htmlspecialchars($cloneData['remarks'] ?? ''); ?></textarea>
+        </div>
 
-            <div class="mb-3">
-                <label for="iacuc" class="form-label">IACUC <span class="badge bg-info">Important</span></label>
-                <select class="form-control" id="iacuc" name="iacuc[]" multiple data-field-type="important">
-                    <option value="" disabled>Select IACUC</option>
-                    <?php
-                    // Populate the dropdown with IACUC values from the database
-                    while ($iacucRow = $iacucResult->fetch_assoc()) {
-                        $iacuc_id = htmlspecialchars($iacucRow['iacuc_id']);
-                        $iacuc_title = htmlspecialchars($iacucRow['iacuc_title']);
-                        $truncated_title = strlen($iacuc_title) > 40 ? substr($iacuc_title, 0, 40) . '...' : $iacuc_title;
-                        $iacucSelected = in_array($iacucRow['iacuc_id'], $cloneIacuc) ? 'selected' : '';
-                        echo "<option value='$iacuc_id' title='$iacuc_title' $iacucSelected>$iacuc_id | $truncated_title</option>";
-                    }
-                    ?>
-                </select>
-            </div>
+        <button type="submit" class="btn btn-primary">Create Cage</button>
+        <a href="hc_dash.php" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+<br>
+<?php include 'footer.php'; ?>
 
-            <div class="mb-3">
-                <label for="user" class="form-label">User <span class="badge bg-info">Important</span></label>
-                <select class="form-control" id="user" name="user[]" multiple data-field-type="important">
-                    <?php
-                    // Populate the dropdown with options from the database
-                    // Auto-select current user, or use cloneUsers if cloning
-                    while ($userRow = $userResult->fetch_assoc()) {
-                        $user_id = htmlspecialchars($userRow['id']);
-                        $initials = htmlspecialchars($userRow['initials']);
-                        $name = htmlspecialchars($userRow['name']);
-                        if ($cloneData) {
-                            $selected = in_array($userRow['id'], $cloneUsers) ? 'selected' : '';
-                        } else {
-                            $selected = ($currentUserId && $user_id == $currentUserId) ? 'selected' : '';
-                        }
-                        echo "<option value='$user_id' $selected>$initials [$name]</option>";
-                    }
-                    ?>
-                </select>
-            </div>
-
-            <div class="mb-3">
-                <label for="dob" class="form-label">DOB <span class="badge bg-warning">Critical</span></label>
-                <input type="date" class="form-control" id="dob" name="dob" min="1900-01-01" data-field-type="critical" value="<?= htmlspecialchars($cloneData['dob'] ?? ''); ?>">
-            </div>
-
-            <div class="mb-3">
-                <label for="sex" class="form-label">Sex <span class="badge bg-warning">Critical</span></label>
-                <select class="form-control" id="sex" name="sex" data-field-type="critical">
-                    <option value="">Select Sex</option>
-                    <option value="male" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'male') ? 'selected' : '' ?>>Male</option>
-                    <option value="female" <?= ($cloneData && ($cloneData['sex'] ?? '') == 'female') ? 'selected' : '' ?>>Female</option>
-                </select>
-            </div>
-
-            <div class="mb-3">
-                <label for="parent_cg" class="form-label">Parent Cage <span class="badge bg-secondary">Useful</span></label>
-                <input type="text" class="form-control" id="parent_cg" name="parent_cg" data-field-type="useful" value="<?= htmlspecialchars($cloneData['parent_cg'] ?? ''); ?>">
-            </div>
-
-            <div class="mb-3">
-                <label for="cage_genotype" class="form-label">Genotype</label>
-                <input type="text" class="form-control" id="cage_genotype" name="cage_genotype" value="<?= htmlspecialchars($cloneData['genotype'] ?? ''); ?>">
-            </div>
-
-            <div class="mb-3">
-                <label for="remarks" class="form-label">Remarks</label>
-                <textarea class="form-control" id="remarks" name="remarks" oninput="adjustTextareaHeight(this)"><?= htmlspecialchars($cloneData['remarks'] ?? ''); ?></textarea>
-            </div>
-
-            <!-- HTML Form Section for Mouse Fields -->
-            <div id="mouse_fields_container">
-                <!-- Mouse fields will be added here dynamically -->
-            </div>
-
-            <!-- Button to add new mouse fields -->
-            <div class="button-group">
-                <button type="button" class="btn btn-primary btn-icon" onclick="addMouseField()">
-                    <i class="fas fa-plus"></i> Add Mouse
-                </button>
-            </div>
-
-            <br>
-            <br>
-
-            <button type="submit" class="btn btn-primary">Add Cage</button>
-            <button type="button" class="btn btn-secondary" onclick="goBack()">Go Back</button>
-
-        </form>
-    </div>
-
-    <br>
-    <?php include 'footer.php'; ?>
-
-    <?php if (!empty($cloneMice)): ?>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        <?php foreach ($cloneMice as $mouse): ?>
-        addMouseField();
-        document.getElementById('mouse_id_' + mouseFieldCounter).value = <?= json_encode($mouse['mouse_id']); ?>;
-        document.getElementById('genotype_' + mouseFieldCounter).value = <?= json_encode($mouse['genotype']); ?>;
-        document.getElementById('notes_' + mouseFieldCounter).value = <?= json_encode($mouse['notes'] ?? ''); ?>;
-        <?php endforeach; ?>
-    });
-    </script>
-    <?php endif; ?>
+<script>
+$(document).ready(function () {
+    $('#pi_name').select2({ placeholder: 'Select PI', allowClear: true, width: '100%' });
+    $('#iacuc').select2({ placeholder: 'Select IACUC', allowClear: true, width: '100%' });
+    $('#user').select2({ placeholder: 'Select user(s)', allowClear: true, width: '100%' });
+});
+</script>
 </body>
-
 </html>
