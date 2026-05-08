@@ -308,7 +308,7 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
 <!doctype html>
 <html lang="en">
 <head>
-    <title>Import V1 Data | <?= htmlspecialchars($labName); ?></title>
+    <title>Import from Previous Version | <?= htmlspecialchars($labName); ?></title>
     <style>
         .container { max-width: 800px; padding: 20px; margin: auto; background: var(--bs-tertiary-bg); border-radius: 8px; margin-top: 20px; }
         .file-input { padding: 8px; }
@@ -317,19 +317,13 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
 </head>
 <body>
 <div class="container content">
-    <h4>Import V1 Data</h4>
+    <h4>Import data from previous version</h4>
     <p class="text-muted">
-        One-shot importer that consumes a JSON file produced by V1's
-        <code>database/export_for_v2.php</code> exporter. The destination
-        database must be effectively empty (no mice, cages, breeding, or
-        non-seed users) — reset first via <code>php database/install.php --reset</code>
-        if needed.
+        Upload an export file from the previous version of MyVivarium and
+        we'll bring its data into this lab — users, cages, mice, breeding,
+        litters, files, notes, tasks, and history. The system handles the
+        translation between versions internally.
     </p>
-    <ol class="text-muted small">
-        <li>On the V1 server: copy <code>database/export_for_v2.php</code> from this repo into the V1 project root, then run <code>php database/export_for_v2.php --out=v1_export.json</code>.</li>
-        <li>Download <code>v1_export.json</code>.</li>
-        <li>Upload it below.</li>
-    </ol>
 
     <?php if ($errors): ?>
         <div class="alert alert-danger">
@@ -339,7 +333,7 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
 
     <?php if ($report): ?>
         <div class="alert alert-success">
-            <strong>Import complete.</strong> Counts per step:
+            <strong>Import complete.</strong>
             <pre><?= htmlspecialchars(json_encode($report, JSON_PRETTY_PRINT)); ?></pre>
             <a href="mouse_dash.php" class="btn btn-primary btn-sm">Open Mice Dashboard</a>
         </div>
@@ -348,17 +342,23 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
     <form method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
         <div class="mb-3">
-            <label for="v1_export" class="form-label">V1 export JSON</label>
+            <label for="v1_export" class="form-label">Export file (.json)</label>
             <input type="file" id="v1_export" name="v1_export" class="form-control file-input" accept=".json,application/json" required>
             <small class="text-muted d-block mt-1">
-                Large exports may exceed PHP's <code>upload_max_filesize</code> /
-                <code>post_max_size</code>. Both default to 2M and may need raising
-                in your <code>php.ini</code> for production-sized V1 dumps.
+                Ask your previous-version admin to use the
+                <strong>Export for migration</strong> option there and send
+                you the resulting <code>.json</code> file.
             </small>
         </div>
         <button type="submit" class="btn btn-primary">Import</button>
         <a href="home.php" class="btn btn-secondary">Cancel</a>
     </form>
+
+    <p class="text-muted small mt-4 mb-0">
+        Heads up: the import requires a fresh database. If this lab already
+        has data in it, ask your system administrator to reset it before
+        re-running this step.
+    </p>
 </div>
 <br>
 <?php include 'footer.php'; ?>
