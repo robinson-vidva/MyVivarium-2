@@ -169,6 +169,13 @@ $stmt->bind_param($listTypes, ...$listArgs);
 $stmt->execute();
 $res = $stmt->get_result();
 
+// Optional columns the dashboard's "Columns" dropdown lets the user toggle.
+// Always-on columns are Mouse ID / Cage / Status / Actions; everything else
+// is opt-in. Same shape as hc_dash so widths and behavior stay consistent.
+$allowedOptional = ['sex', 'dob', 'age', 'genotype'];
+$colsParam = $_GET['columns'] ?? 'sex,age';
+$visibleColumns = array_values(array_intersect(explode(',', $colsParam), $allowedOptional));
+
 $rows = '';
 $nowDate = new DateTime('today');
 while ($m = $res->fetch_assoc()) {
@@ -189,24 +196,31 @@ while ($m = $res->fetch_assoc()) {
         ? '<a href="hc_view.php?id=' . urlencode($m['current_cage_id']) . '">' . htmlspecialchars($m['current_cage_id']) . '</a>'
         : '<span class="text-muted">—</span>';
 
-    $rows .= '<tr>'
-        . '<td><a href="mouse_view.php?id=' . urlencode($m['mouse_id']) . '"><strong>' . htmlspecialchars($m['mouse_id']) . '</strong></a></td>'
-        . '<td>' . htmlspecialchars(ucfirst($m['sex'])) . '</td>'
-        . '<td>' . htmlspecialchars($m['dob'] ?? '—') . '</td>'
-        . '<td>' . $age . '</td>'
-        . '<td>' . $cageCell . '</td>'
-        . '<td>' . htmlspecialchars($m['genotype'] ?? '') . '</td>'
-        . '<td><span class="badge ' . $statusBadge . '">' . htmlspecialchars($m['status']) . '</span></td>'
-        . '<td class="text-end">'
-            . '<a href="mouse_view.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a> '
-            . '<a href="mouse_edit.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>'
-        . '</td>'
-        . '</tr>';
+    $optionalRender = [
+        'sex'      => htmlspecialchars(ucfirst($m['sex'])),
+        'dob'      => htmlspecialchars($m['dob'] ?? '—'),
+        'age'      => $age,
+        'genotype' => htmlspecialchars($m['genotype'] ?? ''),
+    ];
+
+    $rows .= '<tr>';
+    $rows .= '<td data-label="Mouse ID"><a href="mouse_view.php?id=' . urlencode($m['mouse_id']) . '"><strong>' . htmlspecialchars($m['mouse_id']) . '</strong></a></td>';
+    foreach ($visibleColumns as $c) {
+        $rows .= '<td data-label="' . ucfirst($c) . '">' . $optionalRender[$c] . '</td>';
+    }
+    $rows .= '<td data-label="Cage">' . $cageCell . '</td>';
+    $rows .= '<td data-label="Status"><span class="badge ' . $statusBadge . '">' . htmlspecialchars($m['status']) . '</span></td>';
+    $rows .= '<td data-label="Actions" class="text-end">'
+          .  '<a href="mouse_view.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a> '
+          .  '<a href="mouse_edit.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>'
+          .  '</td>';
+    $rows .= '</tr>';
 }
 $stmt->close();
 
+$colspan = 4 + count($visibleColumns); // Mouse ID + optional + Cage + Status + Actions
 if ($total === 0) {
-    $rows = '<tr><td colspan="8" class="text-center text-muted py-4">No mice found.</td></tr>';
+    $rows = '<tr><td colspan="' . $colspan . '" class="text-center text-muted py-4">No mice found.</td></tr>';
 }
 
 // Pagination
