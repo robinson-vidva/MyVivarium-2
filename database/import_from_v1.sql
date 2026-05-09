@@ -196,7 +196,7 @@ WHERE m.current_cage_id IS NOT NULL;
 -- -----------------------------------------------------------------------------
 -- 5. Breeding cages — only the slim v2 columns. Per-parent dob/genotype/
 -- parent_cage from v1 are now properties of the mouse entity (joined at
--- read time in bc_view / bc_prnt_crd / prnt_crd).
+-- read time in bc_view / prnt_crd).
 -- -----------------------------------------------------------------------------
 
 INSERT IGNORE INTO `breeding` (id, cage_id, `cross`, male_id, female_id)

@@ -17,7 +17,7 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - [Features](#features)
 - [Screenshot](#screenshot)
 - [Installation](#installation)
-- [Upgrading from v1](#upgrading-from-v1)
+- [Migrating from v1](#migrating-from-v1)
 - [Usage](#usage)
 - [File Reference](#file-reference)
 - [Citations](#citations)
@@ -26,15 +26,32 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 
 ## What's New in v2
 
-### New Features
+### Mouse-as-Entity (latest)
+A mouse is now a first-class record with stable identity that survives
+cage moves and survives the cage itself. The `holding` table is gone;
+mouse-level facts (strain, sex, DOB, genotype, ear code, parents) live
+on the mouse, not the cage.
+
+- **Canonical `mice` table** — `mouse_id` is user-supplied, globally unique, and editable. Renaming a mouse cascades through every FK (parent links, cage history, breeding rows).
+- **Cage move history** — every cage assignment is logged in `mouse_cage_history` (append-only, with timestamps + actor + reason). The current cage is just the row whose interval is still open.
+- **Per-mouse lineage** — `sire_id` / `dam_id` are FKs into `mice` itself, with optional `*_external_ref` text fallback for founder mice that came from outside the system, and `source_cage_label` to preserve V1's cage-level breadcrumb.
+- **Status lifecycle** — `alive` / `sacrificed` / `transferred_out` / `archived`, replacing soft-delete columns. Sacrifice records the date and reason and closes the open history interval.
+- **Admin hard delete** — gated behind retype-confirmation, role check, and audit-log entry written *before* the delete so the trail survives.
+- **Mice dashboard + per-mouse view** — searchable, filterable list at `mouse_dash.php`, with a `mouse_view.php` showing the cage history timeline, offspring, and status-aware action buttons (Move / Sacrifice / Edit / admin-Delete).
+- **Inline "+ Add new cage"** — when registering a mouse, the cage dropdown has an Add-new option that opens a modal, creates the cage server-side, and selects it in the parent form (Aaron's UX).
+- **Per-row Transfer button** — every mouse row in a cage view has a Transfer action that opens the move modal pre-populated; the move POSTs to `mouse_move.php` which atomically closes the open interval, opens a new one, and updates the denormalized current-cage pointer.
+- **Slim breeding cage** — `breeding.male_id` / `female_id` are FKs into `mice`. Per-parent DOB / genotype / parent-cage columns are dropped; that data is JOINed from the mouse entity at read time, so the source of truth is unambiguous.
+- **V1 → V2 import** — admin uploads a JSON file produced by V1's "Export for V2 Migration" admin page; the importer transforms V1 holding + mice + breeding parents into the V2 mouse model in a single transaction. Pre-flight aborts unless the V2 database is empty (or the admin explicitly checks "overwrite"). See [database/README.md](database/README.md) for SQL- and shell-based alternatives.
+
+### Earlier v2 features
 - **Calendar View** -- Interactive monthly calendar (FullCalendar v6) showing tasks and reminders with color-coded status, grid and list views, rich event details, and mobile-responsive layout
 - **Task Management** -- Create, assign, and track tasks with status workflow (Pending, In Progress, Completed), due dates, cage association, and user assignment
 - **Reminder System** -- Recurring reminders (daily, weekly, monthly) with automated email notifications via cron jobs, archive/restore workflow, and calendar integration
 - **Reminder Archiving** -- Archive reminders instead of deleting, with restore and permanent delete options (matches cage archive pattern)
 - **Cage Archiving** -- Soft-delete cages instead of permanent deletion, with restore capability
 - **Cage ID Editing** -- Rename cage IDs with automatic propagation across all related tables
-- **Cage Duplication** -- Clone an existing cage to quickly create a similar one (copies strain, IACUC, users, location, mice)
-- **Move Mouse Between Cages** -- Transfer mice from one holding cage to another with validation and quantity tracking
+- **Cage Duplication** -- Clone an existing cage to quickly create a similar one (copies cage metadata: PI, room/rack, IACUC, users, remarks). Mice are independent entities in v2 and aren't auto-cloned — register them into the new cage as needed.
+- **Move Mouse Between Cages** -- Transfer mice between any two cages (holding ↔ breeding) with full append-only history (`mouse_cage_history`); the move is atomic and recorded with timestamp, actor, and reason.
 - **Sticky Notes** -- Per-cage sticky notes for quick annotations visible on cage view pages
 - **Configurable Pagination** -- Choose 10, 20, 30, or 50 cages per page on dashboards
 - **Column Sorting** -- Sort cage lists by cage ID in ascending or descending order
@@ -95,9 +112,10 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 - Task management with status tracking and cage association
 - Recurring reminders with email notifications and archive support
 - Cage archiving with restore and permanent delete options
-- Cage duplication (clone) for quick cage creation
-- Mouse transfer between holding cages
-- Cage lineage view (visual parent-child tree)
+- Cage duplication (clone cage metadata for quick cage creation)
+- First-class mouse records: lineage (sire/dam), cage move history, sacrifice/archive lifecycle
+- Mouse transfer between any cages with audit trail
+- Cage lineage view (derived from per-mouse sire/dam in v2)
 - Sticky notes per cage for quick annotations
 - Activity/audit log with search, date range, and entity filters
 - Configurable pagination and sorting on cage dashboards
@@ -175,13 +193,13 @@ MyVivarium is an online platform designed to manage your vivarium effectively. I
 
 5. **Set up the database:**
     ```bash
-    mysql -u yourusername -p
+    # Create the empty database (the installer doesn't CREATE DATABASE itself)
+    mysql -u yourusername -p -e "CREATE DATABASE myvivarium;"
+
+    # Apply the schema using the installer (reads .env, reports each table created)
+    php /var/www/html/database/install.php
     ```
-    ```sql
-    CREATE DATABASE myvivarium;
-    USE myvivarium;
-    SOURCE /var/www/html/database/schema.sql;
-    ```
+    Need to wipe a dev database and re-apply? `php database/install.php --reset` drops every table, then re-installs. Lost the seeded admin password? `php database/reset_admin.php --email=you@lab.org --password='...'`.
 
 6. **Set up cron jobs:**
     ```bash
@@ -288,6 +306,19 @@ transforms it into the v2 mouse-as-entity model in a single transaction.
 | `manage_strain.php` | Strain management (JAX IDs, RRID, aliases) |
 | `manage_iacuc.php` | IACUC protocol management with file uploads |
 | `export_data.php` | CSV export of all database tables |
+| `admin_import.php` | Import data from a previous version's JSON export (transforms V1 holding+mice+breeding into V2 mouse entities in a single transaction) |
+
+### Mice (v2: first-class entities)
+| File | Description |
+|------|-------------|
+| `mouse_dash.php` | Dashboard listing every mouse, with status / sex / cage filters and toggleable optional columns |
+| `mouse_fetch_data.php` | AJAX endpoint: paginated list, parent-picker search, inline cage create |
+| `mouse_addn.php` | Register a new mouse; cage dropdown has an inline "+ Add new cage" modal |
+| `mouse_view.php` | Detail page with cage history timeline, offspring, status-aware action buttons |
+| `mouse_edit.php` | Edit mouse fields including cage-source breadcrumb; rename cascades through every FK |
+| `mouse_move.php` | Atomic cage move handler — closes the open history interval, opens a new one |
+| `mouse_sacrifice.php` | Mark sacrificed; closes history interval, sets status, records reason |
+| `mouse_drop.php` | Admin-only hard delete with retype-confirmation and audit log |
 
 ### Holding Cages
 | File | Description |
@@ -298,8 +329,6 @@ transforms it into the v2 mouse-as-entity model in a single transaction.
 | `hc_view.php` | View cage details with notes, files, mice, maintenance log |
 | `hc_edit.php` | Edit cage (includes cage ID rename with propagation) |
 | `hc_drop.php` | Archive/restore/permanent delete with permission checks |
-| `hc_slct_crd.php` | Select cages for card printing |
-| `hc_prnt_crd.php` | Print cage cards |
 
 ### Breeding Cages
 | File | Description |
@@ -310,8 +339,6 @@ transforms it into the v2 mouse-as-entity model in a single transaction.
 | `bc_view.php` | View cage details with litters, files, maintenance log |
 | `bc_edit.php` | Edit cage (includes cage ID rename with propagation) |
 | `bc_drop.php` | Archive/restore/permanent delete with permission checks |
-| `bc_slct_crd.php` | Select cages for card printing |
-| `bc_prnt_crd.php` | Print cage cards |
 
 ### Calendar, Tasks & Reminders
 | File | Description |
@@ -332,7 +359,6 @@ transforms it into the v2 mouse-as-entity model in a single transaction.
 | `maintenance.php` | Add maintenance records from cage view pages |
 | `activity_log.php` | Activity/audit log viewer with search, date range, entity type filter |
 | `cage_lineage.php` | Cage lineage view, derived from per-mouse sire/dam in v2 |
-| `admin_import.php` | Admin: import data from a previous version's JSON export |
 
 ### Sticky Notes
 | File | Description |
@@ -341,6 +367,12 @@ transforms it into the v2 mouse-as-entity model in a single transaction.
 | `nt_add.php` | Add a new sticky note |
 | `nt_edit.php` | Edit an existing sticky note |
 | `nt_rmv.php` | Remove a sticky note |
+
+### Cage Cards (printable)
+| File | Description |
+|------|-------------|
+| `slct_crd.php` | Card-printing selector — picks any mix of holding + breeding cages and opens `prnt_crd.php` in a new tab |
+| `prnt_crd.php` | Renders printable cage cards (a 2×2 letter-landscape sheet); pulls cage metadata + currently-resident mice for holding cages and JOINs parent details from the mice table for breeding cages |
 
 ### Other
 | File | Description |
