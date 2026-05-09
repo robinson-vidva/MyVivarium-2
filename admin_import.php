@@ -426,7 +426,7 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
 <head>
     <title>Import from Previous Version | <?= htmlspecialchars($labName); ?></title>
     <style>
-        .container { max-width: 800px; padding: 20px; margin: auto; background: var(--bs-tertiary-bg); border-radius: 8px; margin-top: 20px; }
+        .container { max-width: 900px; padding: 20px; margin: auto; background: var(--bs-tertiary-bg); border-radius: 8px; margin-top: 20px; }
         .file-input { padding: 8px; }
         pre { background: var(--bs-body-bg); padding: 12px; border-radius: 6px; max-height: 320px; overflow: auto; }
     </style>

@@ -91,10 +91,6 @@ if (isset($_GET['id'])) {
             $holdingcage['pi_initials'] = 'NA';
             $holdingcage['pi_name'] = 'NA';
         }
-        // Default fields the old `holding` table contributed but the cage no
-        // longer owns (strain/genotype/dob/sex/parent_cg are now per-mouse).
-        $holdingcage['genotype']   = $holdingcage['genotype']   ?? '';
-        $holdingcage['parent_cg']  = $holdingcage['parent_cg']  ?? '';
 
         $iacucQuery = "SELECT GROUP_CONCAT(iacuc_id SEPARATOR ', ') AS iacuc_ids FROM cage_iacuc WHERE cage_id = ?";
         $stmtIacuc = $con->prepare($iacucQuery);
@@ -468,17 +464,10 @@ require 'header.php';
             document.getElementById('viewPopupForm').style.display = 'none';
         }
 
-        function openTransferModal(dbId, mouseId) {
-            document.getElementById('transfer_mouse_db_id').value = dbId;
-            document.getElementById('transfer_mouse_id_display').textContent = mouseId;
-            document.getElementById('transferOverlay').style.display = 'block';
-            document.getElementById('transferForm').style.display = 'block';
-        }
-
-        function closeTransferModal() {
-            document.getElementById('transferOverlay').style.display = 'none';
-            document.getElementById('transferForm').style.display = 'none';
-        }
+        // openTransferModal lives further down the page near the actual
+        // modal element — these v1-era stubs (with a different signature
+        // and pointing at DOM ids that no longer exist) are removed so
+        // they can't shadow the live function.
     </script>
     <!-- Font Awesome loaded via header.php -->
 </head>
@@ -571,14 +560,9 @@ require 'header.php';
                     <th>Sex</th>
                     <td id="sex-data" data-value="<?= !empty($holdingcage['sex']) ? '1' : ''; ?>"><?= htmlspecialchars(ucfirst($holdingcage['sex'])); ?></td>
                 </tr>
-                <tr>
-                    <th>Parent Cage</th>
-                    <td id="parent-data" data-value="<?= !empty($holdingcage['parent_cg']) ? '1' : ''; ?>"><?= htmlspecialchars($holdingcage['parent_cg']); ?></td>
-                </tr>
-                <tr>
-                    <th>Genotype</th>
-                    <td><?= htmlspecialchars($holdingcage['genotype'] ?? ''); ?></td>
-                </tr>
+                <!-- v2: parent_cg and genotype were cage-level in v1; in v2
+                     they're per-mouse (sire/dam_id, mice.genotype). The Mice
+                     section below renders that data. -->
                 <tr>
                     <th>Remarks</th>
                     <td><?= htmlspecialchars($holdingcage['remarks']); ?></td>

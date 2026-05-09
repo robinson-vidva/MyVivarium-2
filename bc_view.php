@@ -55,9 +55,7 @@ if (isset($_GET['id'])) {
                      mm.dob       AS male_dob,
                      mm.genotype  AS male_genotype,
                      ff.dob       AS female_dob,
-                     ff.genotype  AS female_genotype,
-                     NULL         AS male_parent_cage,
-                     NULL         AS female_parent_cage
+                     ff.genotype  AS female_genotype
           FROM breeding b
           LEFT JOIN cages c   ON b.cage_id = c.cage_id
           LEFT JOIN users pi  ON c.pi_name = pi.id
@@ -586,10 +584,6 @@ require 'header.php';
                     <td id="male-dob-data" data-value="<?= !empty($breedingcage['male_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['male_dob']); ?></td>
                 </tr>
                 <tr>
-                    <th>Male Source / Parent Cage</th>
-                    <td><?= htmlspecialchars($breedingcage['male_parent_cage'] ?? ''); ?></td>
-                </tr>
-                <tr>
                     <th>Female (Dam)</th>
                     <td id="female-id-data" data-value="<?= !empty($breedingcage['female_id']) ? '1' : ''; ?>">
                         <?php if (!empty($breedingcage['female_id'])): ?>
@@ -607,10 +601,9 @@ require 'header.php';
                     <th>Female DOB</th>
                     <td id="female-dob-data" data-value="<?= !empty($breedingcage['female_dob']) ? '1' : ''; ?>"><?= htmlspecialchars($breedingcage['female_dob']); ?></td>
                 </tr>
-                <tr>
-                    <th>Female Source / Parent Cage</th>
-                    <td><?= htmlspecialchars($breedingcage['female_parent_cage'] ?? ''); ?></td>
-                </tr>
+                <!-- v2: per-parent "source / parent cage" rows removed.
+                     The Sire / Dam links above route to mouse_view, which
+                     shows that mouse's cage history and source_cage_label. -->
                 <tr>
                     <th>Remarks</th>
                     <td><?= htmlspecialchars($breedingcage['remarks']); ?></td>

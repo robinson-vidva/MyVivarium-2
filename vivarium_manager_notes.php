@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             // Add new maintenance note
             $cage_id = trim($_POST['cage_id'] ?? '');
             $comments = trim($_POST['comments'] ?? '');
-            $user_id = $_SESSION['user_id'];
+            $user_id = $_SESSION['user_id'] ?? null;
 
             if (empty($cage_id)) {
                 echo json_encode(['success' => false, 'message' => 'Cage ID is required']);
@@ -153,7 +153,7 @@ $offset = ($current_page - 1) * $records_per_page;
 
 // Filter settings - default to "vivarium_managers"
 $filter_view = isset($_GET['view']) && $_GET['view'] === 'all' ? 'all' : 'vivarium_managers';
-$current_user_id = $_SESSION['user_id'];
+$current_user_id = $_SESSION['user_id'] ?? null;
 
 // Search functionality
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
