@@ -220,42 +220,13 @@ SENDER_EMAIL=sender@example.com
 SENDER_NAME=MyVivarium
 ```
 
-## Upgrading from v1
+## Migrating from v1
 
-If you're upgrading from the original MyVivarium, you have two options:
-
-### Option A: In-Place SQL Migration (Recommended)
-Run the migration script directly on your existing database:
-```bash
-# Back up first!
-mysqldump -u root -p myvivarium > backup_before_v2.sql
-
-# Apply migration
-mysql -u root -p myvivarium < database/migrate_v1_to_v2.sql
-```
-
-### Option B: Interactive Shell Migration
-Use the interactive script to migrate data from one database to another:
-```bash
-chmod +x database/migrate_v1_to_v2.sh
-./database/migrate_v1_to_v2.sh
-```
-This will prompt for source/destination database credentials, create automatic backups, and migrate data table-by-table.
-
-### What the Migration Does
-| Change | Details |
-|--------|---------|
-| Vivarium Manager role | Auto-assigns role to users with matching positions |
-| Cage status column | Adds `status` ENUM ('active', 'archived') with default 'active' |
-| Location fields | Adds `room` and `rack` to cages |
-| Genotype (holding) | Adds `genotype` to holding table |
-| Genotype (breeding) | Adds `male_genotype` and `female_genotype` to breeding table |
-| Parent cage (breeding) | Adds `male_parent_cage` and `female_parent_cage` to breeding table |
-| Optional fields | Makes DOB, parent cage, cross, male/female IDs nullable |
-
-> **Note**: If upgrading from an earlier v2 install, also run `database/migrate_add_parent_cage.sql` to add the parent cage columns.
-
-See `database/README.md` for full migration details.
+V2 is a greenfield rewrite — it doesn't upgrade an existing v1 database
+in place. To bring v1 production data over, see `database/README.md`.
+The summary: v1 produces a JSON export (or `mysqldump`), v2 admin uploads
+it through **Administration → Import from Previous Version**, the system
+transforms it into the v2 mouse-as-entity model in a single transaction.
 
 ## Screenshot
 
@@ -360,8 +331,8 @@ See `database/README.md` for full migration details.
 | `vivarium_manager_notes.php` | Maintenance notes CRUD with search, date range filter, pagination, print |
 | `maintenance.php` | Add maintenance records from cage view pages |
 | `activity_log.php` | Activity/audit log viewer with search, date range, entity type filter |
-| `cage_lineage.php` | Visual tree view of parent-child cage relationships |
-| `mouse_transfer.php` | Transfer mice between holding cages with validation |
+| `cage_lineage.php` | Cage lineage view, derived from per-mouse sire/dam in v2 |
+| `admin_import.php` | Admin: import data from a previous version's JSON export |
 
 ### Sticky Notes
 | File | Description |
@@ -382,12 +353,13 @@ See `database/README.md` for full migration details.
 ### Database
 | File | Description |
 |------|-------------|
-| `database/schema.sql` | Full v2 database schema -- 17 tables (use for fresh installs) |
-| `database/migrate_v1_to_v2.sql` | In-place SQL migration from v1 to v2 |
-| `database/migrate_v1_to_v2.sh` | Interactive shell migration script |
-| `database/migrate_add_parent_cage.sql` | Adds male/female parent cage columns to breeding table |
-| `database/README.md` | Detailed migration and schema documentation |
-| `database/erd.png` | Entity-Relationship Diagram |
+| `database/schema.sql` | Canonical v2 schema (19 tables, mouse-as-entity model) |
+| `database/install.php` | CLI installer: applies `schema.sql` to the DB configured in `.env`. `--reset` drops existing tables first |
+| `database/reset_admin.php` | CLI helper to create or reset an admin user with a known email/password |
+| `database/import_from_v1.sql` | Cross-database SQL import from a v1 source DB |
+| `database/sync_from_v1.sh` | One-command shell wrapper for v1→v2 sync (same- or cross-server) |
+| `database/README.md` | Schema and migration documentation |
+| `database/erd.png` | Entity-Relationship Diagram (stale — pending regeneration) |
 
 ### Setup & Configuration
 | File | Description |

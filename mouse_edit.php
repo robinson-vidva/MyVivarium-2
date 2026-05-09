@@ -272,6 +272,8 @@ require 'header.php';
     <div class="modal-content">
       <form method="POST" action="mouse_move.php">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
+        <!-- After transfer, drop into mouse_view so the user sees the updated cage history. -->
+        <input type="hidden" name="redirect_to" value="mouse_view.php?id=<?= rawurlencode($mouse['mouse_id']); ?>">
         <input type="hidden" id="transfer_mouse_id" name="mouse_id" value="">
         <div class="modal-header">
           <h5 class="modal-title">Transfer mouse <span id="transfer_mouse_id_display" class="text-muted"></span></h5>

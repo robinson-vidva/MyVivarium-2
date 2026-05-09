@@ -38,6 +38,19 @@ if ($row = mysqli_fetch_assoc($labResult)) {
 if (isset($_GET['id'])) {
     $id = mysqli_real_escape_string($con, $_GET['id']);
 
+    // If this cage_id belongs to a breeding cage, hand off to bc_view.
+    // Lets every "view cage" link point at hc_view safely, regardless of
+    // which kind of cage the mouse is actually in.
+    $bcCheck = $con->prepare("SELECT 1 FROM breeding WHERE cage_id = ? LIMIT 1");
+    $bcCheck->bind_param("s", $id);
+    $bcCheck->execute();
+    if ($bcCheck->get_result()->num_rows > 0) {
+        $bcCheck->close();
+        header("Location: bc_view.php?id=" . urlencode($id));
+        exit;
+    }
+    $bcCheck->close();
+
     // v2: cage is the canonical container; mice are independent. We pull cage
     // metadata directly from `cages` and aggregate mouse-level facts (strain,
     // sex, dob) from the mice currently in the cage.
@@ -769,6 +782,7 @@ require 'header.php';
         <div class="modal-content">
           <form method="POST" action="mouse_move.php">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
+            <input type="hidden" name="redirect_to" value="hc_view.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>">
             <input type="hidden" id="transfer_mouse_id" name="mouse_id" value="">
             <div class="modal-header">
               <h5 class="modal-title">Transfer mouse <span id="transfer_mouse_id_display" class="text-muted"></span></h5>

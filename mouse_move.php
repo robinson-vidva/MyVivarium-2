@@ -25,6 +25,17 @@ $target_cage_raw = trim($_POST['target_cage_id'] ?? '');
 $reason          = trim($_POST['reason'] ?? '') ?: null;
 $user_id         = $_SESSION['user_id'] ?? null;
 
+// Optional. Pages that initiate a transfer from their own context (cage
+// view, mouse_edit) pass this so we return there instead of bouncing
+// the user to mouse_view. Restricted to a small allow-list to prevent
+// open-redirect via a forged form input.
+$redirectTo      = $_POST['redirect_to'] ?? '';
+$allowedRedirect = ['mouse_view.php', 'hc_view.php', 'bc_view.php', 'mouse_edit.php', 'mouse_dash.php'];
+$redirectBase    = $allowedRedirect[0];
+foreach ($allowedRedirect as $cand) {
+    if (strpos($redirectTo, $cand) === 0) { $redirectBase = $redirectTo; break; }
+}
+
 // "__none__" is the explicit "remove from cage" sentinel from the form
 $target_cage = ($target_cage_raw === '__none__' || $target_cage_raw === '') ? null : $target_cage_raw;
 
@@ -97,5 +108,7 @@ try {
     $_SESSION['message'] = 'Failed to move mouse: ' . $e->getMessage();
 }
 
-header("Location: mouse_view.php?id=" . urlencode($mouse_id));
+header("Location: " . ($redirectBase === 'mouse_view.php'
+    ? 'mouse_view.php?id=' . urlencode($mouse_id)
+    : $redirectBase));
 exit;

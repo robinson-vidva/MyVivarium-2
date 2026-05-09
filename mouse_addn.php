@@ -5,8 +5,9 @@
  *
  * Creates a single mouse as a first-class entity. The cage field is a Select2
  * dropdown over active cages with an "+ Add new cage" option that opens an
- * inline modal (Aaron's UX) — that modal POSTs to hc_addn.php's handler via
- * AJAX, then auto-selects the new cage in the parent form.
+ * inline modal (Aaron's UX) — that modal POSTs to mouse_fetch_data.php's
+ * `mode=create_cage` endpoint via AJAX, then auto-selects the new cage in
+ * the parent form.
  *
  * Required: mouse_id, sex, dob. Cage is required for an "alive" mouse but
  * may be left blank for a planned/incoming mouse — confirm dialog covers that

@@ -3,10 +3,10 @@
 /**
  * Admin: Import V1 data
  *
- * Accepts a JSON file produced by V1's database/export_for_v2.php (the
- * exporter ships in this repo under database/export_for_v2.php — copy it
- * into the V1 repo to run there). Transforms V1 rows into the V2
- * mouse-as-entity model, then inserts everything in a single transaction.
+ * Accepts a JSON file produced by V1's "Export for V2 Migration" admin
+ * page (the V1 side lives in the V1 repo, not here — see V1's
+ * `export_for_v2.php`). Transforms V1 rows into the V2 mouse-as-entity
+ * model, then inserts everything in a single transaction.
  *
  * Same data flow as database/import_from_v1.sql but driven by JSON, so it
  * works without shell-execing mysql and without a temp source schema.
@@ -104,15 +104,23 @@ function describe_destination(mysqli $con): array
 
 /**
  * Wipe all data from every table while keeping the schema intact. Used
- * when the admin has explicitly confirmed an overwrite. Order doesn't
- * matter once FK checks are off — TRUNCATE is faster than DELETE and
- * resets AUTO_INCREMENT.
+ * when the admin has explicitly confirmed an overwrite.
+ *
+ * Uses DELETE FROM rather than TRUNCATE — TRUNCATE on a table that's
+ * referenced by another table's FK can fail even with FOREIGN_KEY_CHECKS=0
+ * on some MySQL versions, which would leave the DB in a half-wiped state
+ * and the import in a broken position. DELETE is slower but reliable.
+ * AUTO_INCREMENT is then reset on each table so freshly-imported ids
+ * land at clean values rather than continuing where the wiped data
+ * left off.
  */
 function reset_destination(mysqli $con): void
 {
+    // Order matters: dependent tables first, then the parents they
+    // reference. Inside a single FOREIGN_KEY_CHECKS=0 block this is
+    // belt-and-suspenders, but it also reads naturally to a future
+    // human auditor.
     $tables = [
-        // Junction / dependent tables first (good practice even with
-        // FK_CHECKS off — keeps the order intuitive).
         'activity_log', 'outbox', 'notifications', 'reminders',
         'maintenance', 'tasks', 'notes', 'files',
         'mouse_cage_history',
@@ -126,7 +134,8 @@ function reset_destination(mysqli $con): void
     ];
     $con->query("SET FOREIGN_KEY_CHECKS = 0");
     foreach ($tables as $t) {
-        $con->query("TRUNCATE TABLE `$t`");
+        $con->query("DELETE FROM `$t`");
+        $con->query("ALTER TABLE `$t` AUTO_INCREMENT = 1");
     }
     $con->query("SET FOREIGN_KEY_CHECKS = 1");
 }

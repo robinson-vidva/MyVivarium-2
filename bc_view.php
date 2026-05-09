@@ -834,6 +834,7 @@ require 'header.php';
         <div class="modal-content">
           <form method="POST" action="mouse_move.php">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
+            <input type="hidden" name="redirect_to" value="bc_view.php?id=<?= rawurlencode($breedingcage['cage_id']); ?>">
             <input type="hidden" id="transfer_mouse_id" name="mouse_id" value="">
             <div class="modal-header">
               <h5 class="modal-title">Transfer mouse <span id="transfer_mouse_id_display" class="text-muted"></span></h5>
