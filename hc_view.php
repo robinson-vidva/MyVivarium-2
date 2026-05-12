@@ -557,8 +557,8 @@ require 'header.php';
                     <td id="user-data" data-value="<?= !empty($userIds) ? '1' : ''; ?>"><?= $userDisplayString; ?></td>
                 </tr>
                 <tr>
-                    <th>Qty</th>
-                    <td><?= htmlspecialchars($holdingcage['quantity']); ?></td>
+                    <th>Live mice</th>
+                    <td><?= (int)($holdingcage['live_count'] ?? 0); ?></td>
                 </tr>
                 <tr>
                     <th>DOB</th>
