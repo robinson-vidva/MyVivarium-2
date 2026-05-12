@@ -38,6 +38,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $action = trim($_POST['action'] ?? '');
 
+    // Block actions that an admin should never be able to run against themselves.
+    // (Deleting yourself or downgrading yourself can lock the system out.)
+    $selfDestructive = ['delete', 'pending', 'vivarium_manager', 'user'];
+    if ($username === ($_SESSION['username'] ?? '') && in_array($action, $selfDestructive, true)) {
+        $_SESSION['message'] = 'You cannot perform that action on your own account.';
+        header('Location: manage_users.php');
+        exit;
+    }
+
+    // Last-admin protection: refuse any change that would remove the final
+    // active admin (delete, pending, or role downgrade away from admin).
+    $wouldRemoveAdmin = in_array($action, ['delete', 'pending', 'vivarium_manager', 'user'], true);
+    if ($wouldRemoveAdmin) {
+        $roleStmt = $con->prepare("SELECT role, status FROM users WHERE username = ?");
+        $roleStmt->bind_param('s', $username);
+        $roleStmt->execute();
+        $targetRow = $roleStmt->get_result()->fetch_assoc();
+        $roleStmt->close();
+
+        if ($targetRow && $targetRow['role'] === 'admin' && $targetRow['status'] === 'approved') {
+            $countStmt = $con->prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND status='approved'");
+            $countStmt->execute();
+            $adminCount = (int) ($countStmt->get_result()->fetch_assoc()['n'] ?? 0);
+            $countStmt->close();
+            if ($adminCount <= 1) {
+                $_SESSION['message'] = 'Refused: this would leave the system with no active admin.';
+                header('Location: manage_users.php');
+                exit;
+            }
+        }
+    }
+
     // Initialize query variables
     $query = "";
 

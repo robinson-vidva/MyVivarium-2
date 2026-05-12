@@ -125,7 +125,8 @@ if (isset($_POST['login'])) {
         $result = json_decode($response, true);
 
         // Check Turnstile response success
-        if (!$result['success']) {
+        if (empty($result['success'])) {
+            mysqli_close($con);
             // Store error message in the session to display to the user
             $_SESSION['error_message'] = "Cloudflare Turnstile verification failed. Please try again.";
             header("Location: " . htmlspecialchars($_SERVER["PHP_SELF"]));
@@ -173,7 +174,11 @@ if (isset($_POST['login'])) {
                 $error_message = "Your account is pending admin approval.";
             } else {
                 // Check if the account is locked
-                if (!is_null($row['account_locked']) && new DateTime() < new DateTime($row['account_locked'])) {
+                // Compare lockout in UTC so admin-configurable timezone settings
+                // do not accidentally let a still-locked account sign back in.
+                $utc = new DateTimeZone('UTC');
+                if (!is_null($row['account_locked'])
+                    && (new DateTime('now', $utc)) < (new DateTime($row['account_locked'], $utc))) {
                     $error_message = "Account is temporarily locked. Please try again later.";
                 } else {
                     // Verify password
@@ -201,7 +206,11 @@ if (isset($_POST['login'])) {
                             // Open redirects can be exploited for phishing by redirecting users to malicious sites
                             // Only allow relative URLs to .php pages within this application
                             // Reject any URLs containing http:// or https:// (external sites)
-                            if (preg_match('/^[a-zA-Z0-9_\-\.\/\?=&]+\.php/', $rurl) && !preg_match('/^(https?:)?\/\//', $rurl)) {
+                            // Only accept same-origin relative URLs that point at a .php page.
+                            // The path must start with a single "/" (no scheme, no protocol-relative "//",
+                            // no backslash variants) and the filename must be a strict identifier
+                            // ending in .php. Querystring is optional.
+                            if (preg_match('#^/[A-Za-z0-9_\-]+\.php(\?[A-Za-z0-9_\-\.\/=&%]*)?$#', $rurl)) {
                                 header("Location: $rurl");
                                 exit;
                             }
@@ -213,7 +222,9 @@ if (isset($_POST['login'])) {
                         // Handle failed login attempts
                         $new_attempts = $row['login_attempts'] + 1;
                         if ($new_attempts >= 3) {
-                            $lock_time = "UPDATE users SET account_locked = DATE_ADD(NOW(), INTERVAL 15 MINUTE), login_attempts = 3 WHERE username=?";
+                            // Store the unlock time in UTC so it matches the
+                            // UTC-based comparison above.
+                            $lock_time = "UPDATE users SET account_locked = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 MINUTE), login_attempts = 3 WHERE username=?";
                             $lock_stmt = mysqli_prepare($con, $lock_time);
                             mysqli_stmt_bind_param($lock_stmt, "s", $username);
                             mysqli_stmt_execute($lock_stmt);

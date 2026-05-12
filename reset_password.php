@@ -24,55 +24,67 @@ if ($row = mysqli_fetch_assoc($labResult)) {
 }
 
 $resultMessage = "";
+$resetSuccess  = false;  // set true once the password has been successfully reset
 $updateStmt = null; // Initialize $updateStmt for later use
+
+// Token is required to render the form. Validate it before showing anything.
+$token = $_POST['token'] ?? $_GET['token'] ?? '';
+$tokenValid = false;
+if ($token !== '') {
+    $tokenStmt = $con->prepare("SELECT 1 FROM users WHERE reset_token = ? AND reset_token_expiration >= NOW()");
+    if ($tokenStmt) {
+        $tokenStmt->bind_param("s", $token);
+        $tokenStmt->execute();
+        $tokenStmt->store_result();
+        $tokenValid = $tokenStmt->num_rows === 1;
+        $tokenStmt->close();
+    }
+}
+
+if (!$tokenValid && $_SERVER["REQUEST_METHOD"] !== "POST") {
+    // No valid token in the URL — show the error up-front rather than letting
+    // the user fill in a new password and discover the failure on submit.
+    $resultMessage = "Invalid or expired token. Please request a new password reset.";
+}
 
 // Check if the form is submitted via POST and the reset button was clicked
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
-    $token = $_POST['token'];
-    $newPassword = $_POST['new_password'];
-    $confirmPassword = $_POST['confirm_password'];
+    $newPassword = $_POST['new_password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
 
-    // Check if new password and confirm password are the same
-    if ($newPassword === $confirmPassword) {
-        // Prepare SQL to check if the token exists and is valid
-        $query = "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiration >= NOW()";
-        $stmt = $con->prepare($query);
+    if (!$tokenValid) {
+        $resultMessage = "Invalid or expired token. Please request a new password reset.";
+    } elseif ($newPassword !== $confirmPassword) {
+        $resultMessage = "New Password and Confirm Password do not match.";
+    } else {
+        // Look up the username belonging to this token.
+        $stmt = $con->prepare("SELECT username FROM users WHERE reset_token = ? AND reset_token_expiration >= NOW()");
         $stmt->bind_param("s", $token);
         $stmt->execute();
         $result = $stmt->get_result();
 
-        // Check if the token is valid
-        if ($result->num_rows == 1) {
-            // Fetch user data
+        if ($result && $result->num_rows == 1) {
             $row = $result->fetch_assoc();
             $username = $row['username'];
 
-            // Prepare SQL to update the user's password
-            $updateQuery = "UPDATE users SET password = ?, reset_token = NULL, reset_token_expiration = NULL WHERE username = ?";
-            $updateStmt = $con->prepare($updateQuery);
+            $updateStmt = $con->prepare("UPDATE users SET password = ?, reset_token = NULL, reset_token_expiration = NULL WHERE username = ?");
             $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
             $updateStmt->bind_param("ss", $hashedPassword, $username);
 
-            // Execute the update and set a success or failure message
             if ($updateStmt->execute()) {
                 $resultMessage = "Password reset successfully. You can now <a href='index.php'>login</a> with your new password.";
+                $resetSuccess = true;
             } else {
                 $resultMessage = "Password reset failed. Please try again.";
             }
+            $updateStmt->close();
         } else {
             $resultMessage = "Invalid or expired token. Please request a new password reset.";
         }
 
-        // Close the statement
         $stmt->close();
-        if (isset($updateStmt)) {
-            $updateStmt->close();
-        }
-    } else {
-        $resultMessage = "New Password and Confirm Password do not match.";
     }
 
-    // Close the database connection
     $con->close();
 }
 ?>
@@ -198,9 +210,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
     <div class="container content">
         <h2>Reset Password</h2>
         <br>
+        <?php if ($tokenValid && !$resetSuccess) { ?>
         <form method="POST" action="">
             <!-- Hidden field for the token -->
-            <input type="hidden" id="token" name="token" value="<?= htmlspecialchars($_GET['token']); ?>">
+            <input type="hidden" id="token" name="token" value="<?= htmlspecialchars($token); ?>">
 
             <!-- New Password Field -->
             <div class="mb-3">
@@ -217,11 +230,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
             <!-- Submit Button -->
             <button type="submit" class="btn btn-primary" name="reset">Reset Password</button>
         </form>
+        <?php } ?>
 
         <!-- Display Result Message -->
-        <?php if (!empty($resultMessage)) {
-            echo "<p class='result-message'>$resultMessage</p>";
-        } ?>
+        <?php if (!empty($resultMessage)) { ?>
+            <p class='result-message'><?= $resetSuccess ? $resultMessage : htmlspecialchars($resultMessage); ?></p>
+        <?php } ?>
         <br>
 
         <a href="index.php" class="btn btn-secondary">Go Back</a>

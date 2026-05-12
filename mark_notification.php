@@ -44,7 +44,12 @@ try {
         echo json_encode(['error' => 'No action specified.']);
     }
 } catch (Exception $e) {
-    // Table may not exist yet
+    // The `notifications` table is optional in older deployments. Only swallow
+    // the "missing table" case; log everything else so real failures surface.
+    if (stripos($e->getMessage(), "doesn't exist") === false
+        && stripos($e->getMessage(), 'unknown table') === false) {
+        error_log('mark_notification error: ' . $e->getMessage());
+    }
     echo json_encode(['success' => true, 'marked' => 0]);
 }
 

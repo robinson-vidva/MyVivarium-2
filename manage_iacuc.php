@@ -11,6 +11,14 @@
 
 require 'session_config.php'; // Start the session to use session variables
 require 'dbcon.php'; // Include database connection
+
+// Require admin login before any further work (including before header.php so
+// we don't render UI to an unauthenticated visitor).
+if (!isset($_SESSION['username']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: index.php');
+    exit;
+}
+
 require 'header.php'; // Include the header for consistent page structure
 
 // Generate CSRF token if not already set
@@ -20,9 +28,25 @@ if (empty($_SESSION['csrf_token'])) {
 
 // Handle file upload with validation
 function handleFileUpload($file) {
-    // Define allowed file types and maximum size
+    // SVG is excluded because it can contain executable script (stored XSS).
     $allowedExtensions = ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx',
-                          'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
+                          'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+    $allowedMimes = [
+        'pdf'  => ['application/pdf'],
+        'doc'  => ['application/msword'],
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+        'txt'  => ['text/plain'],
+        'xls'  => ['application/vnd.ms-excel'],
+        'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'],
+        'ppt'  => ['application/vnd.ms-powerpoint'],
+        'pptx' => ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip'],
+        'jpg'  => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+        'png'  => ['image/png'],
+        'gif'  => ['image/gif'],
+        'bmp'  => ['image/bmp', 'image/x-ms-bmp'],
+        'webp' => ['image/webp'],
+    ];
     $maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
 
     // Check if file was uploaded without errors
@@ -40,8 +64,22 @@ function handleFileUpload($file) {
     $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
     // Validate file extension
-    if (!in_array($fileExtension, $allowedExtensions)) {
-        $_SESSION['message'] = "Invalid file type. Allowed: pdf, doc, docx, txt, xls, xlsx, ppt, pptx, jpg, jpeg, png, gif, bmp, svg, webp";
+    if (!in_array($fileExtension, $allowedExtensions, true)) {
+        $_SESSION['message'] = "Invalid file type. Allowed: pdf, doc, docx, txt, xls, xlsx, ppt, pptx, jpg, jpeg, png, gif, bmp, webp";
+        return false;
+    }
+
+    // Server-side MIME validation via finfo (client filename is not trusted).
+    $detectedMime = '';
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) {
+            $detectedMime = (string) finfo_file($finfo, $file['tmp_name']);
+            finfo_close($finfo);
+        }
+    }
+    if ($detectedMime === '' || !in_array($detectedMime, $allowedMimes[$fileExtension] ?? [], true)) {
+        $_SESSION['message'] = "File content does not match its extension.";
         return false;
     }
 

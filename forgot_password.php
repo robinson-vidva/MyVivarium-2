@@ -38,6 +38,17 @@ while ($row = mysqli_fetch_assoc($labResult)) {
     }
 }
 
+// Derive the reset link host from the request itself, not from a DB-editable
+// setting. This prevents a compromised/malicious admin from rerouting future
+// reset emails to an attacker-controlled domain via the `url` setting.
+$resetBaseUrl = (
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://'
+) . ($_SERVER['HTTP_HOST'] ?? $url);
+
+// Generic message used both for "email sent" and "email not found", to avoid
+// turning this endpoint into a username-enumeration oracle.
+$genericSuccess = "If that email address is registered, password reset instructions have been sent.";
+
 // Handle form submission for password reset
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
     $email = $_POST['email'];
@@ -45,7 +56,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
     // Proceed with Turnstile verification only if both sitekey and secret key are set
     if (!empty($turnstileSiteKey) && !empty($turnstileSecretKey)) {
         // Check Turnstile token
-        $turnstileResponse = $_POST['cf-turnstile-response'];
+        $turnstileResponse = $_POST['cf-turnstile-response'] ?? '';
 
         // Verify the Turnstile token with Cloudflare's API
         $verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -66,43 +77,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
         $result = json_decode($response, true);
 
         // Check if Turnstile verification was successful
-        if (!$result['success']) {
+        if (empty($result['success'])) {
             $resultMessage = "Cloudflare Turnstile verification failed. Please try again.";
         } else {
-            // Continue with password reset process if Turnstile verification is successful
-            handlePasswordReset($con, $email, $url);
+            $resultMessage = handlePasswordReset($con, $email, $resetBaseUrl, $genericSuccess);
         }
     } else {
-        // Skip Turnstile verification if keys are not set and proceed with password reset
-        handlePasswordReset($con, $email, $url);
+        $resultMessage = handlePasswordReset($con, $email, $resetBaseUrl, $genericSuccess);
     }
 }
 
-function handlePasswordReset($con, $email, $url) {
+function handlePasswordReset($con, $email, $resetBaseUrl, $genericSuccess) {
     // Check if the email exists in the database
-    $query = "SELECT * FROM users WHERE username = ?";
+    $query = "SELECT id FROM users WHERE username = ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
+    $exists = $result && $result->num_rows == 1;
+    $stmt->close();
 
-    if ($result->num_rows == 1) {
-        // Email exists, generate and save a reset token
+    if ($exists) {
+        // Generate and save a reset token. Do NOT clear `login_attempts` or
+        // `account_locked` — that would let anyone lift a brute-force lockout
+        // by triggering a reset for someone else's email.
         $resetToken = bin2hex(random_bytes(32));
-        $expirationTimeUnix = time() + 3600; // 1 hour expiration time
-        $expirationTime = date('Y-m-d H:i:s', $expirationTimeUnix);
+        $expirationTime = date('Y-m-d H:i:s', time() + 3600); // 1 hour
 
-        $updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiration = ?, login_attempts = 0, account_locked = NULL WHERE username = ?";
-        $updateStmt = $con->prepare($updateQuery);
+        $updateStmt = $con->prepare("UPDATE users SET reset_token = ?, reset_token_expiration = ? WHERE username = ?");
         $updateStmt->bind_param("sss", $resetToken, $expirationTime, $email);
         $updateStmt->execute();
+        $updateStmt->close();
 
-        // Send the password reset email
-        $resetLink = "https://" . $url . "/reset_password.php?token=$resetToken";
-
-        $to = $email;
-        $subject = 'Password Reset';
-        $message = "To reset your password, click the following link:\n$resetLink";
+        // Build the reset link from the server's own hostname.
+        $resetLink = rtrim($resetBaseUrl, '/') . "/reset_password.php?token=" . urlencode($resetToken);
 
         $mail = new PHPMailer(true);
         try {
@@ -115,28 +123,23 @@ function handlePasswordReset($con, $email, $url) {
             $mail->SMTPSecure = SMTP_ENCRYPTION;
 
             $mail->setFrom(SENDER_EMAIL, SENDER_NAME);
-            $mail->addAddress($to);
+            $mail->addAddress($email);
             $mail->isHTML(false);
-            $mail->Subject = $subject;
-            $mail->Body = $message;
+            $mail->Subject = 'Password Reset';
+            $mail->Body = "To reset your password, click the following link:\n" . $resetLink;
 
             $mail->send();
-            $resultMessage = "Password reset instructions have been sent to your email address.";
         } catch (Exception $e) {
-            $resultMessage = "Email could not be sent. Error: " . $mail->ErrorInfo;
+            // Log the underlying SMTP error for operators, but show the user a
+            // generic message — ErrorInfo can echo back user-supplied data and
+            // leak SMTP server details.
+            error_log('forgot_password mailer error: ' . $mail->ErrorInfo);
         }
-    } else {
-        $resultMessage = "Email address not found in our records. Please try again.";
     }
 
-    $stmt->close();
-    if (isset($updateStmt)) {
-        $updateStmt->close();
-    }
-    $con->close();
-
-    // Display the result message after form submission
-    echo "<p class='result-message'>$resultMessage</p>";
+    // Always respond with the same generic message regardless of whether the
+    // address exists, so the endpoint cannot be used to enumerate accounts.
+    return $genericSuccess;
 }
 ?>
 
@@ -306,9 +309,9 @@ function handlePasswordReset($con, $email, $url) {
 
             <button type="submit" class="btn btn-primary" name="reset">Reset Password</button>
         </form>
-        <?php if (isset($resultMessage)) {
-            echo "<p class='result-message'>$resultMessage</p>";
-        } ?>
+        <?php if (isset($resultMessage)) { ?>
+            <p class='result-message'><?= htmlspecialchars($resultMessage); ?></p>
+        <?php } ?>
         <br>
         <a href="index.php" class="btn btn-secondary">Go Back</a>
     </div>

@@ -25,21 +25,22 @@ if (!isset($_SESSION['username'])) {
     exit; // Exit to ensure no further code is executed
 }
 
-// Accept both POST (preferred) and GET (legacy) requests for deletion
-$requestId = $_POST['id'] ?? $_GET['id'] ?? null;
-$requestConfirm = $_POST['confirm'] ?? $_GET['confirm'] ?? null;
-
-// Validate CSRF token for POST requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
-        $_SESSION['message'] = 'CSRF token validation failed.';
-        header("Location: bc_dash.php");
-        exit();
-    }
+// State-changing actions require POST + CSRF — refuse GET outright so the
+// CSRF check cannot be sidestepped via a one-click attacker URL.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header("Location: bc_dash.php");
+    exit();
 }
 
-// Determine the action: default is 'archive', also supports 'permanent_delete' and 'restore'
-$action = $_POST['action'] ?? $_GET['action'] ?? 'archive';
+if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf_token'])) {
+    $_SESSION['message'] = 'CSRF token validation failed.';
+    header("Location: bc_dash.php");
+    exit();
+}
+
+$requestId      = $_POST['id'] ?? null;
+$requestConfirm = $_POST['confirm'] ?? null;
+$action         = $_POST['action'] ?? 'archive';
 
 // Check if both 'id' and 'confirm' parameters are set, and if 'confirm' is 'true'
 if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
@@ -53,35 +54,46 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
     $currentUserId = $_SESSION['user_id']; // Assuming user ID is stored in session
     $userRole = $_SESSION['role']; // Assuming user role is stored in session
 
-    // Fetch the cage record to check for user assignment
-    $cageQuery = "SELECT c.pi_name, cu.user_id FROM cages c LEFT JOIN cage_users cu ON c.cage_id = cu.cage_id WHERE c.cage_id = ?";
-    if ($stmt = mysqli_prepare($con, $cageQuery)) {
-        mysqli_stmt_bind_param($stmt, "s", $id);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-        $cage = mysqli_fetch_assoc($result);
-        mysqli_stmt_close($stmt);
-
-        if (!$cage) {
-            $_SESSION['message'] = 'Cage not found.';
-            header("Location: bc_dash.php");
-            exit();
-        }
-
-        $cageUsers = [];
-        do {
-            if ($cage['user_id']) {
-                $cageUsers[] = $cage['user_id'];
-            }
-        } while ($cage = mysqli_fetch_assoc($result));
-    } else {
+    // Lock the cage row for the duration of the transaction so concurrent
+    // delete/archive requests against the same cage serialize cleanly.
+    $existsStmt = mysqli_prepare($con, "SELECT pi_name FROM cages WHERE cage_id = ? FOR UPDATE");
+    if (!$existsStmt) {
+        mysqli_rollback($con);
         $_SESSION['message'] = 'Error retrieving cage data.';
         header("Location: bc_dash.php");
         exit();
     }
+    mysqli_stmt_bind_param($existsStmt, "s", $id);
+    mysqli_stmt_execute($existsStmt);
+    $existsResult = mysqli_stmt_get_result($existsStmt);
+    $cageRow = mysqli_fetch_assoc($existsResult);
+    mysqli_stmt_close($existsStmt);
+
+    if (!$cageRow) {
+        mysqli_rollback($con);
+        $_SESSION['message'] = 'Cage not found.';
+        header("Location: bc_dash.php");
+        exit();
+    }
+
+    // Separate assignment lookup (zero rows is OK — admin-only).
+    $cageUsers = [];
+    $usersStmt = mysqli_prepare($con, "SELECT user_id FROM cage_users WHERE cage_id = ?");
+    if ($usersStmt) {
+        mysqli_stmt_bind_param($usersStmt, "s", $id);
+        mysqli_stmt_execute($usersStmt);
+        $usersResult = mysqli_stmt_get_result($usersStmt);
+        while ($row = mysqli_fetch_assoc($usersResult)) {
+            if ($row['user_id']) {
+                $cageUsers[] = $row['user_id'];
+            }
+        }
+        mysqli_stmt_close($usersStmt);
+    }
 
     // Check if the user is either an admin or assigned to the cage
     if ($userRole !== 'admin' && !in_array($currentUserId, $cageUsers)) {
+        mysqli_rollback($con);
         $_SESSION['message'] = 'Access denied. Only the assigned user or an admin can perform this action.';
         header("Location: bc_dash.php");
         exit();

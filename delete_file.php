@@ -83,8 +83,13 @@ if (isset($_GET['id'])) {
             $redirect = 'bc_edit'; // Default to safe page
         }
 
+        // Defensive: strip control characters before composing the Location
+        // header. urlencode() already escapes them, but stripping leaves the
+        // redirect target clean for legitimate use too.
+        $safeCageId = preg_replace('/[\r\n\0]/', '', (string) $cage_id);
+
         // Build safe redirect URL
-        $url = $redirect . ".php?id=" . urlencode($cage_id);
+        $url = $redirect . ".php?id=" . urlencode($safeCageId);
 
         // Redirect to the validated URL
         header("Location: $url");
