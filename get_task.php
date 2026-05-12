@@ -15,7 +15,7 @@ require 'session_config.php';
 require 'dbcon.php';
 
 // Check if the user is logged in
-if (!isset($_SESSION['name'])) {
+if (!isset($_SESSION['username'])) {
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Authentication required.']);
     exit;

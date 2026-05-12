@@ -43,7 +43,13 @@ try {
         'notifications' => $notifications
     ]);
 } catch (Exception $e) {
-    // Table may not exist yet - return empty state
+    // The `notifications` table is optional in older deployments. Only swallow
+    // the "missing table" case; log everything else so real DB failures don't
+    // silently show "no notifications" forever.
+    if (stripos($e->getMessage(), "doesn't exist") === false
+        && stripos($e->getMessage(), 'unknown table') === false) {
+        error_log('get_notifications error: ' . $e->getMessage());
+    }
     echo json_encode([
         'unread_count' => 0,
         'notifications' => []

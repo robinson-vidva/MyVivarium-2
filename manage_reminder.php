@@ -12,7 +12,7 @@ ob_start();
 require 'session_config.php';
 
 // Check if the user is logged in
-if (!isset($_SESSION['name'])) {
+if (!isset($_SESSION['username'])) {
     header("Location: index.php");
     exit;
 }
@@ -28,7 +28,7 @@ require 'dbcon.php';
 // Get the current user ID and name from the session
 $currentUserId = $_SESSION['user_id'] ?? null;
 $currentUserName = $_SESSION['name'] ?? '';
-$isAdmin = $_SESSION['role'] == 'admin';
+$isAdmin = (($_SESSION['role'] ?? '') === 'admin');
 
 // Function to redirect with a message
 function redirectToPage($message)

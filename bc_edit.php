@@ -319,9 +319,25 @@ if (isset($_GET['id'])) {
 
             // Handle file upload with validation
             if (isset($_FILES['fileUpload']) && $_FILES['fileUpload']['error'] == UPLOAD_ERR_OK) {
-                // Define allowed file types and maximum size
+                // SVG is excluded — it is XML/script-capable and would yield stored XSS.
                 $allowedExtensions = ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx',
-                                      'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
+                                      'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+                $allowedMimes = [
+                    'pdf'  => ['application/pdf'],
+                    'doc'  => ['application/msword'],
+                    'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+                    'txt'  => ['text/plain'],
+                    'xls'  => ['application/vnd.ms-excel'],
+                    'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'],
+                    'ppt'  => ['application/vnd.ms-powerpoint'],
+                    'pptx' => ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip'],
+                    'jpg'  => ['image/jpeg'],
+                    'jpeg' => ['image/jpeg'],
+                    'png'  => ['image/png'],
+                    'gif'  => ['image/gif'],
+                    'bmp'  => ['image/bmp', 'image/x-ms-bmp'],
+                    'webp' => ['image/webp'],
+                ];
                 $maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
 
                 // Validate file size
@@ -331,40 +347,59 @@ if (isset($_GET['id'])) {
                     // Get and validate file extension
                     $fileExtension = strtolower(pathinfo($_FILES['fileUpload']['name'], PATHINFO_EXTENSION));
 
-                    if (!in_array($fileExtension, $allowedExtensions)) {
-                        $_SESSION['message'] .= " Invalid file type. Allowed: pdf, doc, docx, txt, xls, xlsx, ppt, pptx, jpg, jpeg, png, gif, bmp, svg, webp";
+                    if (!in_array($fileExtension, $allowedExtensions, true)) {
+                        $_SESSION['message'] .= " Invalid file type. Allowed: pdf, doc, docx, txt, xls, xlsx, ppt, pptx, jpg, jpeg, png, gif, bmp, webp";
                     } else {
-                        // Sanitize filename to prevent directory traversal
-                        $originalFileName = preg_replace("/[^a-zA-Z0-9._-]/", "_", basename($_FILES['fileUpload']['name']));
-
-                        $targetDirectory = "uploads/$cage_id/"; // Define the target directory
-
-                        // Create the cage_id specific sub-directory if it doesn't exist
-                        if (!file_exists($targetDirectory)) {
-                            if (!mkdir($targetDirectory, 0777, true)) {
-                                $_SESSION['message'] .= " Failed to create directory.";
-                                exit;
+                        // Server-side MIME validation (don't trust client filename).
+                        $detectedMime = '';
+                        if (function_exists('finfo_open')) {
+                            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                            if ($finfo) {
+                                $detectedMime = (string) finfo_file($finfo, $_FILES['fileUpload']['tmp_name']);
+                                finfo_close($finfo);
                             }
                         }
-
-                        $targetFilePath = $targetDirectory . $originalFileName;
-
-                        // Check if file already exists
-                        if (!file_exists($targetFilePath)) {
-                            if (move_uploaded_file($_FILES['fileUpload']['tmp_name'], $targetFilePath)) {
-                                // Insert file info into the database
-                                $insert = $con->prepare("INSERT INTO files (file_name, file_path, cage_id) VALUES (?, ?, ?)");
-                                $insert->bind_param("sss", $originalFileName, $targetFilePath, $cage_id);
-                                if ($insert->execute()) {
-                                    $_SESSION['message'] .= " File uploaded successfully.";
-                                } else {
-                                    $_SESSION['message'] .= " File upload failed, please try again.";
-                                }
-                            } else {
-                                $_SESSION['message'] .= " Sorry, there was an error uploading your file.";
-                            }
+                        if ($detectedMime === '' || !in_array($detectedMime, $allowedMimes[$fileExtension] ?? [], true)) {
+                            $_SESSION['message'] .= " File content does not match its extension.";
                         } else {
-                            $_SESSION['message'] .= " Sorry, file already exists.";
+                            // Sanitize filename to prevent directory traversal
+                            $originalFileName = preg_replace("/[^a-zA-Z0-9._-]/", "_", basename($_FILES['fileUpload']['name']));
+
+                            // Validate cage_id as a safe directory component (path-traversal guard).
+                            $safeCageId = preg_replace('/[^A-Za-z0-9_\-]/', '', (string) $cage_id);
+                            if ($safeCageId === '' || $safeCageId !== $cage_id) {
+                                $_SESSION['message'] .= " Invalid cage ID for file upload.";
+                            } else {
+                                $targetDirectory = "uploads/$safeCageId/"; // Define the target directory
+
+                                // Create the cage_id specific sub-directory if it doesn't exist
+                                if (!file_exists($targetDirectory)) {
+                                    if (!mkdir($targetDirectory, 0755, true)) {
+                                        $_SESSION['message'] .= " Failed to create directory.";
+                                        exit;
+                                    }
+                                }
+
+                                $targetFilePath = $targetDirectory . $originalFileName;
+
+                                // Check if file already exists
+                                if (!file_exists($targetFilePath)) {
+                                    if (move_uploaded_file($_FILES['fileUpload']['tmp_name'], $targetFilePath)) {
+                                        // Insert file info into the database
+                                        $insert = $con->prepare("INSERT INTO files (file_name, file_path, cage_id) VALUES (?, ?, ?)");
+                                        $insert->bind_param("sss", $originalFileName, $targetFilePath, $cage_id);
+                                        if ($insert->execute()) {
+                                            $_SESSION['message'] .= " File uploaded successfully.";
+                                        } else {
+                                            $_SESSION['message'] .= " File upload failed, please try again.";
+                                        }
+                                    } else {
+                                        $_SESSION['message'] .= " Sorry, there was an error uploading your file.";
+                                    }
+                                } else {
+                                    $_SESSION['message'] .= " Sorry, file already exists.";
+                                }
+                            }
                         }
                     }
                 }

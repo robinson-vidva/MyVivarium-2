@@ -20,6 +20,16 @@ if (!isset($_SESSION['username'])) {
     exit;
 }
 
+// CSRF check
+if ($_SERVER['REQUEST_METHOD'] !== 'POST'
+    || !isset($_POST['csrf_token'])
+    || !isset($_SESSION['csrf_token'])
+    || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token.']);
+    exit;
+}
+
 // Handle form submission
 $response = ['success' => false, 'message' => 'Invalid request.'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['note_text'])) {

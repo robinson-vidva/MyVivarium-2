@@ -190,6 +190,17 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
     // first. So we proceed directly here.
 
     $con->query("SET FOREIGN_KEY_CHECKS = 0");
+
+    // Back up the seed admin row in PHP memory before the destructive step.
+    // If we're not running on InnoDB (or the transaction rolls back partially)
+    // we want to be able to put it back rather than losing administrative
+    // access permanently.
+    $seedAdminBackup = null;
+    if ($seedRes = $con->query("SELECT * FROM users WHERE id = 1 LIMIT 1")) {
+        $seedAdminBackup = $seedRes->fetch_assoc() ?: null;
+        $seedRes->free();
+    }
+
     $con->begin_transaction();
     $counts = [];
     try {
@@ -415,6 +426,27 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
     } catch (Exception $e) {
         $con->rollback();
         $con->query("SET FOREIGN_KEY_CHECKS = 1");
+
+        // If the seed admin was deleted before failure and the engine didn't
+        // roll the DELETE back (e.g. non-InnoDB tables), restore it from the
+        // in-memory backup so the operator isn't locked out.
+        if ($seedAdminBackup !== null) {
+            $checkSeed = $con->query("SELECT 1 FROM users WHERE id = 1 LIMIT 1");
+            if ($checkSeed && $checkSeed->num_rows === 0) {
+                $cols = array_keys($seedAdminBackup);
+                $colList = '`' . implode('`,`', $cols) . '`';
+                $marks = implode(',', array_fill(0, count($cols), '?'));
+                $restoreStmt = $con->prepare("INSERT INTO users ($colList) VALUES ($marks)");
+                if ($restoreStmt) {
+                    $types = str_repeat('s', count($cols));
+                    $vals  = array_values($seedAdminBackup);
+                    $restoreStmt->bind_param($types, ...$vals);
+                    $restoreStmt->execute();
+                    $restoreStmt->close();
+                }
+            }
+        }
+
         $errors[] = 'Import failed and was rolled back: ' . $e->getMessage();
         return null;
     }

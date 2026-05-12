@@ -71,6 +71,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_lab'])) {
 
     // Update or insert new data
     foreach ($inputData as $name => $value) {
+        // The Turnstile secret is a credential — only overwrite it when the
+        // admin actually typed a new value. An empty submitted field means
+        // "leave it alone" so we never have to round-trip the secret to the
+        // browser in order to preserve it on form submit.
+        if ($name === 'cf-turnstile-secretKey' && $value === '') {
+            continue;
+        }
+
         $checkQuery = "SELECT COUNT(*) as count FROM settings WHERE name = ?";
         $checkStmt = $con->prepare($checkQuery);
         $checkStmt->bind_param("s", $name);
@@ -312,7 +320,8 @@ require 'header.php';
                 </div>
                 <div class="form-group mb-0">
                     <label for="cf-turnstile-secretKey">Cloudflare Turnstile Secret Key</label>
-                    <input type="password" class="form-control" id="cf-turnstile-secretKey" name="cf-turnstile-secretKey" value="<?php echo htmlspecialchars($labData['cf-turnstile-secretKey']); ?>">
+                    <input type="password" class="form-control" id="cf-turnstile-secretKey" name="cf-turnstile-secretKey" value="" autocomplete="new-password" placeholder="<?php echo !empty($labData['cf-turnstile-secretKey']) ? 'Saved — leave blank to keep' : 'Not set'; ?>">
+                    <small class="form-text text-muted">Leave blank to keep the existing secret. Enter a new value to replace it.</small>
                 </div>
             </div>
 

@@ -16,11 +16,13 @@ if (php_sapi_name() !== 'cli') {
 
 require 'dbcon.php';
 
-// Fetch the timezone from the settings table
+// Fetch the timezone from the settings table. Guard against $timezoneResult
+// being `false` (query error) — mysqli_fetch_assoc(false) raises a TypeError
+// under PHP 8 and silently kills the cron job otherwise.
 $timezoneQuery = "SELECT value FROM settings WHERE name = 'timezone'";
 $timezoneResult = mysqli_query($con, $timezoneQuery);
-$timezoneRow = mysqli_fetch_assoc($timezoneResult);
-$timezone = $timezoneRow['value'] ?? 'America/New_York';
+$timezoneRow = $timezoneResult ? mysqli_fetch_assoc($timezoneResult) : null;
+$timezone = ($timezoneRow['value'] ?? null) ?: 'America/New_York';
 
 // Set the default timezone
 date_default_timezone_set($timezone);

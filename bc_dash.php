@@ -23,6 +23,11 @@ if (!isset($_SESSION['username'])) {
     exit; // Exit to ensure no further code is executed
 }
 
+// CSRF token for state-changing requests submitted from this page (archive/restore/delete).
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Include the header file
 require 'header.php';
 ?>
@@ -54,29 +59,43 @@ require 'header.php';
           return new bootstrap.Tooltip(tooltipTriggerEl)
         })
 
+        // Submit a state-changing action to bc_drop.php as a POST with the CSRF token.
+        var BC_DROP_CSRF = <?= json_encode($_SESSION['csrf_token']); ?>;
+        function postToDrop(id, action) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'bc_drop.php';
+            var fields = { id: id, action: action, confirm: 'true', csrf_token: BC_DROP_CSRF };
+            for (var k in fields) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = k;
+                input.value = fields[k];
+                form.appendChild(input);
+            }
+            document.body.appendChild(form);
+            form.submit();
+        }
+
         // Confirm archive function with a dialog
         function confirmDeletion(id) {
-            var confirmAction = confirm("Are you sure you want to archive cage '" + id + "'?");
-            if (confirmAction) {
-                window.location.href = "bc_drop.php?id=" + id + "&action=archive&confirm=true";
+            if (confirm("Are you sure you want to archive cage '" + id + "'?")) {
+                postToDrop(id, 'archive');
             }
         }
 
         // Confirm restore function
         function confirmRestore(id) {
-            var confirmAction = confirm("Restore cage '" + id + "' back to active?");
-            if (confirmAction) {
-                window.location.href = "bc_drop.php?id=" + id + "&action=restore&confirm=true";
+            if (confirm("Restore cage '" + id + "' back to active?")) {
+                postToDrop(id, 'restore');
             }
         }
 
         // Confirm permanent delete function
         function confirmPermanentDelete(id) {
-            var confirmAction = confirm("PERMANENTLY delete cage '" + id + "' and ALL related data?\n\nThis action CANNOT be undone.");
-            if (confirmAction) {
-                var doubleConfirm = confirm("Are you absolutely sure? This will permanently remove all data for cage '" + id + "'.");
-                if (doubleConfirm) {
-                    window.location.href = "bc_drop.php?id=" + id + "&action=permanent_delete&confirm=true";
+            if (confirm("PERMANENTLY delete cage '" + id + "' and ALL related data?\n\nThis action CANNOT be undone.")) {
+                if (confirm("Are you absolutely sure? This will permanently remove all data for cage '" + id + "'.")) {
+                    postToDrop(id, 'permanent_delete');
                 }
             }
         }

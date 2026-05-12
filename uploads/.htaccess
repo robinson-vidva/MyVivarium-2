@@ -1,0 +1,25 @@
+# Disable script execution under the uploads directory.
+# User-supplied files must never be parsed as PHP, CGI, Perl, etc., even if
+# an attacker manages to upload a file with a script extension or a
+# double-extension that confuses the server's content-type handling.
+
+# Apache 2.4: turn off all handlers and disable PHP outright.
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .pht .phar .cgi .pl .py .jsp .asp .aspx .sh
+    RemoveType .php .phtml .php3 .php4 .php5 .php7 .pht .phar .cgi .pl .py .jsp .asp .aspx .sh
+    AddType text/plain .php .phtml .php3 .php4 .php5 .php7 .pht .phar .cgi .pl .py .jsp .asp .aspx .sh
+</IfModule>
+
+# Block direct requests for script files inside this tree even if a
+# handler is added back by a future config change.
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|pht|phar|cgi|pl|py|jsp|asp|aspx|sh)$">
+    Require all denied
+</FilesMatch>
+
+Options -ExecCGI -Indexes
