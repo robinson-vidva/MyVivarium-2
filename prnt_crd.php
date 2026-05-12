@@ -88,7 +88,14 @@ foreach ($ids as $id) {
                        c.quantity AS qty, c.room, c.rack,
                        (SELECT MIN(mi.dob) FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS dob,
                        (SELECT GROUP_CONCAT(DISTINCT mi.sex SEPARATOR ', ') FROM mice mi WHERE mi.current_cage_id = c.cage_id AND mi.status = 'alive') AS sex,
-                       NULL AS parent_cg,
+                       -- v2: parent_cg is per-mouse now (mice.source_cage_label). Aggregate
+                       -- distinct labels from live mice for the printed card.
+                       (SELECT GROUP_CONCAT(DISTINCT mi.source_cage_label SEPARATOR ', ')
+                          FROM mice mi
+                         WHERE mi.current_cage_id = c.cage_id
+                           AND mi.status = 'alive'
+                           AND mi.source_cage_label IS NOT NULL
+                           AND mi.source_cage_label != '') AS parent_cg,
                        s.str_name
                 FROM cages c
                 LEFT JOIN users pi  ON c.pi_name = pi.id
