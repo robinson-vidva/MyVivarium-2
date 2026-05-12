@@ -90,8 +90,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                    source_cage_label, status, notes, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'alive', ?, ?)
             ");
+            // 14 placeholders / 14 variables: 13 strings + created_by (int).
             $insert->bind_param(
-                "ssssssssssssss" . "i",
+                "sssssssssssssi",
                 $mouse_id, $sex, $dob, $cage_id, $strain, $genotype, $ear_code,
                 $sire_id, $dam_id, $sire_ext, $dam_ext,
                 $source_cage, $notes, $created_by
