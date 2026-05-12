@@ -219,6 +219,13 @@ if (isset($_GET['id'])) {
 
 function getUserDetailsByIds($con, $userIds)
 {
+    // Bail out early on an empty cage_users list — otherwise the `IN ()`
+    // clause and the zero-length bind_param both throw fatals. v2 cages
+    // can legitimately have no users (e.g. one created via the inline
+    // "+ Add new cage" modal from mouse_addn).
+    if (empty($userIds)) {
+        return [];
+    }
     $placeholders = implode(',', array_fill(0, count($userIds), '?'));
     $query = "SELECT id, initials, name FROM users WHERE id IN ($placeholders)";
     $stmt = $con->prepare($query);

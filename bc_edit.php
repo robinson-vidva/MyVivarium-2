@@ -441,6 +441,10 @@ if (isset($_GET['id'])) {
 
 function getUserDetailsByIds($con, $userIds)
 {
+    // Empty input → invalid SQL + zero-length bind_param fatal. Guard.
+    if (empty($userIds)) {
+        return [];
+    }
     $placeholders = implode(',', array_fill(0, count($userIds), '?'));
     $query = "SELECT id, initials, name FROM users WHERE id IN ($placeholders)";
     $stmt = $con->prepare($query);

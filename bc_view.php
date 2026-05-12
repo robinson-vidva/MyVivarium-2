@@ -144,6 +144,11 @@ if (isset($_GET['id'])) {
 
 function getUserDetailsByIds($con, $userIds)
 {
+    // Empty cage_users → `IN ()` is invalid SQL and zero-length
+    // bind_param throws a fatal. Bail out for empty input.
+    if (empty($userIds)) {
+        return [];
+    }
     $placeholders = implode(',', array_fill(0, count($userIds), '?'));
     $query = "SELECT id, initials, name FROM users WHERE id IN ($placeholders)";
     $stmt = $con->prepare($query);
