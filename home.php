@@ -109,8 +109,14 @@ require 'header.php';
         <!-- Display session messages if any -->
         <?php include('message.php'); ?>
 
-        <!-- Security warning for default admin account -->
-        <?php if ($_SESSION['username'] === 'admin@myvivarium.online' && $_SESSION['role'] === 'admin'): ?>
+        <!--
+            Default-admin warning.
+            In production: red, urgent — the default admin is a known credential.
+            In demo mode: skip it. The site already shows a global "DEMO" banner
+            and publishes the admin credentials on the login page, so a separate
+            "create a new admin" alarm is just noise.
+        -->
+        <?php if ($_SESSION['username'] === 'admin@myvivarium.online' && $_SESSION['role'] === 'admin' && ($demo ?? '') !== 'yes'): ?>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong><i class="fas fa-exclamation-triangle"></i> Security Warning:</strong> You are using the default admin account.
             For security reasons, please create a new admin user and delete this default account immediately.
