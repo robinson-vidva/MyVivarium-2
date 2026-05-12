@@ -509,14 +509,15 @@ require 'header.php';
                 </div>
             </div>
 
-            <!-- Information Completeness Indicator -->
-            <div id="completeness-alert" class="alert" style="display: none; margin-bottom: 20px;">
-                <strong>Information Completeness:</strong> <span id="completeness-percentage">0%</span>
-                <div class="progress mt-2" style="height: 20px;">
-                    <div id="completeness-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                </div>
-                <div id="missing-fields" class="mt-2"></div>
-            </div>
+            <!--
+                v1 had a per-cage "Information Completeness" widget that
+                graded each cage on dob/sex/strain/parent_cg as if those
+                were cage-level. In v2 those facts live on the mouse
+                entity, so this widget's premise is gone — removed. Per-
+                mouse completeness can be reintroduced on mouse_view if
+                we want something similar in v2.
+            -->
+
 
             <table class="details-table">
                 <tr>
@@ -537,10 +538,14 @@ require 'header.php';
                 </tr>
                 <tr>
                     <th>Strain</th>
-                    <td id="strain-data" data-value="<?= !empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA' ? '1' : ''; ?>">
-                        <a href="javascript:void(0);" onclick="viewStrainDetails(<?= htmlspecialchars(json_encode($holdingcage['str_id'] ?? 'NA')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_name'] ?? 'Unknown Name')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_aka'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_url'] ?? '#')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_rrid'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_notes'] ?? '')) ?>)">
-                            <?= htmlspecialchars($holdingcage['str_id'] ?? 'NA'); ?> | <?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>
-                        </a>
+                    <td>
+                        <?php if (!empty($holdingcage['str_id']) && $holdingcage['str_id'] !== 'NA'): ?>
+                            <a href="javascript:void(0);" onclick="viewStrainDetails(<?= htmlspecialchars(json_encode($holdingcage['str_id'])) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_name'] ?? 'Unknown Name')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_aka'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_url'] ?? '#')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_rrid'] ?? '')) ?>, <?= htmlspecialchars(json_encode($holdingcage['str_notes'] ?? '')) ?>)">
+                                <?= htmlspecialchars($holdingcage['str_id']); ?> | <?= htmlspecialchars($holdingcage['str_name'] ?? 'Unknown Name'); ?>
+                            </a>
+                        <?php else: ?>
+                            <span class="text-muted">—</span>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <tr>
@@ -819,103 +824,8 @@ require 'header.php';
     </script>
 
 
-    <script>
-        // Information Completeness Calculation
-        document.addEventListener('DOMContentLoaded', function() {
-            const fields = {
-                critical: ['dob', 'sex'],
-                important: ['pi', 'strain', 'iacuc', 'user'],
-                useful: ['parent']
-            };
-
-            let totalFields = 0;
-            let filledFields = 0;
-            let missingCritical = [];
-            let missingImportant = [];
-            let missingUseful = [];
-
-            // Count critical fields
-            fields.critical.forEach(fieldId => {
-                totalFields++;
-                const field = document.getElementById(fieldId + '-data');
-                if (field && field.dataset.value) {
-                    filledFields++;
-                } else {
-                    const label = fieldId.charAt(0).toUpperCase() + fieldId.slice(1);
-                    missingCritical.push(label);
-                }
-            });
-
-            // Count important fields
-            fields.important.forEach(fieldId => {
-                totalFields++;
-                const field = document.getElementById(fieldId + '-data');
-                if (field && field.dataset.value) {
-                    filledFields++;
-                } else {
-                    const label = fieldId === 'pi' ? 'PI Name' : (fieldId.charAt(0).toUpperCase() + fieldId.slice(1));
-                    missingImportant.push(label);
-                }
-            });
-
-            // Count useful fields
-            fields.useful.forEach(fieldId => {
-                totalFields++;
-                const field = document.getElementById(fieldId + '-data');
-                if (field && field.dataset.value) {
-                    filledFields++;
-                } else {
-                    const label = 'Parent Cage';
-                    missingUseful.push(label);
-                }
-            });
-
-            const percentage = Math.round((filledFields / totalFields) * 100);
-
-            // Only show alert if not 100% complete
-            if (percentage < 100) {
-                const alert = document.getElementById('completeness-alert');
-                const bar = document.getElementById('completeness-bar');
-                const percentageText = document.getElementById('completeness-percentage');
-                const missingFieldsDiv = document.getElementById('missing-fields');
-
-                // Update percentage
-                bar.style.width = percentage + '%';
-                bar.setAttribute('aria-valuenow', percentage);
-                bar.textContent = percentage + '%';
-                percentageText.textContent = percentage + '%';
-
-                // Change bar and alert color based on completion
-                bar.classList.remove('bg-danger', 'bg-warning', 'bg-success');
-                alert.classList.remove('alert-danger', 'alert-warning', 'alert-success');
-                if (percentage < 50) {
-                    bar.classList.add('bg-danger');
-                    alert.classList.add('alert-danger');
-                } else if (percentage < 80) {
-                    bar.classList.add('bg-warning');
-                    alert.classList.add('alert-warning');
-                } else {
-                    bar.classList.add('bg-success');
-                    alert.classList.add('alert-success');
-                }
-
-                // Show missing fields
-                let missingText = '';
-                if (missingCritical.length > 0) {
-                    missingText += '<strong class="text-danger">Critical fields missing:</strong> ' + missingCritical.join(', ') + '<br>';
-                }
-                if (missingImportant.length > 0) {
-                    missingText += '<strong class="text-warning">Important fields missing:</strong> ' + missingImportant.join(', ') + '<br>';
-                }
-                if (missingUseful.length > 0) {
-                    missingText += '<strong class="text-muted">Useful fields missing:</strong> ' + missingUseful.join(', ');
-                }
-
-                missingFieldsDiv.innerHTML = missingText;
-                alert.style.display = 'block';
-            }
-        });
-    </script>
+    <!-- Completeness widget script removed with its HTML (v1 cage-level
+         grading no longer applies to v2's mouse-level model). -->
 </body>
 
 </html>
