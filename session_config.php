@@ -39,7 +39,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => 1800,           // Cookie expires after 30 minutes
         'path'     => '/',
-        'secure'   => true,           // Only send cookie over HTTPS (set to false for HTTP dev)
+        'secure'   => filter_var(getenv('SESSION_COOKIE_SECURE') ?: 'true', FILTER_VALIDATE_BOOLEAN),           // Only send cookie over HTTPS (set to false for HTTP dev)
         'httponly'  => true,           // Prevent JavaScript access to session cookie (XSS protection)
         'samesite'  => 'Strict'       // Prevent CSRF attacks
     ]);
