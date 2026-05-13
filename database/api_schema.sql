@@ -69,6 +69,47 @@ ALTER TABLE `maintenance`
   ADD COLUMN `deleted_at` datetime     DEFAULT NULL,
   ADD COLUMN `updated_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
+-- AI chatbot conversation persistence (part three).
+CREATE TABLE IF NOT EXISTS `ai_conversations` (
+  `id` char(36) NOT NULL,
+  `user_id` int NOT NULL,
+  `title` varchar(200) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_conv_user` (`user_id`),
+  KEY `idx_ai_conv_updated` (`updated_at`),
+  CONSTRAINT `fk_ai_conv_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `ai_messages` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `conversation_id` char(36) NOT NULL,
+  `role` enum('user','assistant','tool','system_event') NOT NULL,
+  `content` text,
+  `tool_call_json` text,
+  `tool_result_json` text,
+  `pending_op_id` varchar(36) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_msg_conv_created` (`conversation_id`, `created_at`),
+  CONSTRAINT `fk_ai_msg_conv` FOREIGN KEY (`conversation_id`) REFERENCES `ai_conversations` (`id`) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `ai_usage_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` int DEFAULT NULL,
+  `conversation_id` char(36) DEFAULT NULL,
+  `prompt_tokens` int NOT NULL DEFAULT 0,
+  `completion_tokens` int NOT NULL DEFAULT 0,
+  `model` varchar(64) NOT NULL DEFAULT '',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_usage_user_created` (`user_id`, `created_at`),
+  KEY `idx_ai_usage_conv` (`conversation_id`),
+  CONSTRAINT `fk_ai_usage_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+);
+
 -- AI Configuration storage for the admin chatbot settings (Groq key, model, prompt, toggle).
 -- Values are stored encrypted with AES-256-CBC; key lives in AI_SETTINGS_ENCRYPTION_KEY.
 CREATE TABLE IF NOT EXISTS `ai_settings` (
