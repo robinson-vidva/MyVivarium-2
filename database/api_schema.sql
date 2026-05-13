@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS `ai_usage_log` (
   `conversation_id` char(36) DEFAULT NULL,
   `prompt_tokens` int NOT NULL DEFAULT 0,
   `completion_tokens` int NOT NULL DEFAULT 0,
+  `estimated_prompt_tokens` int NOT NULL DEFAULT 0,
   `model` varchar(64) NOT NULL DEFAULT '',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
