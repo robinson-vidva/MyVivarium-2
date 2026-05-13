@@ -13,7 +13,13 @@
 
 require 'dbcon.php';  // Include database connection file
 require 'config.php';  // Include configuration file
-require 'vendor/autoload.php'; // Load PHPMailer library
+// PHPMailer is required for this script (it's the actual mail dispatcher).
+// If vendor/ is missing, exit cleanly so cron doesn't spew a fatal.
+if (!file_exists(__DIR__ . '/vendor/autoload.php')) {
+    fwrite(STDERR, "send_email.php: vendor/autoload.php missing — run `composer install` to enable email delivery.\n");
+    exit(1);
+}
+require_once __DIR__ . '/vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;

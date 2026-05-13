@@ -14,7 +14,9 @@ use PHPMailer\PHPMailer\Exception;
 
 require 'dbcon.php';  // Include database connection file
 require 'config.php';  // Include configuration file
-require 'vendor/autoload.php';  // Include PHPMailer autoload file
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
 
 // Query to fetch the lab name, URL, and Turnstile keys from the settings table
 $labQuery = "SELECT name, value FROM settings WHERE name IN ('lab_name', 'url', 'cf-turnstile-sitekey', 'cf-turnstile-secretKey')";

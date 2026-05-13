@@ -3,26 +3,22 @@
 /**
  * SMTP Configuration Script
  *
- * This script loads environment variables from a .env file using the Dotenv library and defines constants
- * for SMTP server settings and sender information. These constants are used for configuring the SMTP
- * server for sending emails.
- *
+ * Defines SMTP_* / SENDER_* constants from .env. Uses the built-in env
+ * parser in includes/env.php so it works whether or not Composer has
+ * been installed.
  */
 
-// Load Composer's autoload file
-require __DIR__ . '/vendor/autoload.php';
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
 
-use Dotenv\Dotenv;
+require_once __DIR__ . '/includes/env.php';
+env_load_into_superglobals();
 
-// Load environment variables from the .env file
-$dotenv = Dotenv::createImmutable(__DIR__);
-$dotenv->load();
-
-// Define constants for SMTP server settings and sender information
-define('SMTP_HOST', $_ENV['SMTP_HOST']); // SMTP server hostname
-define('SMTP_PORT', $_ENV['SMTP_PORT']); // SMTP server port
-define('SMTP_USERNAME', $_ENV['SMTP_USERNAME']); // SMTP server username
-define('SMTP_PASSWORD', $_ENV['SMTP_PASSWORD']); // SMTP server password
-define('SMTP_ENCRYPTION', $_ENV['SMTP_ENCRYPTION']); // SMTP server encryption type (tls or ssl)
-define('SENDER_EMAIL', $_ENV['SENDER_EMAIL']); // Sender's email address
-define('SENDER_NAME', $_ENV['SENDER_NAME']); // Sender's name
+if (!defined('SMTP_HOST'))       define('SMTP_HOST',       env_get('SMTP_HOST')       ?? '');
+if (!defined('SMTP_PORT'))       define('SMTP_PORT',       env_get('SMTP_PORT')       ?? '');
+if (!defined('SMTP_USERNAME'))   define('SMTP_USERNAME',   env_get('SMTP_USERNAME')   ?? '');
+if (!defined('SMTP_PASSWORD'))   define('SMTP_PASSWORD',   env_get('SMTP_PASSWORD')   ?? '');
+if (!defined('SMTP_ENCRYPTION')) define('SMTP_ENCRYPTION', env_get('SMTP_ENCRYPTION') ?? '');
+if (!defined('SENDER_EMAIL'))    define('SENDER_EMAIL',    env_get('SENDER_EMAIL')    ?? '');
+if (!defined('SENDER_NAME'))     define('SENDER_NAME',     env_get('SENDER_NAME')     ?? '');
