@@ -1171,3 +1171,12 @@ if (isset($settings['r2_pres'])) {
     </script>
 
 <!-- Note: Document structure (html/head/body) is managed by the including page -->
+
+<?php
+// Inject the chatbot widget here as well as in footer.php so pages that
+// include header.php but not footer.php still get the widget. The widget
+// has its own idempotency guard, so including it twice is a no-op.
+if (file_exists(__DIR__ . '/includes/chatbot_widget.php')) {
+    include __DIR__ . '/includes/chatbot_widget.php';
+}
+?>

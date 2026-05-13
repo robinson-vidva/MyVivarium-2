@@ -2,30 +2,55 @@
 /**
  * Chatbot floating widget injector.
  *
- * Include this from footer.php (or any authenticated page). Renders the
- * floating chat button + panel only when:
+ * Include this from header.php and/or footer.php (or any authenticated page).
+ * Renders the floating chat button + panel only when:
  *   1. The user has an authenticated PHP session (user_id set).
  *   2. ai_settings.chatbot_enabled === '1'.
  *   3. ai_settings.groq_api_key is non-empty.
+ *
+ * Idempotent: a $GLOBALS flag prevents double-render when included from both
+ * header.php and footer.php on the same request.
+ *
+ * Debug: when ?chatbot_debug=1 is on the URL AND the session user is admin,
+ * an HTML comment is emitted with the three gating booleans so an admin can
+ * see at a glance why the widget is or isn't rendering on any page.
  *
  * Self-contained: emits one <style> block, one widget markup block, and one
  * <script> block. No bundler, no frameworks. Bootstrap 5 is already loaded
  * by header.php; we don't rely on it.
  */
 
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) return;
+// Idempotency guard — safe to include from both header.php and footer.php.
+if (!empty($GLOBALS['__chatbot_widget_rendered'])) return;
 
-require_once __DIR__ . '/ai_settings.php';
-
-$__chat_show = false;
-try {
-    $__chat_enabled = ai_settings_get('chatbot_enabled') === '1';
-    $__chat_groq    = ai_settings_get('groq_api_key');
-    $__chat_show    = $__chat_enabled && !empty($__chat_groq);
-} catch (Throwable $e) {
-    $__chat_show = false;
+$__chat_authed  = isset($_SESSION['user_id']) && isset($_SESSION['username']);
+$__chat_enabled = false;
+$__chat_key_set = false;
+if ($__chat_authed) {
+    require_once __DIR__ . '/ai_settings.php';
+    try {
+        $__chat_enabled = ai_settings_get('chatbot_enabled') === '1';
+        $__chat_groq    = ai_settings_get('groq_api_key');
+        $__chat_key_set = is_string($__chat_groq) && $__chat_groq !== '';
+    } catch (Throwable $e) {
+        // Swallow — debug comment below still reports authed/enabled/key_set.
+    }
 }
+$__chat_show = $__chat_authed && $__chat_enabled && $__chat_key_set;
+
+// Admin-only debug comment.
+if (isset($_GET['chatbot_debug']) && $_GET['chatbot_debug'] === '1'
+    && isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+    echo "\n<!-- chatbot_widget: authed=" . ($__chat_authed ? '1' : '0')
+       . ", enabled=" . ($__chat_enabled ? '1' : '0')
+       . ", key_set=" . ($__chat_key_set ? '1' : '0')
+       . ", will_render=" . ($__chat_show ? '1' : '0') . " -->\n";
+}
+
 if (!$__chat_show) return;
+
+// Mark as rendered BEFORE emitting markup so a re-include in footer.php is a no-op.
+$GLOBALS['__chatbot_widget_rendered'] = true;
 ?>
 <style>
   /* Floating chat widget — bottom-right, above everything else. */
