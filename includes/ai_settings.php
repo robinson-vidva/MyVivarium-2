@@ -26,14 +26,89 @@ class AiSettingsException extends RuntimeException {}
 const AI_SETTINGS_ENV_VAR = 'AI_SETTINGS_ENCRYPTION_KEY';
 
 /**
+ * Read an environment variable with a fallback for shared hosts that disable
+ * getenv(). Order of lookup:
+ *   1. Per-request override set by env_set_runtime() — lets a value written
+ *      mid-request be visible immediately, even when putenv() is disabled.
+ *   2. $_ENV / $_SERVER superglobals.
+ *   3. getenv(), if the function is available.
+ *   4. A parsed copy of .env at the project root.
+ *
+ * Returns null if the variable is not set or is empty.
+ */
+function env_get(string $name): ?string
+{
+    static $envValues = null;
+
+    if (isset($GLOBALS['__env_runtime_overrides'][$name])
+        && $GLOBALS['__env_runtime_overrides'][$name] !== '') {
+        return (string)$GLOBALS['__env_runtime_overrides'][$name];
+    }
+    if (isset($_ENV[$name]) && $_ENV[$name] !== '') {
+        return (string)$_ENV[$name];
+    }
+    if (isset($_SERVER[$name]) && $_SERVER[$name] !== '') {
+        return (string)$_SERVER[$name];
+    }
+    if (function_exists('getenv')) {
+        $v = @getenv($name);
+        if ($v !== false && $v !== '') {
+            return (string)$v;
+        }
+    }
+    if ($envValues === null) {
+        $envValues = [];
+        $envPath = realpath(__DIR__ . '/..') . '/.env';
+        if (is_string($envPath) && is_file($envPath) && is_readable($envPath)) {
+            $lines = @file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    $line = ltrim($line);
+                    if ($line === '' || $line[0] === '#') continue;
+                    $eq = strpos($line, '=');
+                    if ($eq === false) continue;
+                    $k = trim(substr($line, 0, $eq));
+                    $v = trim(substr($line, $eq + 1));
+                    if (strlen($v) >= 2
+                        && (($v[0] === '"' && substr($v, -1) === '"')
+                         || ($v[0] === "'" && substr($v, -1) === "'"))) {
+                        $v = substr($v, 1, -1);
+                    }
+                    $envValues[$k] = $v;
+                }
+            }
+        }
+    }
+    if (isset($envValues[$name]) && $envValues[$name] !== '') {
+        return $envValues[$name];
+    }
+    return null;
+}
+
+/**
+ * Make a value visible to env_get() for the rest of this request. Calls
+ * putenv() when available; on shared hosts where putenv() is disabled the
+ * value is still recorded in $_ENV and a runtime override map so env_get()
+ * returns it. The authoritative store remains the .env file on disk.
+ */
+function env_set_runtime(string $name, string $value): void
+{
+    $GLOBALS['__env_runtime_overrides'][$name] = $value;
+    $_ENV[$name] = $value;
+    if (function_exists('putenv')) {
+        @putenv($name . '=' . $value);
+    }
+}
+
+/**
  * Returns the raw hex-encoded encryption key from .env. Throws if the key
  * is absent — callers must ensure the key is provisioned (e.g. via
  * ai_settings_ensure_key()) before encrypting.
  */
 function ai_settings_get_key(): string
 {
-    $k = $_ENV[AI_SETTINGS_ENV_VAR] ?? getenv(AI_SETTINGS_ENV_VAR);
-    if ($k === false || $k === null || $k === '') {
+    $k = env_get(AI_SETTINGS_ENV_VAR);
+    if ($k === null || $k === '') {
         throw new AiSettingsException(
             'AI_SETTINGS_ENCRYPTION_KEY is missing from .env. ' .
             'Visit AI Configuration as an admin to auto-generate one, or add it manually.'
@@ -58,7 +133,7 @@ function ai_settings_get_key(): string
  */
 function ai_settings_ensure_key(): bool
 {
-    $existing = $_ENV[AI_SETTINGS_ENV_VAR] ?? getenv(AI_SETTINGS_ENV_VAR);
+    $existing = env_get(AI_SETTINGS_ENV_VAR);
     if (is_string($existing) && $existing !== '') {
         return false;
     }
@@ -123,9 +198,10 @@ function ai_settings_ensure_key(): bool
     }
 
     // Make the new value visible to the running process so the very same
-    // request can encrypt with it.
-    $_ENV[AI_SETTINGS_ENV_VAR] = $newKey;
-    putenv(AI_SETTINGS_ENV_VAR . '=' . $newKey);
+    // request can encrypt with it. env_set_runtime() handles hosts that
+    // disable putenv() by populating an in-process override map; .env on
+    // disk remains the source of truth for future requests.
+    env_set_runtime(AI_SETTINGS_ENV_VAR, $newKey);
 
     return true;
 }
