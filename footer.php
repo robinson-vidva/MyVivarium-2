@@ -52,3 +52,12 @@
         }
         ?>. All rights reserved.</p>
 </footer>
+
+<?php
+// Inject the chatbot widget on every authenticated page that includes this
+// footer. The widget hides itself when chatbot_enabled is off, no Groq key
+// is configured, or the user is unauthenticated.
+if (file_exists(__DIR__ . '/includes/chatbot_widget.php')) {
+    include __DIR__ . '/includes/chatbot_widget.php';
+}
+?>
