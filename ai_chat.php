@@ -26,6 +26,7 @@ require 'session_config.php';
 require 'dbcon.php';
 require_once __DIR__ . '/log_activity.php';
 require_once __DIR__ . '/includes/ai_settings.php';
+require_once __DIR__ . '/includes/llm_provider.php';
 require_once __DIR__ . '/includes/chatbot_session.php';
 require_once __DIR__ . '/includes/chatbot_helpers.php';
 require_once __DIR__ . '/services/helpers.php';
@@ -92,16 +93,17 @@ if (!$isDecisionTurn) {
 }
 
 // -----------------------------------------------------------------------------
-// Admin gate: chatbot must be enabled AND a Groq key must be configured.
+// Admin gate: chatbot must be enabled AND the active provider's key must be
+// configured. Provider selection lives in ai_settings.llm_provider; the
+// chatbot itself does not care which one is in use.
 // -----------------------------------------------------------------------------
 
 try {
     $chatbotEnabled = ai_settings_get('chatbot_enabled') === '1';
-    $groqKey        = ai_settings_get('groq_api_key');
-    $groqModel      = ai_settings_get('groq_model') ?: 'llama-3.3-70b-versatile';
+    $llmConfig      = llm_get_active_config();
     $systemPrompt   = ai_settings_get('system_prompt') ?: "You are MyVivarium's AI assistant.";
-    // Compact override: aggressively short system prompt to fit Groq token cap.
-    // Admin-set system_prompt is still honored but kept compact-only.
+    // Compact override: aggressively short system prompt to fit the LLM
+    // token cap. Admin-set system_prompt is still honored but kept compact.
     $systemPrompt   = trim($systemPrompt);
     if (strlen($systemPrompt) > 400) {
         $systemPrompt = mb_substr($systemPrompt, 0, 400);
@@ -112,11 +114,13 @@ try {
     echo json_encode(['ok' => false, 'error' => 'chatbot_unavailable']);
     exit;
 }
-if (!$chatbotEnabled || !$groqKey) {
+if (!$chatbotEnabled || $llmConfig['api_key'] === '') {
     http_response_code(503);
     echo json_encode(['ok' => false, 'error' => 'chatbot_disabled']);
     exit;
 }
+$activeProvider = $llmConfig['provider'];
+$activeModel    = $llmConfig['model'];
 
 // -----------------------------------------------------------------------------
 // Session API key (mint if needed)
@@ -189,19 +193,28 @@ function chatbot_context_message_limit(): int
     return $n;
 }
 
-function chatbot_usage_log(mysqli $con, int $user_id, string $cid, string $model, array $usage, int $estPrompt = 0): void
+function chatbot_usage_log(mysqli $con, int $user_id, string $cid, string $model, array $usage, int $estPrompt = 0, string $provider = ''): void
 {
     $pt = (int)($usage['prompt_tokens']     ?? 0);
     $ct = (int)($usage['completion_tokens'] ?? 0);
-    // ai_usage_log may or may not have estimated_prompt_tokens (added in
-    // schema rev "perf: chatbot payload reduction"). Detect & fall back.
+    // ai_usage_log may or may not have estimated_prompt_tokens / provider
+    // columns (added in subsequent schema revisions). Detect & fall back.
     static $hasEstCol = null;
+    static $hasProvCol = null;
     if ($hasEstCol === null) {
         $r = @$con->query("SHOW COLUMNS FROM ai_usage_log LIKE 'estimated_prompt_tokens'");
         $hasEstCol = ($r && $r->num_rows > 0);
         if ($r) $r->close();
     }
-    if ($hasEstCol) {
+    if ($hasProvCol === null) {
+        $r = @$con->query("SHOW COLUMNS FROM ai_usage_log LIKE 'provider'");
+        $hasProvCol = ($r && $r->num_rows > 0);
+        if ($r) $r->close();
+    }
+    if ($hasEstCol && $hasProvCol) {
+        $stmt = $con->prepare("INSERT INTO ai_usage_log (user_id, conversation_id, prompt_tokens, completion_tokens, model, estimated_prompt_tokens, provider) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param('isiisis', $user_id, $cid, $pt, $ct, $model, $estPrompt, $provider);
+    } elseif ($hasEstCol) {
         $stmt = $con->prepare("INSERT INTO ai_usage_log (user_id, conversation_id, prompt_tokens, completion_tokens, model, estimated_prompt_tokens) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->bind_param('isiisi', $user_id, $cid, $pt, $ct, $model, $estPrompt);
     } else {
@@ -260,7 +273,7 @@ $SAFE_WRITE_TOOLS = [
 
 // -----------------------------------------------------------------------------
 // Tool dispatch: chatbot_resolve_tool() lives in includes/chatbot_helpers.php
-// alongside chatbot_sanitize_for_groq() and chatbot_truncate(), so tests can
+// alongside chatbot_sanitize_for_llm() and chatbot_truncate(), so tests can
 // import them without standing up the request pipeline.
 // -----------------------------------------------------------------------------
 
@@ -424,43 +437,12 @@ function chatbot_api_health(): array
 }
 
 // -----------------------------------------------------------------------------
-// Groq call
+// LLM call — all chat-completions HTTP goes through includes/llm_provider.php
+// so the chatbot never depends on which provider is configured.
 // -----------------------------------------------------------------------------
 
-function chatbot_call_groq(string $apiKey, string $model, array $messages, array $tools): array
-{
-    $payload = [
-        'model'    => $model,
-        'messages' => $messages,
-        'tools'    => $tools,
-        'tool_choice' => 'auto',
-        'temperature' => 0.2,
-    ];
-    $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_HTTPHEADER     => [
-            'Authorization: Bearer ' . $apiKey,
-            'Content-Type: application/json',
-        ],
-        CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_SLASHES),
-        CURLOPT_TIMEOUT        => 30,
-    ]);
-    $raw = curl_exec($ch);
-    if ($raw === false) {
-        $err = curl_error($ch);
-        curl_close($ch);
-        return ['ok' => false, 'status' => 0, 'error' => $err, 'body' => null];
-    }
-    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    $decoded = json_decode($raw, true);
-    return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'error' => null, 'body' => $decoded, 'raw' => $raw];
-}
-
 // -----------------------------------------------------------------------------
-// Build the message stack for Groq from persisted history + system prompt.
+// Build the message stack for the LLM from persisted history + system prompt.
 // -----------------------------------------------------------------------------
 
 function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, string $username, int $user_id): array
@@ -587,14 +569,14 @@ if ($cancel_pending_op !== '') {
     $tools = [];
     $messages = chatbot_fit_to_budget($messages, $tools);
     $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
-    $groq = chatbot_call_groq($groqKey, $groqModel, $messages, $tools);
-    if ($groq['ok']) {
-        $reply = $groq['body']['choices'][0]['message']['content'] ?? 'Cancelled.';
+    $llm = llm_chat_completions($messages, $tools);
+    if ($llm['ok']) {
+        $reply = $llm['body']['choices'][0]['message']['content'] ?? 'Cancelled.';
         if (!is_string($reply) || $reply === '') $reply = 'Cancelled.';
-        if (isset($groq['body']['usage'])) {
-            $u = $groq['body']['usage'];
-            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", model=$groqModel, est=$estPrompt");
-            chatbot_usage_log($con, $user_id, $conversation_id, $groqModel, $u, $estPrompt);
+        if (isset($llm['body']['usage'])) {
+            $u = $llm['body']['usage'];
+            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$llm['provider']}, model={$llm['model']}, est=$estPrompt");
+            chatbot_usage_log($con, $user_id, $conversation_id, $llm['model'], $u, $estPrompt, $llm['provider']);
         }
     } else {
         $reply = 'Cancelled.';
@@ -704,7 +686,7 @@ try {
                 break;
             }
 
-            $rawResult = chatbot_sanitize_for_groq(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
+            $rawResult = chatbot_sanitize_for_llm(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
             $rawResult = chatbot_cap_list_result($replayToolName, $rawResult);
             $resultStr = chatbot_truncate($rawResult);
             chatbot_message_persist($con, $conversation_id, 'tool', $resultStr,
@@ -724,11 +706,11 @@ try {
         }
         $messages = chatbot_fit_to_budget($messages, $toolsForTurn);
         $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($toolsForTurn);
-        $groq = chatbot_call_groq($groqKey, $groqModel, $messages, $toolsForTurn);
+        $llm = llm_chat_completions($messages, $toolsForTurn);
 
-        if (!$groq['ok']) {
-            error_log('chatbot groq error status=' . $groq['status'] . ' err=' . ($groq['error'] ?? '') . ' raw=' . ($groq['raw'] ?? ''));
-            if ($groq['status'] === 429) {
+        if (!$llm['ok']) {
+            error_log('chatbot llm error provider=' . $llm['provider'] . ' status=' . $llm['status'] . ' err=' . ($llm['error'] ?? '') . ' raw=' . ($llm['raw'] ?? ''));
+            if ($llm['status'] === 429) {
                 $finalReply = 'I am getting too many requests right now, try again in a minute.';
             } else {
                 $finalReply = 'AI assistant is temporarily unavailable.';
@@ -737,13 +719,13 @@ try {
             break;
         }
 
-        if (isset($groq['body']['usage'])) {
-            $u = $groq['body']['usage'];
-            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", model=$groqModel, est=$estPrompt");
-            chatbot_usage_log($con, $user_id, $conversation_id, $groqModel, $u, $estPrompt);
+        if (isset($llm['body']['usage'])) {
+            $u = $llm['body']['usage'];
+            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$llm['provider']}, model={$llm['model']}, est=$estPrompt");
+            chatbot_usage_log($con, $user_id, $conversation_id, $llm['model'], $u, $estPrompt, $llm['provider']);
         }
 
-        $choice = $groq['body']['choices'][0]['message'] ?? null;
+        $choice = $llm['body']['choices'][0]['message'] ?? null;
         if (!$choice) {
             $finalReply = 'AI assistant returned an empty response.';
             chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
@@ -846,7 +828,7 @@ try {
                 log_activity($con, 'ai_chat_write', 'ai_conversation', $conversation_id, $name);
             }
 
-            $rawResult = chatbot_sanitize_for_groq(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
+            $rawResult = chatbot_sanitize_for_llm(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
             $rawResult = chatbot_cap_list_result($name, $rawResult);
             $resultStr = chatbot_truncate($rawResult);
             chatbot_message_persist($con, $conversation_id, 'tool', $resultStr,

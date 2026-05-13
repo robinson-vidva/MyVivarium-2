@@ -4,7 +4,7 @@
  *
  * These cover the pieces that don't need a live DB / Groq egress:
  *   - chatbot_resolve_tool() mapping (every tool → expected HTTP shape).
- *   - chatbot_sanitize_for_groq() email + phone redaction.
+ *   - chatbot_sanitize_for_llm() email + phone redaction.
  *   - chatbot_truncate() boundary behavior.
  *   - safety guard regex (>10 consecutive non-alphanumeric chars).
  *
@@ -80,7 +80,7 @@ check('create_breeding_cage maps sire/dam to male_id/female_id', $r['body']['mal
 
 // --- sanitizer ---
 $blob = 'contact alice@example.com or 555-123-4567 for help';
-$out  = chatbot_sanitize_for_groq($blob);
+$out  = chatbot_sanitize_for_llm($blob);
 check('email redacted', strpos($out, 'alice@example.com') === false && strpos($out, '[REDACTED]') !== false);
 check('phone redacted', strpos($out, '555-123-4567') === false);
 
