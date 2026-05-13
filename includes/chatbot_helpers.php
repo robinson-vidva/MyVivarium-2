@@ -122,9 +122,10 @@ if (!function_exists('chatbot_resolve_tool')) {
     }
 
     /**
-     * Strip emails and phone numbers from a string before it goes to Groq.
+     * Strip emails and phone numbers from a string before it goes to the LLM
+     * (Groq or OpenAI). Same rules apply to either provider.
      */
-    function chatbot_sanitize_for_groq(string $blob): string
+    function chatbot_sanitize_for_llm(string $blob): string
     {
         $blob = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', '[REDACTED]', $blob);
         $blob = preg_replace('/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/', '[REDACTED]', $blob);

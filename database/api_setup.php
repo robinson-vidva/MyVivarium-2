@@ -201,6 +201,7 @@ $chatbotTables = [
         `completion_tokens` int NOT NULL DEFAULT 0,
         `estimated_prompt_tokens` int NOT NULL DEFAULT 0,
         `model` varchar(64) NOT NULL DEFAULT '',
+        `provider` varchar(16) NOT NULL DEFAULT '',
         `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`),
         KEY `idx_ai_usage_user_created` (`user_id`, `created_at`),
@@ -227,6 +228,16 @@ if (table_exists($con, 'ai_usage_log') && !column_exists($con, 'ai_usage_log', '
         exit(1);
     }
     echo "[ok]    ai_usage_log.estimated_prompt_tokens added\n";
+}
+
+// Migration: add provider column to ai_usage_log so we can attribute usage
+// to Groq vs OpenAI side by side. Idempotent.
+if (table_exists($con, 'ai_usage_log') && !column_exists($con, 'ai_usage_log', 'provider')) {
+    if ($con->query("ALTER TABLE `ai_usage_log` ADD COLUMN `provider` varchar(16) NOT NULL DEFAULT '' AFTER `model`") === false) {
+        fwrite(STDERR, "[error] ai_usage_log.provider: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    ai_usage_log.provider added\n";
 }
 
 // AI settings storage for the admin chatbot configuration.

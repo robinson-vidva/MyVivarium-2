@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS `ai_usage_log` (
   `completion_tokens` int NOT NULL DEFAULT 0,
   `estimated_prompt_tokens` int NOT NULL DEFAULT 0,
   `model` varchar(64) NOT NULL DEFAULT '',
+  `provider` varchar(16) NOT NULL DEFAULT '',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_ai_usage_user_created` (`user_id`, `created_at`),

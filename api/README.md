@@ -207,16 +207,29 @@ header. The counter is stored per key in `rate_limit`.
 
 ## AI Configuration
 
+MyVivarium supports two LLM providers: **Groq** (free tier available, fast,
+open models) and **OpenAI** (paid, most reliable tool calling). Switch in
+**Admin → AI Configuration**. Both providers speak the same OpenAI-style
+`/v1/chat/completions` shape and are dispatched through a single function
+in `includes/llm_provider.php`; the chatbot itself does not know which one
+is active.
+
 Admins manage chatbot settings under **Admin → AI Configuration**
-(`manage_ai_config.php`). Four values are stored in the `ai_settings`
-table:
+(`manage_ai_config.php`). Values are stored in the `ai_settings` table:
 
 | `setting_key`     | Meaning |
 |-------------------|---------|
+| `llm_provider`    | `"groq"` (default) or `"openai"` — which provider the chatbot uses. |
 | `groq_api_key`    | Groq Cloud API key (encrypted). |
 | `groq_model`      | One of `llama-3.3-70b-versatile` (default), `llama-3.1-8b-instant`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`. |
+| `openai_api_key`  | OpenAI API key (encrypted). |
+| `openai_model`    | One of `gpt-5.4-mini` (default), `gpt-5.4-nano`, `gpt-5.4`, `gpt-4.1-nano`, `gpt-4.1-mini`. |
 | `system_prompt`   | System prompt prepended to every chatbot turn. |
 | `chatbot_enabled` | `"1"` or `"0"`. |
+
+Both providers can be configured side by side — the admin can prepare an
+OpenAI key in advance and switch over later. Switching to a provider whose
+key is empty is rejected with an inline error.
 
 ### Encryption model
 
@@ -248,10 +261,12 @@ been provisioned.
 ### Test Connection
 
 The admin page exposes a "Test Connection" button that calls
-`ai_test_connection.php` (admin-only, returns JSON). The endpoint hits
-`https://api.groq.com/openai/v1/models` with a 10-second cURL timeout
-using the decrypted key as `Authorization: Bearer …`. The API key value
-is **never echoed back** to the browser, the rendered HTML, or any log
+`ai_test_connection.php?provider=<groq|openai>` (admin-only, returns JSON).
+The endpoint hits the active provider's `/v1/models` endpoint
+(`api.groq.com/openai/v1/models` or `api.openai.com/v1/models`) with a
+10-second cURL timeout using the decrypted key as `Authorization: Bearer …`.
+The API key value is **never echoed back** to the browser, the rendered
+HTML, or any log
 line.
 
 ### Activity logging

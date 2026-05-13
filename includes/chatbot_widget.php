@@ -26,12 +26,19 @@ if (!empty($GLOBALS['__chatbot_widget_rendered'])) return;
 $__chat_authed  = isset($_SESSION['user_id']) && isset($_SESSION['username']);
 $__chat_enabled = false;
 $__chat_key_set = false;
+$__chat_provider = 'groq';
+$__chat_provider_label = 'Groq';
+$__chat_model    = '';
 if ($__chat_authed) {
     require_once __DIR__ . '/ai_settings.php';
+    require_once __DIR__ . '/llm_provider.php';
     try {
         $__chat_enabled = ai_settings_get('chatbot_enabled') === '1';
-        $__chat_groq    = ai_settings_get('groq_api_key');
-        $__chat_key_set = is_string($__chat_groq) && $__chat_groq !== '';
+        $__cfg          = llm_get_active_config();
+        $__chat_key_set = $__cfg['api_key'] !== '';
+        $__chat_provider       = $__cfg['provider'];
+        $__chat_provider_label = llm_provider_label($__cfg['provider']);
+        $__chat_model          = $__cfg['model'];
     } catch (Throwable $e) {
         // Swallow — debug comment below still reports authed/enabled/key_set.
     }
@@ -79,6 +86,7 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
     display: flex; align-items: center; gap: 8px;
   }
   #mv-chat-header .mv-chat-title { flex: 1; font-weight: 600; font-size: 14px; }
+  #mv-chat-header .mv-chat-title .mv-chat-subtitle { display: block; font-weight: 400; font-size: 11px; color: rgba(255,255,255,0.8); line-height: 1.2; margin-top: 1px; }
   #mv-chat-header button {
     background: transparent; border: none; color: #fff; cursor: pointer;
     font-size: 18px; padding: 2px 6px; line-height: 1;
@@ -150,7 +158,7 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
 <button id="mv-chat-fab" type="button" aria-label="Open MyVivarium AI chat" title="MyVivarium AI">💬</button>
 <div id="mv-chat-panel" role="dialog" aria-label="MyVivarium AI">
   <div id="mv-chat-header">
-    <span class="mv-chat-title">MyVivarium AI</span>
+    <span class="mv-chat-title">MyVivarium AI<span class="mv-chat-subtitle">powered by <?= htmlspecialchars($__chat_provider_label); ?> <?= htmlspecialchars($__chat_model); ?></span></span>
     <button type="button" id="mv-chat-new"     title="New conversation" aria-label="New conversation">＋</button>
     <button type="button" id="mv-chat-history" title="History"          aria-label="History">≡</button>
     <button type="button" id="mv-chat-close"   title="Close"            aria-label="Close">×</button>
