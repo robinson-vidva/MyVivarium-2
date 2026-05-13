@@ -199,6 +199,7 @@ $chatbotTables = [
         `conversation_id` char(36) DEFAULT NULL,
         `prompt_tokens` int NOT NULL DEFAULT 0,
         `completion_tokens` int NOT NULL DEFAULT 0,
+        `estimated_prompt_tokens` int NOT NULL DEFAULT 0,
         `model` varchar(64) NOT NULL DEFAULT '',
         `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`),
@@ -217,6 +218,15 @@ foreach ($chatbotTables as $table => $sql) {
         exit(1);
     }
     echo "[ok]    $table created\n";
+}
+
+// Migration: add estimated_prompt_tokens to ai_usage_log on existing DBs.
+if (table_exists($con, 'ai_usage_log') && !column_exists($con, 'ai_usage_log', 'estimated_prompt_tokens')) {
+    if ($con->query("ALTER TABLE `ai_usage_log` ADD COLUMN `estimated_prompt_tokens` int NOT NULL DEFAULT 0 AFTER `completion_tokens`") === false) {
+        fwrite(STDERR, "[error] ai_usage_log.estimated_prompt_tokens: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    ai_usage_log.estimated_prompt_tokens added\n";
 }
 
 // AI settings storage for the admin chatbot configuration.

@@ -89,6 +89,37 @@ $s = str_repeat('A', 9000);
 $t = chatbot_truncate($s, 8000);
 check('truncate adds marker', strlen($t) > 8000 && str_ends_with($t, '[truncated]'));
 check('truncate skips when short', chatbot_truncate('short', 8000) === 'short');
+// Default cap is now 2500 (payload-reduction change).
+check('truncate default cap is 2500', strlen(chatbot_truncate(str_repeat('A', 3000))) === 2500 + strlen(' ... [truncated]'));
+
+// --- token estimator ---
+check('estimate_tokens roughly len/4',  chatbot_estimate_tokens(str_repeat('a', 400)) === 100);
+check('estimate_tokens handles arrays', chatbot_estimate_tokens(['role'=>'user','content'=>'hi']) > 0);
+
+// --- list cap ---
+$listJson = json_encode(['ok'=>true,'data'=>array_fill(0, 60, ['mouse_id'=>'M-x'])]);
+$capped   = chatbot_cap_list_result('list_mice', $listJson, 25);
+$dec      = json_decode($capped, true);
+check('list cap shrinks to 25',          count($dec['data']) === 25);
+check('list cap notes showing 60',       isset($dec['_truncated']) && strpos($dec['_truncated'], '60') !== false);
+check('list cap no-op on non-list tool', chatbot_cap_list_result('get_mouse', $listJson, 25) === $listJson);
+
+// --- tool selector (keyword router) ---
+$all       = chatbot_all_tool_defs();
+$miceNames = array_map(fn($t) => $t['function']['name'], chatbot_select_tools('show me my mice'));
+$cageNames = array_map(fn($t) => $t['function']['name'], chatbot_select_tools('list cages'));
+$logNames  = array_map(fn($t) => $t['function']['name'], chatbot_select_tools('show activity log'));
+$noneNames = array_map(fn($t) => $t['function']['name'], chatbot_select_tools(''));
+check('select_tools mice keyword includes list_mice',    in_array('list_mice', $miceNames, true));
+check('select_tools mice keyword excludes list_cages',   !in_array('list_holding_cages', $miceNames, true));
+check('select_tools cage keyword includes holding_cages',in_array('list_holding_cages', $cageNames, true));
+check('select_tools log keyword includes activity',      in_array('search_activity_log', $logNames, true));
+check('select_tools fallback returns all',               count($noneNames) === count($all));
+// Descriptions stay informative (>= 30 chars, <= 80 chars sentence).
+$shortDescs = array_filter($all, fn($t) => strlen($t['function']['description']) < 30);
+check('all tool descriptions >= 30 chars (informative)', count($shortDescs) === 0);
+$longDescs = array_filter($all, fn($t) => strlen($t['function']['description']) > 80);
+check('all tool descriptions <= 80 chars (compact)',     count($longDescs) === 0);
 
 // --- safety regex ---
 check('rejects 16 special chars', (bool)preg_match('/[^A-Za-z0-9]{11,}/', '@@@@@@@@@@@@@@@@'));

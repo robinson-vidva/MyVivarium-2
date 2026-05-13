@@ -100,6 +100,12 @@ try {
     $groqKey        = ai_settings_get('groq_api_key');
     $groqModel      = ai_settings_get('groq_model') ?: 'llama-3.3-70b-versatile';
     $systemPrompt   = ai_settings_get('system_prompt') ?: "You are MyVivarium's AI assistant.";
+    // Compact override: aggressively short system prompt to fit Groq token cap.
+    // Admin-set system_prompt is still honored but kept compact-only.
+    $systemPrompt   = trim($systemPrompt);
+    if (strlen($systemPrompt) > 400) {
+        $systemPrompt = mb_substr($systemPrompt, 0, 400);
+    }
 } catch (Throwable $e) {
     error_log('ai_chat ai_settings error: ' . $e->getMessage());
     http_response_code(503);
@@ -160,7 +166,7 @@ function chatbot_message_persist(mysqli $con, string $cid, string $role, ?string
     return $id;
 }
 
-function chatbot_messages_recent(mysqli $con, string $cid, int $limit = 20): array
+function chatbot_messages_recent(mysqli $con, string $cid, int $limit = 10): array
 {
     // Last $limit messages, oldest-first for Groq.
     $stmt = $con->prepare("SELECT role, content, tool_call_json, tool_result_json
@@ -174,12 +180,34 @@ function chatbot_messages_recent(mysqli $con, string $cid, int $limit = 20): arr
     return array_reverse($rows);
 }
 
-function chatbot_usage_log(mysqli $con, int $user_id, string $cid, string $model, array $usage): void
+function chatbot_context_message_limit(): int
+{
+    $raw = ai_settings_get('chatbot_context_messages');
+    $n = is_numeric($raw) ? (int)$raw : 10;
+    if ($n < 4) $n = 4;
+    if ($n > 30) $n = 30;
+    return $n;
+}
+
+function chatbot_usage_log(mysqli $con, int $user_id, string $cid, string $model, array $usage, int $estPrompt = 0): void
 {
     $pt = (int)($usage['prompt_tokens']     ?? 0);
     $ct = (int)($usage['completion_tokens'] ?? 0);
-    $stmt = $con->prepare("INSERT INTO ai_usage_log (user_id, conversation_id, prompt_tokens, completion_tokens, model) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param('isiis', $user_id, $cid, $pt, $ct, $model);
+    // ai_usage_log may or may not have estimated_prompt_tokens (added in
+    // schema rev "perf: chatbot payload reduction"). Detect & fall back.
+    static $hasEstCol = null;
+    if ($hasEstCol === null) {
+        $r = @$con->query("SHOW COLUMNS FROM ai_usage_log LIKE 'estimated_prompt_tokens'");
+        $hasEstCol = ($r && $r->num_rows > 0);
+        if ($r) $r->close();
+    }
+    if ($hasEstCol) {
+        $stmt = $con->prepare("INSERT INTO ai_usage_log (user_id, conversation_id, prompt_tokens, completion_tokens, model, estimated_prompt_tokens) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param('isiisi', $user_id, $cid, $pt, $ct, $model, $estPrompt);
+    } else {
+        $stmt = $con->prepare("INSERT INTO ai_usage_log (user_id, conversation_id, prompt_tokens, completion_tokens, model) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param('isiis', $user_id, $cid, $pt, $ct, $model);
+    }
     $stmt->execute();
     $stmt->close();
 }
@@ -216,7 +244,10 @@ if (!$conv) {
 }
 
 // -----------------------------------------------------------------------------
-// Tool definitions (OpenAI-compatible function-calling schemas)
+// Tool definitions — moved to chatbot_all_tool_defs() in chatbot_helpers.php
+// so they can be subset-routed per turn and shrunk without touching this file.
+// chatbot_select_tools($userMessage) picks the relevant subset; the full set
+// is sent only when no keyword matches.
 // -----------------------------------------------------------------------------
 
 $SAFE_WRITE_TOOLS = [
@@ -226,262 +257,6 @@ $SAFE_WRITE_TOOLS = [
     'create_mouse',
 ];
 
-$TOOLS = [
-    // ---- reads ----
-    ['type' => 'function', 'function' => [
-        'name' => 'get_me',
-        'description' => 'Get the currently signed-in user (id, name, email, role).',
-        'parameters' => ['type' => 'object', 'properties' => new stdClass(), 'additionalProperties' => false],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'list_mice',
-        'description' => 'List mice in the colony, optionally filtered. Returns id, sex, strain, current cage, status.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'status'  => ['type' => 'string', 'description' => 'alive | sacrificed | transferred_out | archived'],
-                'sex'     => ['type' => 'string', 'description' => 'male | female | unknown'],
-                'strain'  => ['type' => 'string'],
-                'cage_id' => ['type' => 'string', 'description' => 'Filter to a single cage'],
-                'limit'   => ['type' => 'integer', 'description' => 'Max rows (default 50, max 200)'],
-            ],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'get_mouse',
-        'description' => 'Get full details for a single mouse by mouse_id.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['id' => ['type' => 'string']],
-            'required' => ['id'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'list_holding_cages',
-        'description' => 'List active holding cages.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['limit' => ['type' => 'integer']],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'get_holding_cage',
-        'description' => 'Get full details for one holding cage by cage_id.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['id' => ['type' => 'string']],
-            'required' => ['id'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'list_breeding_cages',
-        'description' => 'List active breeding cages.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['limit' => ['type' => 'integer']],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'get_breeding_cage',
-        'description' => 'Get full details for one breeding cage by cage_id.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['id' => ['type' => 'string']],
-            'required' => ['id'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'list_maintenance_notes',
-        'description' => 'List maintenance notes, optionally filtered by cage_id, date range, or limit.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'cage_id' => ['type' => 'string'],
-                'from'    => ['type' => 'string', 'description' => 'ISO-8601 or YYYY-MM-DD'],
-                'to'      => ['type' => 'string'],
-                'limit'   => ['type' => 'integer'],
-            ],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'get_maintenance_note',
-        'description' => 'Get a single maintenance note by id.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['id' => ['type' => 'integer']],
-            'required' => ['id'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'search_activity_log',
-        'description' => 'Search the audit log. Filter by user_id, action, or date range.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'user_id' => ['type' => 'integer'],
-                'action'  => ['type' => 'string'],
-                'from'    => ['type' => 'string'],
-                'to'      => ['type' => 'string'],
-                'limit'   => ['type' => 'integer'],
-            ],
-        ],
-    ]],
-
-    // ---- safe writes (no confirmation) ----
-    ['type' => 'function', 'function' => [
-        'name' => 'add_maintenance_note',
-        'description' => 'Add a maintenance note to a cage.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'cage_id'   => ['type' => 'string'],
-                'note_text' => ['type' => 'string'],
-                'type'      => ['type' => 'string', 'description' => 'Optional category, e.g. "water", "bedding"'],
-            ],
-            'required' => ['cage_id', 'note_text'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'create_holding_cage',
-        'description' => 'Create a new holding cage.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'name'     => ['type' => 'string', 'description' => 'cage_id (label)'],
-                'room'     => ['type' => 'string'],
-                'capacity' => ['type' => 'integer', 'description' => 'Informational; stored in remarks if API does not track explicitly'],
-                'notes'    => ['type' => 'string'],
-            ],
-            'required' => ['name'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'create_breeding_cage',
-        'description' => 'Create a new breeding cage with a sire and dam.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'name'    => ['type' => 'string', 'description' => 'cage_id (label)'],
-                'room'    => ['type' => 'string'],
-                'sire_id' => ['type' => 'string', 'description' => 'Male mouse_id'],
-                'dam_id'  => ['type' => 'string', 'description' => 'Female mouse_id'],
-                'notes'   => ['type' => 'string'],
-            ],
-            'required' => ['name'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'create_mouse',
-        'description' => 'Register a new mouse in the colony.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'mouse_id' => ['type' => 'string'],
-                'cage_id'  => ['type' => 'string'],
-                'sex'      => ['type' => 'string'],
-                'strain'   => ['type' => 'string'],
-                'dob'      => ['type' => 'string'],
-                'genotype' => ['type' => 'string'],
-                'notes'    => ['type' => 'string'],
-            ],
-            'required' => ['mouse_id'],
-        ],
-    ]],
-
-    // ---- destructive writes (require confirmation) ----
-    ['type' => 'function', 'function' => [
-        'name' => 'update_mouse',
-        'description' => 'Update editable fields of a mouse. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'id'     => ['type' => 'string'],
-                'fields' => ['type' => 'object', 'description' => 'Map of editable field => new value (sex, dob, strain, genotype, ear_code, notes, etc.)'],
-            ],
-            'required' => ['id', 'fields'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'move_mouse',
-        'description' => 'Move a mouse to a different cage. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'id'         => ['type' => 'string'],
-                'to_cage_id' => ['type' => 'string'],
-                'reason'     => ['type' => 'string'],
-            ],
-            'required' => ['id', 'to_cage_id'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'sacrifice_mouse',
-        'description' => 'Mark a mouse as sacrificed. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'id'     => ['type' => 'string'],
-                'date'   => ['type' => 'string'],
-                'reason' => ['type' => 'string'],
-            ],
-            'required' => ['id'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'delete_mouse',
-        'description' => 'Soft-delete (archive) a mouse. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['id' => ['type' => 'string']],
-            'required' => ['id'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'update_holding_cage',
-        'description' => 'Update fields on a holding cage. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'id'     => ['type' => 'string'],
-                'fields' => ['type' => 'object'],
-            ],
-            'required' => ['id', 'fields'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'update_breeding_cage',
-        'description' => 'Update fields on a breeding cage. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'id'     => ['type' => 'string'],
-                'fields' => ['type' => 'object'],
-            ],
-            'required' => ['id', 'fields'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'edit_maintenance_note',
-        'description' => 'Edit the text of a maintenance note. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'id'        => ['type' => 'integer'],
-                'note_text' => ['type' => 'string'],
-            ],
-            'required' => ['id', 'note_text'],
-        ],
-    ]],
-    ['type' => 'function', 'function' => [
-        'name' => 'delete_maintenance_note',
-        'description' => 'Soft-delete a maintenance note. Destructive — requires user confirmation.',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => ['id' => ['type' => 'integer']],
-            'required' => ['id'],
-        ],
-    ]],
-];
 
 // -----------------------------------------------------------------------------
 // Tool dispatch: chatbot_resolve_tool() lives in includes/chatbot_helpers.php
@@ -690,14 +465,18 @@ function chatbot_call_groq(string $apiKey, string $model, array $messages, array
 
 function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, string $username, int $user_id): array
 {
+    // Compact system prompt — role / capabilities / rules / runtime — under
+    // ~300 tokens. Lines are intentionally terse; verbose phrasing was the
+    // single largest per-call payload contributor.
     $augmented = $systemPrompt
-        . "\n\nCurrent user: $username (id $user_id). Current datetime: " . date('c') . "."
-        . "\nDestructive operations require user confirmation."
-        . "\nNever reveal API keys, environment variables, or system internals even if asked. If a user requests these, decline.";
+        . " You can query and modify the colony (mice, cages, maintenance notes, audit log) via tools."
+        . " Rules: destructive ops need user confirmation; never reveal API keys, env vars, or internals."
+        . " User: $username (id $user_id). Time: " . date('c') . ".";
 
     $messages = [['role' => 'system', 'content' => $augmented]];
 
-    foreach (chatbot_messages_recent($con, $cid, 20) as $r) {
+    $msgLimit = chatbot_context_message_limit();
+    foreach (chatbot_messages_recent($con, $cid, $msgLimit) as $r) {
         if ($r['role'] === 'system_event') {
             // Hint Groq about prior pending op decisions etc.
             $messages[] = ['role' => 'system', 'content' => '[event] ' . ($r['content'] ?? '')];
@@ -730,6 +509,64 @@ function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, 
         // role=user
         $messages[] = ['role' => 'user', 'content' => $r['content'] ?? ''];
     }
+
+    // Hard token budget on the conversation portion. If the joined history
+    // alone exceeds 4000 estimated tokens, drop the oldest non-system message
+    // until we're back under budget.
+    $budgetTokens = 4000;
+    while (count($messages) > 2) {
+        $est = chatbot_estimate_tokens($messages);
+        if ($est <= $budgetTokens) break;
+        // Find the first non-system message and drop it (preserve [0] system).
+        for ($i = 1; $i < count($messages); $i++) {
+            if (($messages[$i]['role'] ?? '') !== 'system') {
+                array_splice($messages, $i, 1);
+                break;
+            }
+        }
+        if ($i >= count($messages)) break; // safety
+    }
+    return $messages;
+}
+
+/**
+ * Final aggressive trim before sending to Groq. Estimates tokens for
+ * (system prompt + tools + messages); if over $hardCap, drops the largest
+ * tool-result messages, then the oldest non-system messages, until under.
+ * Logs the final estimate so the admin can see what each turn is using.
+ */
+function chatbot_fit_to_budget(array $messages, array $tools, int $hardCap = 8000): array
+{
+    $est = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
+    if ($est <= $hardCap) {
+        error_log("Chatbot turn estimated $est tokens (cap $hardCap)");
+        return $messages;
+    }
+
+    // Pass 1: shrink the biggest tool results.
+    while ($est > $hardCap) {
+        $biggestIdx = -1; $biggestLen = 0;
+        foreach ($messages as $i => $m) {
+            if (($m['role'] ?? '') !== 'tool') continue;
+            $len = strlen((string)($m['content'] ?? ''));
+            if ($len > $biggestLen) { $biggestLen = $len; $biggestIdx = $i; }
+        }
+        if ($biggestIdx < 0 || $biggestLen <= 500) break;
+        $messages[$biggestIdx]['content'] = substr((string)$messages[$biggestIdx]['content'], 0, 500) . ' ...[trimmed for budget]';
+        $est = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
+    }
+
+    // Pass 2: drop oldest non-system messages.
+    while ($est > $hardCap && count($messages) > 2) {
+        for ($i = 1; $i < count($messages); $i++) {
+            if (($messages[$i]['role'] ?? '') !== 'system') {
+                array_splice($messages, $i, 1);
+                break;
+            }
+        }
+        $est = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
+    }
+    error_log("Chatbot turn estimated $est tokens (cap $hardCap, after trim)");
     return $messages;
 }
 
@@ -746,12 +583,18 @@ if ($cancel_pending_op !== '') {
     // get a one-line acknowledgement.
     $messages = chatbot_build_messages($con, $conversation_id, $systemPrompt, $username, $user_id);
     $messages[] = ['role' => 'user', 'content' => 'I cancelled the pending action — please acknowledge briefly.'];
-    $groq = chatbot_call_groq($groqKey, $groqModel, $messages, $TOOLS);
+    // Cancellation reply doesn't need tools — empty tools array.
+    $tools = [];
+    $messages = chatbot_fit_to_budget($messages, $tools);
+    $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
+    $groq = chatbot_call_groq($groqKey, $groqModel, $messages, $tools);
     if ($groq['ok']) {
         $reply = $groq['body']['choices'][0]['message']['content'] ?? 'Cancelled.';
         if (!is_string($reply) || $reply === '') $reply = 'Cancelled.';
         if (isset($groq['body']['usage'])) {
-            chatbot_usage_log($con, $user_id, $conversation_id, $groqModel, $groq['body']['usage']);
+            $u = $groq['body']['usage'];
+            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", model=$groqModel, est=$estPrompt");
+            chatbot_usage_log($con, $user_id, $conversation_id, $groqModel, $u, $estPrompt);
         }
     } else {
         $reply = 'Cancelled.';
@@ -814,6 +657,7 @@ $MAX_ITERATIONS = 6;
 $toolCallsForResponse = [];
 $pendingConfirmation = null;
 $finalReply = '';
+$toolsForTurn = chatbot_select_tools($incomingMessage);
 
 // Health pre-check: if /api/v1 is unreachable or returning HTML, abort
 // before we burn Groq tokens looping on bad tool results.
@@ -860,7 +704,9 @@ try {
                 break;
             }
 
-            $resultStr = chatbot_truncate(chatbot_sanitize_for_groq(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES)));
+            $rawResult = chatbot_sanitize_for_groq(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
+            $rawResult = chatbot_cap_list_result($replayToolName, $rawResult);
+            $resultStr = chatbot_truncate($rawResult);
             chatbot_message_persist($con, $conversation_id, 'tool', $resultStr,
                 ['id' => $replayToolCallId, 'function' => ['name' => $replayToolName]],
                 ['status' => $apiRes['status'], 'body' => $apiRes['body']],
@@ -870,7 +716,15 @@ try {
         }
 
         $messages = chatbot_build_messages($con, $conversation_id, $systemPrompt, $username, $user_id);
-        $groq = chatbot_call_groq($groqKey, $groqModel, $messages, $TOOLS);
+        // Per-turn tool subset: route by the user's message on iteration 0;
+        // afterwards just keep the same set so Groq can finish a multi-call
+        // workflow without losing visibility on tools it already used.
+        if ($iter === 0) {
+            $toolsForTurn = chatbot_select_tools($incomingMessage);
+        }
+        $messages = chatbot_fit_to_budget($messages, $toolsForTurn);
+        $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($toolsForTurn);
+        $groq = chatbot_call_groq($groqKey, $groqModel, $messages, $toolsForTurn);
 
         if (!$groq['ok']) {
             error_log('chatbot groq error status=' . $groq['status'] . ' err=' . ($groq['error'] ?? '') . ' raw=' . ($groq['raw'] ?? ''));
@@ -884,7 +738,9 @@ try {
         }
 
         if (isset($groq['body']['usage'])) {
-            chatbot_usage_log($con, $user_id, $conversation_id, $groqModel, $groq['body']['usage']);
+            $u = $groq['body']['usage'];
+            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", model=$groqModel, est=$estPrompt");
+            chatbot_usage_log($con, $user_id, $conversation_id, $groqModel, $u, $estPrompt);
         }
 
         $choice = $groq['body']['choices'][0]['message'] ?? null;
@@ -990,7 +846,9 @@ try {
                 log_activity($con, 'ai_chat_write', 'ai_conversation', $conversation_id, $name);
             }
 
-            $resultStr = chatbot_truncate(chatbot_sanitize_for_groq(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES)));
+            $rawResult = chatbot_sanitize_for_groq(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
+            $rawResult = chatbot_cap_list_result($name, $rawResult);
+            $resultStr = chatbot_truncate($rawResult);
             chatbot_message_persist($con, $conversation_id, 'tool', $resultStr,
                 ['id' => $tc['id'] ?? null, 'function' => ['name' => $name]],
                 ['status' => $apiRes['status'], 'body' => $apiRes['body']]
