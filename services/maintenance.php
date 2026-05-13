@@ -31,7 +31,15 @@ function maint_list(mysqli $con, int $user_id, array $filters): array
 {
     [$limit, $offset] = svc_paginate($filters, 50, 200);
 
-    $where = ['m.deleted_at IS NULL']; $args = []; $types = '';
+    // Soft-deleted rows are hidden by default. Admins can opt in via
+    // include_deleted=true; non-admins have the flag silently ignored.
+    $includeDeleted = svc_str($filters, 'include_deleted');
+    $wantDeleted = ($includeDeleted === '1' || strtolower((string)$includeDeleted) === 'true');
+    $where = [];
+    if (!($wantDeleted && perm_is_admin($con, $user_id))) {
+        $where[] = 'm.deleted_at IS NULL';
+    }
+    $args = []; $types = '';
     $cage_id = svc_str($filters, 'cage_id');
     if ($cage_id !== null) { $where[] = 'm.cage_id = ?'; $args[] = $cage_id; $types .= 's'; }
     $from = svc_str($filters, 'from');
@@ -39,7 +47,7 @@ function maint_list(mysqli $con, int $user_id, array $filters): array
     $to = svc_str($filters, 'to');
     if ($to !== null) { $where[] = 'm.timestamp <= ?'; $args[] = svc_parse_date($to, 'to'); $types .= 's'; }
 
-    $whereSql = 'WHERE ' . implode(' AND ', $where);
+    $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
     $cs = $con->prepare("SELECT COUNT(*) AS n FROM maintenance m $whereSql");
     if ($args) $cs->bind_param($types, ...$args);
@@ -67,6 +75,23 @@ function maint_load(mysqli $con, int $id): ?array
     $row = $stmt->get_result()->fetch_assoc() ?: null;
     $stmt->close();
     return $row;
+}
+
+function maint_get(mysqli $con, int $user_id, int $note_id, array $filters = []): array
+{
+    $row = maint_load($con, $note_id);
+    if (!$row) throw new ApiException('not_found', "Note $note_id not found", 404);
+
+    // Soft-deleted notes are hidden by default. Admins can opt in via
+    // include_deleted=true; non-admins have the flag silently ignored.
+    if (($row['deleted_at'] ?? null) !== null) {
+        $includeDeleted = svc_str($filters, 'include_deleted');
+        $wantDeleted = ($includeDeleted === '1' || strtolower((string)$includeDeleted) === 'true');
+        if (!($wantDeleted && perm_is_admin($con, $user_id))) {
+            throw new ApiException('not_found', "Note $note_id not found", 404);
+        }
+    }
+    return maint_serialize($row);
 }
 
 function maint_create(mysqli $con, int $user_id, array $body): array

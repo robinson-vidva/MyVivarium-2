@@ -31,6 +31,15 @@ function column_exists(mysqli $con, string $table, string $column): bool {
     return $exists;
 }
 
+function index_exists(mysqli $con, string $table, string $index): bool {
+    $stmt = $con->prepare("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1");
+    $stmt->bind_param('ss', $table, $index);
+    $stmt->execute();
+    $exists = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
 $statements = [
     'api_keys' => "CREATE TABLE `api_keys` (
         `id` int NOT NULL AUTO_INCREMENT,
@@ -41,9 +50,11 @@ $statements = [
         `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         `last_used_at` datetime DEFAULT NULL,
         `revoked_at` datetime DEFAULT NULL,
+        `expires_at` datetime DEFAULT NULL,
         PRIMARY KEY (`id`),
         UNIQUE KEY `uniq_api_key_hash` (`key_hash`),
         KEY `idx_api_keys_user` (`user_id`),
+        KEY `idx_api_keys_expires` (`expires_at`),
         CONSTRAINT `fk_api_keys_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
     )",
     'pending_operations' => "CREATE TABLE `pending_operations` (
@@ -111,6 +122,71 @@ foreach ($maintenanceColumns as $col => $sql) {
         exit(1);
     }
     echo "[ok]    maintenance.$col added\n";
+}
+
+// Additive column for api_keys (in case the table predates the expires_at column).
+$apiKeyColumns = [
+    'expires_at' => "ALTER TABLE `api_keys` ADD COLUMN `expires_at` datetime DEFAULT NULL",
+];
+foreach ($apiKeyColumns as $col => $sql) {
+    if (column_exists($con, 'api_keys', $col)) {
+        echo "[skip]  api_keys.$col already exists\n";
+        continue;
+    }
+    if ($con->query($sql) === false) {
+        fwrite(STDERR, "[error] api_keys.$col: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    api_keys.$col added\n";
+}
+
+// Idempotent index creation. Each entry: [table, index_name, definition].
+$indexes = [
+    ['api_keys',          'idx_api_keys_hash',     "CREATE INDEX `idx_api_keys_hash` ON `api_keys` (`key_hash`)"],
+    ['api_keys',          'idx_api_keys_expires',  "CREATE INDEX `idx_api_keys_expires` ON `api_keys` (`expires_at`)"],
+    ['api_request_log',   'idx_arl_user',          "CREATE INDEX `idx_arl_user` ON `api_request_log` (`user_id`, `created_at`)"],
+    ['api_request_log',   'idx_arl_created',       "CREATE INDEX `idx_arl_created` ON `api_request_log` (`created_at`)"],
+    ['pending_operations','idx_pending_expires',   "CREATE INDEX `idx_pending_expires` ON `pending_operations` (`expires_at`)"],
+    ['pending_operations','idx_pending_user_exec', "CREATE INDEX `idx_pending_user_exec` ON `pending_operations` (`user_id`, `executed_at`)"],
+];
+foreach ($indexes as [$table, $name, $sql]) {
+    // The unique key on key_hash already covers idx_api_keys_hash — skip if any index named
+    // 'uniq_api_key_hash' already exists on the column to avoid redundant indexing.
+    if ($name === 'idx_api_keys_hash' && index_exists($con, 'api_keys', 'uniq_api_key_hash')) {
+        echo "[skip]  $table.$name redundant (uniq_api_key_hash covers key_hash)\n";
+        continue;
+    }
+    if (index_exists($con, $table, $name)) {
+        echo "[skip]  $table.$name already exists\n";
+        continue;
+    }
+    if ($con->query($sql) === false) {
+        fwrite(STDERR, "[error] $table.$name: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    $table.$name added\n";
+}
+
+// AI settings storage for the admin chatbot configuration.
+if (!table_exists($con, 'ai_settings')) {
+    $aiSql = "CREATE TABLE `ai_settings` (
+        `id` int NOT NULL AUTO_INCREMENT,
+        `setting_key` varchar(64) NOT NULL,
+        `setting_value` mediumtext NOT NULL,
+        `updated_by` int DEFAULT NULL,
+        `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uniq_ai_settings_key` (`setting_key`),
+        KEY `idx_ai_settings_updated_by` (`updated_by`),
+        CONSTRAINT `fk_ai_settings_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+    )";
+    if ($con->query($aiSql) === false) {
+        fwrite(STDERR, "[error] ai_settings: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    ai_settings created\n";
+} else {
+    echo "[skip]  ai_settings already exists\n";
 }
 
 echo "Done.\n";

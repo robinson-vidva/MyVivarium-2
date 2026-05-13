@@ -30,7 +30,7 @@ function api_key_lookup(mysqli $con, string $raw): ?array
 {
     if ($raw === '') return null;
     $hash = api_key_hash($raw);
-    $stmt = $con->prepare("SELECT k.id, k.user_id, k.label, k.scopes, k.revoked_at,
+    $stmt = $con->prepare("SELECT k.id, k.user_id, k.label, k.scopes, k.revoked_at, k.expires_at,
                                   u.role, u.status
                              FROM api_keys k
                              JOIN users u ON u.id = k.user_id
@@ -40,6 +40,17 @@ function api_key_lookup(mysqli $con, string $raw): ?array
     $row = $stmt->get_result()->fetch_assoc() ?: null;
     $stmt->close();
     return $row;
+}
+
+/**
+ * True if the key's expires_at is set and strictly in the past.
+ */
+function api_key_is_expired(array $keyRow): bool
+{
+    $exp = $keyRow['expires_at'] ?? null;
+    if ($exp === null || $exp === '') return false;
+    $ts = strtotime((string)$exp);
+    return $ts !== false && $ts < time();
 }
 
 function api_key_mark_used(mysqli $con, int $key_id): void

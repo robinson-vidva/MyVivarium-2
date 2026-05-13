@@ -125,7 +125,10 @@ Content-Type: application/json
 pending row, so client-side and stored versions must match the operation.
 
 If `X-Confirm-Token` is omitted, the operation executes immediately
-(scripts can opt out of the two-step flow).
+(scripts can opt out of the two-step flow). In other words, **scripts can
+bypass confirmation by omitting the header entirely** — the confirm flow
+is opt-in, not enforced. Send `X-Confirm-Token: pending` only when you
+want a preview-then-commit handshake.
 
 Expired tokens return `410 Gone`. Already-executed tokens return `409`.
 
@@ -147,8 +150,8 @@ header. The counter is stored per key in `rate_limit`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET    | /mice | List. Query: `status`, `sex`, `strain`, `cage_id`, `limit` (default 50, max 200), `offset`. |
-| GET    | /mice/{id} | Full mouse with current cage and parents. |
+| GET    | /mice | List. Query: `status`, `sex`, `strain`, `cage_id`, `limit` (default 50, max 200), `offset`, `include_deleted` (admin-only opt-in). |
+| GET    | /mice/{id} | Full mouse with current cage and parents. `include_deleted=true` lets admins fetch archived mice. |
 | POST   | /mice | Create. Body: `mouse_id`, `cage_id`, `sex`, `dob`, `strain`, `genotype`, `notes`. |
 | PATCH  | /mice/{id} | Update editable fields. Supports confirm flow. |
 | POST   | /mice/{id}/move | Move mouse. Body: `to_cage_id`, `reason`. Supports confirm flow. |
@@ -177,7 +180,8 @@ header. The counter is stored per key in `rate_limit`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET    | /maintenance-notes | List. Query: `cage_id`, `from`, `to`, `limit`, `offset`. |
+| GET    | /maintenance-notes | List. Query: `cage_id`, `from`, `to`, `limit`, `offset`, `include_deleted` (admin-only). |
+| GET    | /maintenance-notes/{id} | Read one note. `include_deleted=true` lets admins read soft-deleted ones. |
 | POST   | /maintenance-notes | Create. Body: `cage_id`, `note_text`, `type`. |
 | PATCH  | /maintenance-notes/{id} | Edit by author within 24h. |
 | DELETE | /maintenance-notes/{id} | Soft-delete by author (or admin). Supports confirm flow. |
