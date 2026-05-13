@@ -1,30 +1,38 @@
-# Route every /api/v1/* request through index.php.
-# index.php parses REQUEST_URI itself to figure out the API path.
+# API front-controller routing.
+#
+# Every request under /api/v1/* must reach api/index.php with the original
+# REQUEST_URI intact, so index.php can parse the path itself. This rewrite
+# is written to be maximally compatible with shared hosts (Cloudways, etc.)
+# that may run a restricted AllowOverride.
 
-RewriteEngine On
-RewriteBase /api/
+<IfModule mod_rewrite.c>
+    RewriteEngine On
 
-# Disable content-negotiation fallbacks. MultiViews can cause Apache to
-# resolve /api/v1/mice to ../index.php (the login page) when no rewrite
-# matches, which historically caused the chatbot to receive HTML instead
-# of JSON.
-Options -MultiViews
+    # Avoid content-negotiation surprises (e.g. Apache resolving /api/v1/mice
+    # to ../index.php). Wrapped in IfModule because some shared hosts forbid
+    # bare Options directives in .htaccess.
+    <IfModule mod_negotiation.c>
+        Options -MultiViews
+    </IfModule>
 
-# Allow direct hits to index.php to pass through unchanged.
-RewriteCond %{REQUEST_FILENAME} -f
-RewriteRule ^index\.php$ - [L]
+    # Don't rewrite real files or directories — index.php, README.md, etc.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
 
-# Send everything else (v1/whatever) to the router.
-RewriteRule ^ index.php [QSA,L]
+    # Forward everything else to index.php. REQUEST_URI is preserved, so
+    # index.php parses /api/v1/<path> itself. QSA keeps the query string.
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
 
-# Default response type.
+# Default file when /api/ is hit directly.
 DirectoryIndex index.php
 
-# Forward Authorization-style headers in CGI/FCGI setups that strip them.
+# Forward Authorization headers in CGI/FCGI setups that strip them.
 <IfModule mod_setenvif.c>
     SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
 </IfModule>
 
-# Belt-and-braces: if for any reason a parent ErrorDocument tries to
-# redirect to the project root, force the API to respond with JSON 404.
+# Belt-and-braces: if rewrites fail entirely and the API directory tries to
+# serve a 404, respond with our JSON envelope rather than HTML.
 ErrorDocument 404 "{\"ok\":false,\"error\":{\"code\":\"not_found\",\"message\":\"API route not found\"}}"
