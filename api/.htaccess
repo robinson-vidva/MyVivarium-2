@@ -1,0 +1,19 @@
+# Route every /api/v1/* request through index.php.
+# index.php parses REQUEST_URI itself to figure out the API path.
+
+RewriteEngine On
+
+# Allow direct hits to index.php to pass through unchanged.
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^index\.php$ - [L]
+
+# Send everything else (v1/whatever) to the router.
+RewriteRule ^ index.php [QSA,L]
+
+# Default response type.
+DirectoryIndex index.php
+
+# Forward Authorization-style headers in CGI/FCGI setups that strip them.
+<IfModule mod_setenvif.c>
+    SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
+</IfModule>
