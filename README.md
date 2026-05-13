@@ -431,6 +431,20 @@ Vidva, R., Raza, M. A., Prabhakaran, J., Sheikh, A., Sharp, A., Ott, H., Moore, 
 }
 ```
 
+## Testing & Quality
+
+Regression tests, the test plan, and historical regression reports live in a companion repository: [MyVivarium-2-tests](https://github.com/robinson-vidva/MyVivarium-2-tests).
+
+That repo contains:
+
+- A Docker-based test environment (PHP/MySQL)
+- A Playwright regression suite
+- A 300+ row test plan tracking coverage
+- A synthetic dataset for fast realistic testing
+- Public regression reports snapshotted on every run
+
+Contributors are encouraged to run the regression suite locally before submitting PRs.
+
 ## Contributing
 We welcome contributions to improve MyVivarium. Please follow these steps:
 
