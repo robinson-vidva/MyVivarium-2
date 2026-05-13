@@ -14,7 +14,9 @@ require 'session_config.php';
 require 'dbcon.php'; // Database connection
 require 'config.php'; // Configuration file for email settings
 require 'header.php'; // Include the header file
-require 'vendor/autoload.php'; // Include PHPMailer autoload file
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;

@@ -13,7 +13,11 @@
 require 'session_config.php';
 require 'dbcon.php';  // Include database connection file
 require 'config.php';  // Include configuration file
-require 'vendor/autoload.php';  // Include PHPMailer autoload file
+// Composer is optional — if vendor/ is missing, registration still works
+// but the confirmation email cannot be sent (guarded with class_exists).
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;

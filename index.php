@@ -19,7 +19,11 @@ require 'session_config.php';
 // Include the database connection file
 require 'dbcon.php';
 require 'config.php'; // Include configuration file for SMTP details
-require 'vendor/autoload.php'; // Include PHPMailer autoload file
+// Composer is optional. PHPMailer is only needed for email side-effects on
+// this page; if vendor/ is missing the page still renders.
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
