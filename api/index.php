@@ -47,12 +47,20 @@ header('Cache-Control: no-store');
 
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
-// Path resolution. The .htaccess sets API_PATH to the slice after /api/v1.
-// Fall back to parsing REQUEST_URI for setups (PHP built-in server, dev
-// scripts) that won't go through Apache rewrites.
+// Path resolution. Try every known source in order:
+//   1. API_PATH         — explicit env from a future RewriteRule with [E=...]
+//   2. __api_path query — set by the PHP built-in server dev router
+//   3. ?path=...        — manual debug calls to /api/index.php?path=/api/v1/...
+//   4. PATH_INFO        — works on hosts without mod_rewrite when the client
+//                         calls /api/index.php/v1/health directly
+//   5. REQUEST_URI      — the normal path on Apache + .htaccess rewrites
 $rawPath = $_SERVER['API_PATH']
         ?? $_GET['__api_path']
+        ?? $_GET['path']
         ?? null;
+if ($rawPath === null && !empty($_SERVER['PATH_INFO'])) {
+    $rawPath = $_SERVER['PATH_INFO'];
+}
 if ($rawPath === null) {
     $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
     // Strip everything up to and including /api/v1
@@ -61,6 +69,11 @@ if ($rawPath === null) {
     } else {
         $rawPath = $uri;
     }
+}
+// If a full URI slipped through (e.g. /api/v1/health from REQUEST_URI), strip
+// the /api/v1 prefix once more so route matching always sees just /health.
+if (preg_match('#^/?api/v1(/.*)?$#', (string)$rawPath, $m)) {
+    $rawPath = $m[1] ?? '';
 }
 $path = '/' . ltrim((string)$rawPath, '/');
 $path = rtrim($path, '/');
