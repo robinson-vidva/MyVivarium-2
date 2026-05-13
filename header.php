@@ -372,6 +372,7 @@ if (isset($settings['r2_pres'])) {
                             echo '<li><a class="dropdown-item" href="manage_strain.php">Manage Strain</a></li>';
                             echo '<li><a class="dropdown-item" href="manage_lab.php">Manage Lab</a></li>';
                             echo '<li><a class="dropdown-item" href="manage_api_keys.php">API Keys</a></li>';
+                            echo '<li><a class="dropdown-item" href="manage_ai_config.php">AI Configuration</a></li>';
                             echo '<li><a class="dropdown-item" href="export_data.php">Export CSV</a></li>';
                             echo '<li><a class="dropdown-item" href="admin_import.php"><i class="fas fa-file-import me-1"></i> Import from Previous Version</a></li>';
                             echo '<li><hr class="dropdown-divider"></li>';

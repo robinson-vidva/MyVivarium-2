@@ -54,6 +54,14 @@ function mice_list(mysqli $con, int $user_id, array $filters): array
             throw new ApiException('invalid_argument', 'status must be one of ' . implode(',', MICE_ALLOWED_STATUSES), 400);
         }
         $where[] = 'm.status = ?'; $args[] = $status; $types .= 's';
+    } else {
+        // Soft-deleted (archived) mice are hidden by default. Admins can opt in
+        // with ?include_deleted=true; non-admins have the flag silently ignored.
+        $includeDeleted = svc_str($filters, 'include_deleted');
+        $wantDeleted = ($includeDeleted === '1' || strtolower((string)$includeDeleted) === 'true');
+        if (!($wantDeleted && perm_is_admin($con, $user_id))) {
+            $where[] = "m.status <> 'archived'";
+        }
     }
     $sex = svc_str($filters, 'sex');
     if ($sex !== null) {
@@ -89,7 +97,7 @@ function mice_list(mysqli $con, int $user_id, array $filters): array
     return ['items' => $out, 'total' => $total, 'limit' => $limit, 'offset' => $offset];
 }
 
-function mice_get(mysqli $con, int $user_id, string $mouse_id): array
+function mice_get(mysqli $con, int $user_id, string $mouse_id, array $filters = []): array
 {
     $stmt = $con->prepare("SELECT m.*, sire.dob AS sire_dob, dam.dob AS dam_dob
                              FROM mice m
@@ -105,6 +113,18 @@ function mice_get(mysqli $con, int $user_id, string $mouse_id): array
     }
     $row = $res->fetch_assoc();
     $stmt->close();
+
+    // Soft-deleted rows are hidden by default. Admins can opt in with
+    // ?include_deleted=true; non-admins have the flag silently ignored.
+    // Internal callers (mice_update, mice_move, mice_sacrifice, mice_soft_delete)
+    // bypass via $filters['_internal'] so they can return the post-mutation row.
+    if (($row['status'] ?? null) === 'archived' && empty($filters['_internal'])) {
+        $includeDeleted = svc_str($filters, 'include_deleted');
+        $wantDeleted = ($includeDeleted === '1' || strtolower((string)$includeDeleted) === 'true');
+        if (!($wantDeleted && perm_is_admin($con, $user_id))) {
+            throw new ApiException('not_found', "Mouse $mouse_id not found", 404);
+        }
+    }
 
     $out = mice_serialize($row);
 
@@ -187,7 +207,7 @@ function mice_create(mysqli $con, int $user_id, array $body): array
         throw new ApiException('server_error', 'Failed to create mouse: ' . $e->getMessage(), 500);
     }
 
-    return mice_get($con, $user_id, $mouse_id);
+    return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
 }
 
 /**
@@ -240,7 +260,7 @@ function mice_update(mysqli $con, int $user_id, string $mouse_id, array $body): 
     $stmt->execute();
     $stmt->close();
 
-    return mice_get($con, $user_id, $mouse_id);
+    return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
 }
 
 function mice_move(mysqli $con, int $user_id, string $mouse_id, array $body): array
@@ -304,7 +324,7 @@ function mice_move(mysqli $con, int $user_id, string $mouse_id, array $body): ar
         throw new ApiException('server_error', 'Failed to move mouse: ' . $e->getMessage(), 500);
     }
 
-    return mice_get($con, $user_id, $mouse_id);
+    return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
 }
 
 function mice_move_diff(mysqli $con, string $mouse_id, array $body): array
@@ -357,7 +377,7 @@ function mice_sacrifice(mysqli $con, int $user_id, string $mouse_id, array $body
         throw new ApiException('server_error', 'Failed to sacrifice mouse: ' . $e->getMessage(), 500);
     }
 
-    return mice_get($con, $user_id, $mouse_id);
+    return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
 }
 
 function mice_sacrifice_diff(mysqli $con, string $mouse_id, array $body): array
@@ -410,7 +430,7 @@ function mice_soft_delete(mysqli $con, int $user_id, string $mouse_id): array
         throw new ApiException('server_error', 'Failed to archive mouse: ' . $e->getMessage(), 500);
     }
 
-    return mice_get($con, $user_id, $mouse_id);
+    return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
 }
 
 function mice_soft_delete_diff(mysqli $con, string $mouse_id): array

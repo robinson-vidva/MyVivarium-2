@@ -162,6 +162,9 @@ if (!$authKeyRow) {
 if ($authKeyRow['revoked_at'] !== null) {
     api_error('unauthorized', 'API key has been revoked', 401);
 }
+if (api_key_is_expired($authKeyRow)) {
+    api_error('unauthorized', 'API key has expired', 401);
+}
 if (($authKeyRow['status'] ?? '') !== 'approved') {
     api_error('forbidden', 'Key owner is not an approved user', 403);
 }
@@ -289,7 +292,7 @@ function dispatch(string $method, string $path, array $body): void {
     if (preg_match('#^/mice/([^/]+)$#', $path, $m)) {
         $id = urldecode($m[1]);
         if ($method === 'GET') {
-            api_data(mice_get($con, $authUserId, $id));
+            api_data(mice_get($con, $authUserId, $id, $_GET));
         }
         if ($method === 'PATCH') {
             confirm_or_execute(
@@ -399,6 +402,9 @@ function dispatch(string $method, string $path, array $body): void {
     }
     if (preg_match('#^/maintenance-notes/(\d+)$#', $path, $m)) {
         $id = (int)$m[1];
+        if ($method === 'GET') {
+            api_data(maint_get($con, $authUserId, $id, $_GET));
+        }
         if ($method === 'PATCH') {
             $r = maint_update($con, $authUserId, $id, $body);
             api_log_write('maintenance', (string)$id, 'patch_note');

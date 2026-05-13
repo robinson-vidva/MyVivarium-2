@@ -15,9 +15,11 @@ CREATE TABLE IF NOT EXISTS `api_keys` (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_used_at` datetime DEFAULT NULL,
   `revoked_at` datetime DEFAULT NULL,
+  `expires_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_api_key_hash` (`key_hash`),
   KEY `idx_api_keys_user` (`user_id`),
+  KEY `idx_api_keys_expires` (`expires_at`),
   CONSTRAINT `fk_api_keys_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 );
 
@@ -34,6 +36,7 @@ CREATE TABLE IF NOT EXISTS `pending_operations` (
   PRIMARY KEY (`id`),
   KEY `idx_pending_user` (`user_id`),
   KEY `idx_pending_expires` (`expires_at`),
+  KEY `idx_pending_user_exec` (`user_id`, `executed_at`),
   CONSTRAINT `fk_pending_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 );
 
@@ -65,3 +68,17 @@ ALTER TABLE `maintenance`
   ADD COLUMN `note_type`  varchar(64)  DEFAULT NULL,
   ADD COLUMN `deleted_at` datetime     DEFAULT NULL,
   ADD COLUMN `updated_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- AI Configuration storage for the admin chatbot settings (Groq key, model, prompt, toggle).
+-- Values are stored encrypted with AES-256-CBC; key lives in AI_SETTINGS_ENCRYPTION_KEY.
+CREATE TABLE IF NOT EXISTS `ai_settings` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(64) NOT NULL,
+  `setting_value` mediumtext NOT NULL,
+  `updated_by` int DEFAULT NULL,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_ai_settings_key` (`setting_key`),
+  KEY `idx_ai_settings_updated_by` (`updated_by`),
+  CONSTRAINT `fk_ai_settings_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+);

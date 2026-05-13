@@ -161,8 +161,7 @@ require 'header.php';
                     <td data-label="Label"><?= htmlspecialchars($k['label']); ?></td>
                     <td data-label="User"><?= htmlspecialchars($k['user_name'] . ' (' . $k['user_email'] . ')'); ?></td>
                     <td data-label="Scopes">
-                        <?php foreach (explode(',', $k['scopes']) as $sc):
-                            $sc = trim($sc); if ($sc === '') continue; ?>
+                        <?php foreach (api_key_scopes($k) as $sc): ?>
                             <span class="badge-scope <?= htmlspecialchars($sc); ?>"><?= htmlspecialchars($sc); ?></span>
                         <?php endforeach; ?>
                     </td>
