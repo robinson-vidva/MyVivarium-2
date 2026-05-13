@@ -56,6 +56,9 @@ function chatbot_session_key_mint(mysqli $con, int $user_id, string $username): 
 
     $_SESSION['chatbot_api_key']    = $created['raw'];
     $_SESSION['chatbot_api_key_id'] = $keyId;
+
+    error_log("Chatbot session key minted for user $user_id ($username), key_id=$keyId, expires $expires");
+
     return $created['raw'];
 }
 

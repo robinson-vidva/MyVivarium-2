@@ -99,6 +99,9 @@ if ($method !== 'GET' && $method !== 'DELETE') {
 $authKeyRow = null; // populated after auth
 $authUserId = null;
 
+// API version banner — bumped when the surface changes in incompatible ways.
+const API_VERSION = '1.0';
+
 // -----------------------------------------------------------------------------
 // Response helpers
 // -----------------------------------------------------------------------------
@@ -145,6 +148,23 @@ function api_list(array $serviceResult, int $status = 200): void {
         'limit'  => $serviceResult['limit'],
         'offset' => $serviceResult['offset'],
     ], $status);
+}
+
+// -----------------------------------------------------------------------------
+// Health check — no auth, no session, no permissions, no rate limit.
+//
+// The chatbot calls this once at the start of every conversation to verify
+// the API surface is reachable and returning JSON. If THIS endpoint comes
+// back as HTML, the deployment is misrouting requests (vhost rewrite,
+// MultiViews, ErrorDocument, etc.) and no amount of credential juggling
+// will help. We answer here, before touching the DB.
+// -----------------------------------------------------------------------------
+
+if ($path === '/health' && $method === 'GET') {
+    api_data([
+        'version' => API_VERSION,
+        'time'    => date('c'),
+    ]);
 }
 
 // -----------------------------------------------------------------------------

@@ -509,9 +509,14 @@ function chatbot_api_base(): string
 /**
  * Make one HTTP call to the local REST API.
  *
- * Returns ['status' => int, 'body' => mixed, 'raw' => string]. On 401 the
- * caller is expected to mint a fresh session key and retry once; this
- * function does not auto-retry.
+ * Returns ['status' => int, 'body' => array, 'raw' => string, 'content_type' => string].
+ * On 401 the caller is expected to mint a fresh session key and retry once;
+ * this function does not auto-retry.
+ *
+ * Hard guard: if the response is not 2xx OR the content-type is not
+ * application/json, body is replaced with a synthetic JSON error envelope.
+ * This prevents Groq from ever seeing raw HTML (e.g. a login page) as a
+ * tool result and looping on it.
  */
 function chatbot_api_call(string $sessionKey, string $method, string $path, array $query, array $body, ?string $confirmToken): array
 {
@@ -534,6 +539,8 @@ function chatbot_api_call(string $sessionKey, string $method, string $path, arra
         CURLOPT_CUSTOMREQUEST  => $method,
         CURLOPT_HTTPHEADER     => $headers,
         CURLOPT_TIMEOUT        => 15,
+        CURLOPT_FOLLOWLOCATION => false,   // never follow a redirect to a login page
+        CURLOPT_MAXREDIRS      => 0,
         CURLOPT_SSL_VERIFYPEER => false,   // self-hosted, dev-friendly
         CURLOPT_SSL_VERIFYHOST => 0,
     ]);
@@ -544,12 +551,45 @@ function chatbot_api_call(string $sessionKey, string $method, string $path, arra
     if ($raw === false) {
         $err = curl_error($ch);
         curl_close($ch);
-        return ['status' => 0, 'body' => ['ok' => false, 'error' => ['code' => 'network', 'message' => $err]], 'raw' => $err];
+        return [
+            'status' => 0,
+            'body'   => ['ok' => false, 'error' => ['code' => 'network', 'message' => $err]],
+            'raw'    => $err,
+            'content_type' => '',
+        ];
     }
-    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $status      = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $contentType = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
     curl_close($ch);
-    $decoded = json_decode($raw, true);
-    return ['status' => $status, 'body' => is_array($decoded) ? $decoded : ['raw' => $raw], 'raw' => $raw];
+
+    $isJsonCT = stripos($contentType, 'application/json') !== false;
+    $decoded  = $isJsonCT ? json_decode($raw, true) : null;
+
+    // Hard guard: any non-JSON response (HTML login page, gateway error,
+    // proxy banner) becomes a structured error so Groq does NOT see the
+    // raw HTML — that's what was triggering retry storms and dumping the
+    // login page into the chat reply.
+    if (!$isJsonCT || !is_array($decoded)) {
+        $snippet = substr(preg_replace('/\s+/', ' ', strip_tags((string)$raw)), 0, 200);
+        return [
+            'status' => $status,
+            'body'   => ['ok' => false, 'error' => [
+                'code'    => 'api_not_json',
+                'message' => "The API returned a non-JSON response with status $status (content-type: " . ($contentType ?: 'unknown') . ").",
+                'snippet' => $snippet,
+            ]],
+            'raw'          => (string)$raw,
+            'content_type' => $contentType,
+        ];
+    }
+
+    // JSON came back but the API itself reported non-2xx (e.g. 401).
+    return [
+        'status'       => $status,
+        'body'         => $decoded,
+        'raw'          => (string)$raw,
+        'content_type' => $contentType,
+    ];
 }
 
 /**
@@ -560,10 +600,52 @@ function chatbot_api_call_with_retry(mysqli $con, int $user_id, string $username
     $key = chatbot_session_key_get($con, $user_id, $username);
     $res = chatbot_api_call($key, $method, $path, $query, $body, $confirmToken);
     if ($res['status'] === 401) {
+        $snippet = substr((string)($res['raw'] ?? ''), 0, 200);
+        error_log("Chatbot session key rejected by API (user $user_id), body: $snippet");
         $key = chatbot_session_key_mint($con, $user_id, $username);
         $res = chatbot_api_call($key, $method, $path, $query, $body, $confirmToken);
     }
     return $res;
+}
+
+/**
+ * Ping the API surface. Used once per conversation turn so we fail fast
+ * with a clear message if /api/v1/* is being misrouted (e.g. to the login
+ * HTML) instead of dragging Groq through a retry storm.
+ */
+function chatbot_api_health(): array
+{
+    $url = chatbot_api_base() . '/api/v1/health';
+    $ch  = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        CURLOPT_TIMEOUT        => 5,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_MAXREDIRS      => 0,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+    ]);
+    $raw = curl_exec($ch);
+    if ($raw === false) {
+        $err = curl_error($ch);
+        curl_close($ch);
+        return ['ok' => false, 'status' => 0, 'reason' => 'network: ' . $err];
+    }
+    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $ct     = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    curl_close($ch);
+    if ($status < 200 || $status >= 300) {
+        return ['ok' => false, 'status' => $status, 'reason' => "status $status"];
+    }
+    if (stripos($ct, 'application/json') === false) {
+        return ['ok' => false, 'status' => $status, 'reason' => "non-JSON content-type ($ct)"];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || empty($decoded['ok'])) {
+        return ['ok' => false, 'status' => $status, 'reason' => 'unexpected JSON shape'];
+    }
+    return ['ok' => true, 'status' => $status, 'body' => $decoded];
 }
 
 // -----------------------------------------------------------------------------
@@ -733,6 +815,27 @@ $toolCallsForResponse = [];
 $pendingConfirmation = null;
 $finalReply = '';
 
+// Health pre-check: if /api/v1 is unreachable or returning HTML, abort
+// before we burn Groq tokens looping on bad tool results.
+$health = chatbot_api_health();
+if (!$health['ok']) {
+    error_log("Chatbot health check failed for user $user_id: " . ($health['reason'] ?? 'unknown'));
+    $finalReply = 'The API is not responding correctly. Check that /api/v1 is reachable and the session key is valid.';
+    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
+    echo json_encode([
+        'ok'                  => true,
+        'reply'               => $finalReply,
+        'conversation_id'     => $conversation_id,
+        'tool_calls'          => [],
+        'pending_confirmation'=> null,
+    ], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// Track repeated failures of the same tool call so we can bail out of the
+// loop rather than letting Groq retry indefinitely on a broken API.
+$toolFailureStreak = [];
+
 try {
     for ($iter = 0; $iter < $MAX_ITERATIONS; $iter++) {
 
@@ -831,6 +934,35 @@ try {
                 'status' => $apiRes['status'],
                 'request' => ['method' => $resolved['method'], 'path' => $resolved['path']],
             ];
+
+            // Loop guard: if the same tool keeps coming back with a
+            // non-2xx / non-JSON response, abort the turn instead of
+            // letting Groq spin on bad data. Two strikes per tool.
+            $isFailure = $apiRes['status'] < 200 || $apiRes['status'] >= 300;
+            $isNotJson = isset($apiRes['body']['error']['code']) && $apiRes['body']['error']['code'] === 'api_not_json';
+            if ($isFailure || $isNotJson) {
+                $toolFailureStreak[$name] = ($toolFailureStreak[$name] ?? 0) + 1;
+                if ($toolFailureStreak[$name] >= 2) {
+                    error_log("Chatbot aborting loop: tool '$name' failed " . $toolFailureStreak[$name] . "x in one turn (status={$apiRes['status']})");
+                    $finalReply = 'The API is not responding correctly. Check that /api/v1 is reachable and the session key is valid.';
+                    chatbot_message_persist($con, $conversation_id, 'tool',
+                        json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES),
+                        ['id' => $tc['id'] ?? null, 'function' => ['name' => $name]],
+                        ['status' => $apiRes['status'], 'body' => $apiRes['body']]
+                    );
+                    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
+                    echo json_encode([
+                        'ok'                  => true,
+                        'reply'               => $finalReply,
+                        'conversation_id'     => $conversation_id,
+                        'tool_calls'          => $toolCallsForResponse,
+                        'pending_confirmation'=> null,
+                    ], JSON_UNESCAPED_SLASHES);
+                    exit;
+                }
+            } else {
+                $toolFailureStreak[$name] = 0;
+            }
 
             // Destructive tool → 202 with pending_operation_id. Halt the
             // loop and surface the confirmation card to the browser.

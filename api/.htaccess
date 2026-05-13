@@ -2,6 +2,13 @@
 # index.php parses REQUEST_URI itself to figure out the API path.
 
 RewriteEngine On
+RewriteBase /api/
+
+# Disable content-negotiation fallbacks. MultiViews can cause Apache to
+# resolve /api/v1/mice to ../index.php (the login page) when no rewrite
+# matches, which historically caused the chatbot to receive HTML instead
+# of JSON.
+Options -MultiViews
 
 # Allow direct hits to index.php to pass through unchanged.
 RewriteCond %{REQUEST_FILENAME} -f
@@ -17,3 +24,7 @@ DirectoryIndex index.php
 <IfModule mod_setenvif.c>
     SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
 </IfModule>
+
+# Belt-and-braces: if for any reason a parent ErrorDocument tries to
+# redirect to the project root, force the API to respond with JSON 404.
+ErrorDocument 404 "{\"ok\":false,\"error\":{\"code\":\"not_found\",\"message\":\"API route not found\"}}"
