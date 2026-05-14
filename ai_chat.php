@@ -55,22 +55,15 @@ $username  = (string)($_SESSION['name'] ?? $_SESSION['username']);
 // -----------------------------------------------------------------------------
 // Per-user daily rate limit
 //
-// Caps the number of LLM calls each user can make in a rolling 24-hour
-// window so a single account cannot drain provider credits. The cap defaults
-// per DEMO mode (invite=30, yes=100, otherwise unlimited) and can be
-// overridden by the AI_DAILY_USER_LIMIT env var. A value of 0 disables.
+// Disabled by default during the testing phase. To turn it on, set the
+// AI_DAILY_USER_LIMIT env var to a positive integer (max LLM calls per
+// rolling 24h per user). Leaving it unset or 0 means unlimited.
 // -----------------------------------------------------------------------------
 
 $dailyLimitOverride = env_get('AI_DAILY_USER_LIMIT');
-if ($dailyLimitOverride !== null && $dailyLimitOverride !== '' && ctype_digit((string)$dailyLimitOverride)) {
-    $dailyLimit = (int)$dailyLimitOverride;
-} elseif ($demo === 'invite') {
-    $dailyLimit = 30;
-} elseif ($demo === 'yes') {
-    $dailyLimit = 100;
-} else {
-    $dailyLimit = 0;
-}
+$dailyLimit = ($dailyLimitOverride !== null && $dailyLimitOverride !== '' && ctype_digit((string)$dailyLimitOverride))
+    ? (int)$dailyLimitOverride
+    : 0;
 
 if ($dailyLimit > 0) {
     $rlStmt = $con->prepare("SELECT COUNT(*) AS c, UNIX_TIMESTAMP(MIN(created_at)) AS oldest FROM ai_usage_log WHERE user_id = ? AND created_at >= NOW() - INTERVAL 1 DAY");
