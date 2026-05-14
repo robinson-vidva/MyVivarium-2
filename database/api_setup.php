@@ -262,4 +262,24 @@ if (!table_exists($con, 'ai_settings')) {
     echo "[skip]  ai_settings already exists\n";
 }
 
+// AI chatbot per-user rate limit counters. One row per user per
+// (window_kind, window_start) pair. Idempotent.
+if (!table_exists($con, 'ai_chat_rate')) {
+    $sql = "CREATE TABLE `ai_chat_rate` (
+        `user_id` int NOT NULL,
+        `window_kind` enum('minute','day') NOT NULL,
+        `window_start` datetime NOT NULL,
+        `count` int NOT NULL DEFAULT 0,
+        PRIMARY KEY (`user_id`, `window_kind`, `window_start`),
+        KEY `idx_aicr_user_kind` (`user_id`, `window_kind`)
+    )";
+    if ($con->query($sql) === false) {
+        fwrite(STDERR, "[error] ai_chat_rate: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    ai_chat_rate created\n";
+} else {
+    echo "[skip]  ai_chat_rate already exists\n";
+}
+
 echo "Done.\n";

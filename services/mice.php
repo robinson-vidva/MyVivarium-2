@@ -433,6 +433,66 @@ function mice_soft_delete(mysqli $con, int $user_id, string $mouse_id): array
     return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
 }
 
+/**
+ * Chronological cage-move history for a mouse. Visibility inherits from the
+ * mouse: a non-admin who can't see the mouse (because they have no write
+ * access to its current cage AND it's archived) gets a 404 from mice_get
+ * first.
+ */
+function mice_history(mysqli $con, int $user_id, string $mouse_id): array
+{
+    // Ensure the mouse exists (and visibility check via mice_get for archived).
+    mice_get($con, $user_id, $mouse_id);
+
+    $stmt = $con->prepare("SELECT id, mouse_id, cage_id, moved_in_at, moved_out_at, reason, moved_by
+                             FROM mouse_cage_history
+                            WHERE mouse_id = ?
+                         ORDER BY moved_in_at ASC, id ASC");
+    $stmt->bind_param('s', $mouse_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $items = [];
+    while ($r = $res->fetch_assoc()) {
+        $items[] = [
+            'id'           => (int)$r['id'],
+            'mouse_id'     => $r['mouse_id'],
+            'cage_id'      => $r['cage_id'],
+            'moved_in_at'  => $r['moved_in_at'],
+            'moved_out_at' => $r['moved_out_at'],
+            'reason'       => $r['reason'],
+            'moved_by'     => $r['moved_by'] !== null ? (int)$r['moved_by'] : null,
+        ];
+    }
+    $stmt->close();
+    return ['items' => $items, 'total' => count($items), 'limit' => count($items), 'offset' => 0];
+}
+
+/**
+ * Offspring of one mouse — any mouse whose sire_id or dam_id matches.
+ */
+function mice_offspring(mysqli $con, int $user_id, string $mouse_id, array $filters = []): array
+{
+    mice_get($con, $user_id, $mouse_id);
+
+    [$limit, $offset] = svc_paginate($filters, 50, 200);
+
+    $cs = $con->prepare("SELECT COUNT(*) AS n FROM mice WHERE sire_id = ? OR dam_id = ?");
+    $cs->bind_param('ss', $mouse_id, $mouse_id);
+    $cs->execute();
+    $total = (int)$cs->get_result()->fetch_assoc()['n'];
+    $cs->close();
+
+    $stmt = $con->prepare("SELECT * FROM mice WHERE sire_id = ? OR dam_id = ?
+                            ORDER BY dob ASC, mouse_id ASC LIMIT ? OFFSET ?");
+    $stmt->bind_param('ssii', $mouse_id, $mouse_id, $limit, $offset);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $out = [];
+    while ($r = $res->fetch_assoc()) $out[] = mice_serialize($r);
+    $stmt->close();
+    return ['items' => $out, 'total' => $total, 'limit' => $limit, 'offset' => $offset];
+}
+
 function mice_soft_delete_diff(mysqli $con, string $mouse_id): array
 {
     $stmt = $con->prepare("SELECT status, current_cage_id FROM mice WHERE mouse_id = ?");

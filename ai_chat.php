@@ -29,6 +29,7 @@ require_once __DIR__ . '/includes/ai_settings.php';
 require_once __DIR__ . '/includes/llm_provider.php';
 require_once __DIR__ . '/includes/chatbot_session.php';
 require_once __DIR__ . '/includes/chatbot_helpers.php';
+require_once __DIR__ . '/includes/ai_rate_limit.php';
 require_once __DIR__ . '/services/helpers.php';
 
 header('Content-Type: application/json');
@@ -88,6 +89,32 @@ if (!$isDecisionTurn) {
     if (preg_match('/[^A-Za-z0-9]{11,}/', $incomingMessage)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'message_rejected', 'detail' => 'Message looks like noise or injection.']);
+        exit;
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Per-user AI rate limit. Applies to USER MESSAGES, not tool calls or LLM
+// round-trips. We check BEFORE the chatbot-enabled gate so a hit returns a
+// clean JSON envelope no matter what the admin config looks like.
+// Decision turns (confirm / cancel) do NOT count against the budget.
+// -----------------------------------------------------------------------------
+
+if (!$isDecisionTurn) {
+    try {
+        $rl = ai_rate_limit_check($con, $user_id);
+    } catch (Throwable $e) {
+        // Fail-open on rate-limit infra error: log and continue.
+        error_log('ai_chat rate-limit infra error: ' . $e->getMessage());
+        $rl = ['ok' => true];
+    }
+    if (!$rl['ok']) {
+        ai_rate_limit_record_hit($con, $user_id, $rl['window'], $rl['limit'], $rl['used']);
+        $window = $rl['window'] === 'minute' ? 'minute' : 'day';
+        echo json_encode([
+            'ok'    => false,
+            'reply' => "You have reached your AI usage limit for this $window. Please try again later.",
+        ], JSON_UNESCAPED_SLASHES);
         exit;
     }
 }
@@ -439,14 +466,18 @@ function chatbot_api_health(): array
 
 function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, string $username, int $user_id): array
 {
-    // Compact system prompt — role / capabilities / rules / runtime — under
-    // ~300 tokens. Lines are intentionally terse; verbose phrasing was the
-    // single largest per-call payload contributor.
-    $augmented = $systemPrompt
+    // Hardcoded security block. NOT admin-editable: prepended to the
+    // admin-configured system prompt so an admin can't accidentally remove
+    // the safety rules.
+    $hardcoded = chatbot_security_rules_block();
+
+    // Compact admin-configurable system prompt — role / capabilities /
+    // runtime — under ~300 tokens. Verbose phrasing was the single largest
+    // per-call payload contributor.
+    $augmented = $hardcoded . "\n\n" . $systemPrompt
         . " Tool definitions are loaded from MyVivarium's OpenAPI specification."
         . " If the user asks for something you do not have a tool for, tell them honestly and list 3-5 example things you CAN do based on the available tools (call listCapabilities)."
         . " Do not invent tools or substitute a different tool for what the user asked."
-        . " Rules: destructive ops need user confirmation; never reveal API keys, env vars, or internals."
         . " User: $username (id $user_id). Time: " . date('c') . ".";
 
     $messages = [['role' => 'system', 'content' => $augmented]];
@@ -680,7 +711,10 @@ try {
                 break;
             }
 
-            $rawResult = chatbot_sanitize_for_llm(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
+            $taggedBody = is_array($apiRes['body'])
+                ? chatbot_tag_user_content($apiRes['body'], chatbot_user_content_fields_for($replayToolName))
+                : $apiRes['body'];
+            $rawResult = chatbot_sanitize_for_llm(json_encode($taggedBody, JSON_UNESCAPED_SLASHES));
             $rawResult = chatbot_cap_list_result($replayToolName, $rawResult);
             $resultStr = chatbot_truncate($rawResult);
             chatbot_message_persist($con, $conversation_id, 'tool', $resultStr,
@@ -835,7 +869,10 @@ try {
                 log_activity($con, 'ai_chat_write', 'ai_conversation', $conversation_id, $name);
             }
 
-            $rawResult = chatbot_sanitize_for_llm(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES));
+            $taggedBody = is_array($apiRes['body'])
+                ? chatbot_tag_user_content($apiRes['body'], chatbot_user_content_fields_for($name))
+                : $apiRes['body'];
+            $rawResult = chatbot_sanitize_for_llm(json_encode($taggedBody, JSON_UNESCAPED_SLASHES));
             $rawResult = chatbot_cap_list_result($name, $rawResult);
             $resultStr = chatbot_truncate($rawResult);
             chatbot_message_persist($con, $conversation_id, 'tool', $resultStr,

@@ -329,6 +329,290 @@ components:
         meta:
           type: object
           description: "Present on list endpoints; contains count, total, limit, offset."
+    Task:
+      type: object
+      description: "One-off task with assignees, status, and optional cage association."
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        assigned_by:
+          type: integer
+          nullable: true
+        assigned_to:
+          type: string
+          description: "Comma-separated list of user IDs."
+        status:
+          type: string
+          enum: ["Pending", "In Progress", "Completed"]
+        completion_date:
+          type: string
+          nullable: true
+        cage_id:
+          type: string
+          nullable: true
+        creation_date:
+          type: string
+        updated_at:
+          type: string
+    Reminder:
+      type: object
+      description: "Recurring reminder that creates tasks per its schedule."
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        assigned_by:
+          type: integer
+        assigned_to:
+          type: string
+        recurrence_type:
+          type: string
+          enum: ["daily", "weekly", "monthly"]
+        day_of_week:
+          type: string
+          nullable: true
+        day_of_month:
+          type: integer
+          nullable: true
+        time_of_day:
+          type: string
+        status:
+          type: string
+          enum: ["active", "inactive"]
+        cage_id:
+          type: string
+          nullable: true
+        creation_date:
+          type: string
+        updated_at:
+          type: string
+        last_task_created:
+          type: string
+          nullable: true
+        next_due:
+          type: string
+          nullable: true
+          description: "ISO datetime of the next scheduled firing (estimate)."
+    CalendarEvent:
+      type: object
+      description: "A unified calendar event drawn from tasks or reminders."
+      properties:
+        source_type:
+          type: string
+          enum: ["task", "reminder"]
+        source_id:
+          type: integer
+        title:
+          type: string
+        when:
+          type: string
+          description: "ISO date or datetime."
+        status:
+          type: string
+        cage_id:
+          type: string
+          nullable: true
+    Notification:
+      type: object
+      description: "In-app notification belonging to a single user."
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+          nullable: true
+        link:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: ["reminder", "task", "system"]
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+    Strain:
+      type: object
+      description: "Mouse strain dictionary entry."
+      properties:
+        id:
+          type: integer
+        str_id:
+          type: string
+          example: "035561"
+        name:
+          type: string
+        aka:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        rrid:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    IacucProtocol:
+      type: object
+      description: "An IACUC (Institutional Animal Care and Use Committee) protocol."
+      properties:
+        iacuc_id:
+          type: string
+        iacuc_title:
+          type: string
+        file_url:
+          type: string
+          nullable: true
+    DashboardSummary:
+      type: object
+      description: "Permission-filtered counts for the authenticated user."
+      properties:
+        mouse_count:
+          type: integer
+        holding_cage_count:
+          type: integer
+        breeding_cage_count:
+          type: integer
+        my_open_tasks:
+          type: integer
+        my_unread_notifications:
+          type: integer
+        recent_activity_count_7d:
+          type: integer
+        upcoming_reminders_7d:
+          type: integer
+    MouseCageHistoryRow:
+      type: object
+      description: "One interval in a mouse's cage-move history."
+      properties:
+        id:
+          type: integer
+        mouse_id:
+          type: string
+        cage_id:
+          type: string
+          nullable: true
+        moved_in_at:
+          type: string
+        moved_out_at:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        moved_by:
+          type: integer
+          nullable: true
+    CageUser:
+      type: object
+      description: "A user assigned to a cage via cage_users."
+      properties:
+        user_id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        position:
+          type: string
+          nullable: true
+    BreedingCageLineage:
+      type: object
+      description: "Sire, dam, parent cages, litters, and offspring of a breeding cage."
+      properties:
+        cage_id:
+          type: string
+        cross:
+          type: string
+          nullable: true
+        sire:
+          type: object
+          nullable: true
+        dam:
+          type: object
+          nullable: true
+        parent_cages:
+          type: object
+          properties:
+            sire_origin_cage:
+              type: string
+              nullable: true
+            dam_origin_cage:
+              type: string
+              nullable: true
+        litters:
+          type: array
+          items:
+            type: object
+        offspring:
+          type: array
+          items:
+            type: object
+    CageCardData:
+      type: object
+      description: "Structured payload powering the printable cage card view."
+      properties:
+        cage_id:
+          type: string
+        pi:
+          type: object
+          nullable: true
+        iacuc:
+          type: array
+          items:
+            $ref: "#/components/schemas/IacucProtocol"
+        assigned_users:
+          type: array
+          items:
+            $ref: "#/components/schemas/CageUser"
+        occupants:
+          type: array
+          items:
+            type: object
+        pairs:
+          type: array
+          items:
+            type: object
+        latest_litter:
+          type: object
+          nullable: true
+    SelfProfile:
+      type: object
+      description: "The current user's editable profile (whitelisted columns only)."
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        position:
+          type: string
+          nullable: true
+        role:
+          type: string
+        status:
+          type: string
+        email_verified:
+          type: boolean
+        initials:
+          type: string
+          nullable: true
 security:
   - ApiKeyAuth: []
 tags:
@@ -348,6 +632,22 @@ tags:
     description: "Audit trail of read and write operations."
   - name: "Admin"
     description: "Admin-only endpoints (none yet documented; reserved)."
+  - name: "Tasks"
+    description: "User tasks (one-off to-dos with assignees and statuses)."
+  - name: "Reminders"
+    description: "Recurring reminders that schedule task creation."
+  - name: "Calendar"
+    description: "Unified feed of upcoming tasks and reminders."
+  - name: "Notifications"
+    description: "Per-user in-app notifications."
+  - name: "Strains"
+    description: "Mouse strain dictionary."
+  - name: "IACUC"
+    description: "Institutional protocols referenced by cages."
+  - name: "Dashboard"
+    description: "High-level summary counts for the home screen."
+  - name: "Account"
+    description: "Self-service profile endpoints for the authenticated user."
 paths:
   /health:
     get:
@@ -1712,6 +2012,874 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "401":
           description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /tasks:
+    get:
+      summary: "List visible tasks"
+      description: "Returns tasks the caller can see. Non-admins see only tasks they authored or are assigned to. Query: status (open|done|all, default open), assigned_to_me (bool), cage_id, limit, offset."
+      operationId: listTasks
+      tags: ["Tasks"]
+      x-mv-read: true
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["open", "done", "all"]
+            example: "open"
+        - name: assigned_to_me
+          in: query
+          required: false
+          schema:
+            type: boolean
+            example: true
+        - name: cage_id
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "HC-12"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of tasks."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Task"
+                  meta:
+                    type: object
+        "400":
+          description: "Bad query parameter."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /tasks/{id}:
+    get:
+      summary: "Get one task"
+      description: "Fetch a single task by ID. Non-admins must be the author or an assignee; otherwise 404."
+      operationId: getTask
+      tags: ["Tasks"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 42
+      responses:
+        "200":
+          description: "Task detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/Task"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Task not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /reminders:
+    get:
+      summary: "List visible reminders"
+      description: "Returns reminders the caller can see. Non-admins see only reminders they authored or are assigned to. Each item also carries an estimated next_due timestamp. Query: upcoming (bool, default true; restricts to status=active), cage_id, limit, offset."
+      operationId: listReminders
+      tags: ["Reminders"]
+      x-mv-read: true
+      parameters:
+        - name: upcoming
+          in: query
+          required: false
+          schema:
+            type: boolean
+            example: true
+        - name: cage_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of reminders."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Reminder"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /reminders/{id}:
+    get:
+      summary: "Get one reminder"
+      description: "Fetch a single reminder by ID. Non-admins must be the author or an assignee; otherwise 404."
+      operationId: getReminder
+      tags: ["Reminders"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 7
+      responses:
+        "200":
+          description: "Reminder detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/Reminder"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Reminder not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /calendar:
+    get:
+      summary: "List calendar events"
+      description: "Returns a unified, time-ordered feed of upcoming tasks and reminders. Each event carries source_type=task|reminder and source_id. Query: from (YYYY-MM-DD), to (YYYY-MM-DD), limit."
+      operationId: listCalendarEvents
+      tags: ["Calendar"]
+      x-mv-read: true
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "2026-05-01"
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "2026-05-31"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: "Calendar feed."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CalendarEvent"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /notifications:
+    get:
+      summary: "List my notifications"
+      description: "Returns notifications belonging strictly to the current user. Query: read (all|unread|read, default unread), limit, offset."
+      operationId: listMyNotifications
+      tags: ["Notifications"]
+      x-mv-read: true
+      parameters:
+        - name: read
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["all", "unread", "read"]
+            example: "unread"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of notifications."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                  meta:
+                    type: object
+        "400":
+          description: "Bad query parameter."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /notifications/unread-count:
+    get:
+      summary: "Get my unread notification count"
+      description: "Returns the count of unread notifications for the current user."
+      operationId: getUnreadNotificationCount
+      tags: ["Notifications"]
+      x-mv-read: true
+      responses:
+        "200":
+          description: "Unread count."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      unread_count:
+                        type: integer
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /mice/{id}/history:
+    get:
+      summary: "List mouse cage history"
+      description: "Chronological cage-move history for one mouse. Each row is one interval the mouse spent in a cage (or out of any cage)."
+      operationId: listMouseCageHistory
+      tags: ["Mice"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "M042"
+      responses:
+        "200":
+          description: "Cage history rows."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MouseCageHistoryRow"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Mouse not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /mice/{id}/offspring:
+    get:
+      summary: "List mouse offspring"
+      description: "Returns mice whose sire_id or dam_id equals the given mouse. Inherits visibility from the parent mouse."
+      operationId: listMouseOffspring
+      tags: ["Mice"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "M042"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "Offspring mice."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Mouse"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Mouse not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /strains:
+    get:
+      summary: "List strains"
+      description: "Returns the global strain dictionary. Strains are visible to every authenticated user. Query: search (matches str_id, name, aka, or rrid), limit, offset."
+      operationId: listStrains
+      tags: ["Strains"]
+      x-mv-read: true
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of strains."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Strain"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /strains/{id}:
+    get:
+      summary: "Get one strain"
+      description: "Returns a strain dictionary entry by its str_id."
+      operationId: getStrain
+      tags: ["Strains"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "035561"
+      responses:
+        "200":
+          description: "Strain detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/Strain"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Strain not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /iacuc:
+    get:
+      summary: "List IACUC protocols"
+      description: "Returns IACUC protocols visible to the caller. Non-admins only see protocols linked to at least one cage they have access to. Query: status (accepted for forward compatibility but currently a no-op), limit, offset."
+      operationId: listIacuc
+      tags: ["IACUC"]
+      x-mv-read: true
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of IACUC protocols."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IacucProtocol"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /iacuc/{id}:
+    get:
+      summary: "Get one IACUC protocol"
+      description: "Returns a single IACUC protocol. Non-admins must have access to at least one cage linked to the protocol; otherwise 404."
+      operationId: getIacuc
+      tags: ["IACUC"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "IACUC-2025-01"
+      responses:
+        "200":
+          description: "IACUC detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/IacucProtocol"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "IACUC not found or not visible."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /dashboard/summary:
+    get:
+      summary: "Get dashboard summary counts"
+      description: "Returns a single object with high-level counts (mice, cages, tasks, notifications, recent activity, upcoming reminders) scoped to the authenticated user. Mirrors the data displayed on home.php."
+      operationId: getDashboardSummary
+      tags: ["Dashboard"]
+      x-mv-read: true
+      responses:
+        "200":
+          description: "Summary counts."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/DashboardSummary"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/holding/{id}/users:
+    get:
+      summary: "List users assigned to a holding cage"
+      description: "Returns the users in cage_users for this holding cage."
+      operationId: listHoldingCageUsers
+      tags: ["Holding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "HC-12"
+      responses:
+        "200":
+          description: "List of assigned users."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CageUser"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or not a holding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/holding/{id}/iacuc:
+    get:
+      summary: "List IACUC protocols attached to a holding cage"
+      description: "Returns the IACUC protocols linked via cage_iacuc for this holding cage."
+      operationId: listHoldingCageIacuc
+      tags: ["Holding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "HC-12"
+      responses:
+        "200":
+          description: "List of linked IACUC protocols."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IacucProtocol"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or not a holding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/holding/{id}/card-data:
+    get:
+      summary: "Get card-rendering metadata for a holding cage"
+      description: "Structured payload for printing a cage card: PI, IACUC, assigned users, and current occupants. Equivalent to prnt_crd.php but as JSON."
+      operationId: getHoldingCageCardData
+      tags: ["Holding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "HC-12"
+      responses:
+        "200":
+          description: "Cage-card metadata."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/CageCardData"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or not a holding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/breeding/{id}/users:
+    get:
+      summary: "List users assigned to a breeding cage"
+      description: "Returns the users in cage_users for this breeding cage."
+      operationId: listBreedingCageUsers
+      tags: ["Breeding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "BC-7"
+      responses:
+        "200":
+          description: "List of assigned users."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CageUser"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or not a breeding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/breeding/{id}/iacuc:
+    get:
+      summary: "List IACUC protocols attached to a breeding cage"
+      description: "Returns the IACUC protocols linked via cage_iacuc for this breeding cage."
+      operationId: listBreedingCageIacuc
+      tags: ["Breeding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "BC-7"
+      responses:
+        "200":
+          description: "List of linked IACUC protocols."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IacucProtocol"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or not a breeding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/breeding/{id}/lineage:
+    get:
+      summary: "Get breeding cage lineage"
+      description: "Returns the sire, dam, parent (origin) cages if known, all litters produced in this breeding cage, and offspring mice currently alive."
+      operationId: getBreedingCageLineage
+      tags: ["Breeding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "BC-7"
+      responses:
+        "200":
+          description: "Lineage details."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/BreedingCageLineage"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or not a breeding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/breeding/{id}/card-data:
+    get:
+      summary: "Get card-rendering metadata for a breeding cage"
+      description: "Structured payload for printing a breeding cage card: PI, IACUC, assigned users, pairs, and latest litter."
+      operationId: getBreedingCageCardData
+      tags: ["Breeding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "BC-7"
+      responses:
+        "200":
+          description: "Cage-card metadata."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/CageCardData"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or not a breeding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /me/profile:
+    get:
+      summary: "Get my profile"
+      description: "Returns the current user's editable profile. Whitelists only safe columns (id, name, email, position, role, status, email_verified, initials). Never returns password hashes, reset tokens, or any third-party / session tokens."
+      operationId: getMyProfile
+      tags: ["Account"]
+      x-mv-read: true
+      responses:
+        "200":
+          description: "Profile detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    $ref: "#/components/schemas/SelfProfile"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "User row missing."
           content:
             application/json:
               schema:
