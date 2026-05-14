@@ -147,13 +147,27 @@ function verifyTurnstile($turnstileResponse, $turnstileSecretKey)
     return $result['success'];
 }
 
+// In invite mode, registrations must pass Cloudflare Turnstile — fail closed
+// if the admin hasn't configured keys yet.
+$inviteMode = ($demo === 'invite');
+$turnstileConfigured = (!empty($turnstileSiteKey) && !empty($turnstileSecretKey));
+$registrationsBlocked = ($inviteMode && !$turnstileConfigured);
+
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if ($registrationsBlocked) {
+        $_SESSION['resultMessage'] = "Registration is currently disabled. Please contact an administrator.";
+        $con->close();
+        header("Location: " . htmlspecialchars($_SERVER["PHP_SELF"]));
+        exit;
+    }
     // Check honeypot field for spam detection
     if (!empty($_POST['honeypot'])) {
         $_SESSION['resultMessage'] = "Spam detected! Please try again.";
     } else {
-        // Proceed with Turnstile verification if keys are set
+        // Proceed with Turnstile verification if keys are set. In invite mode
+        // this branch is always taken because $registrationsBlocked above
+        // already rejected the submission when keys are absent.
         if (!empty($turnstileSiteKey) && !empty($turnstileSecretKey)) {
             $turnstileResponse = $_POST['cf-turnstile-response'];
             if (!verifyTurnstile($turnstileResponse, $turnstileSecretKey)) {
@@ -366,6 +380,13 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
     <div class="container content">
         <h2>User Registration</h2>
         <br>
+        <?php if ($registrationsBlocked) : ?>
+            <div class="alert alert-warning" role="alert">
+                Registration is currently disabled on this invite-only demo.
+                Please contact an administrator to request an account.
+            </div>
+            <a href="index.php" class="btn btn-secondary">Go Back</a>
+        <?php else : ?>
         <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
             <!-- Honeypot field for spam detection -->
             <div style="display:none;">
@@ -437,6 +458,7 @@ unset($_SESSION['resultMessage']);  // Clear the message from session
             cpw.addEventListener('input', check);
         });
         </script>
+        <?php endif; ?>
         <br>
 
         <!-- Display the result message if any -->

@@ -53,6 +53,46 @@ $user_id   = (int)$_SESSION['user_id'];
 $username  = (string)($_SESSION['name'] ?? $_SESSION['username']);
 
 // -----------------------------------------------------------------------------
+// Per-user daily rate limit
+//
+// Caps the number of LLM calls each user can make in a rolling 24-hour
+// window so a single account cannot drain provider credits. The cap defaults
+// per DEMO mode (invite=30, yes=100, otherwise unlimited) and can be
+// overridden by the AI_DAILY_USER_LIMIT env var. A value of 0 disables.
+// -----------------------------------------------------------------------------
+
+$dailyLimitOverride = env_get('AI_DAILY_USER_LIMIT');
+if ($dailyLimitOverride !== null && $dailyLimitOverride !== '' && ctype_digit((string)$dailyLimitOverride)) {
+    $dailyLimit = (int)$dailyLimitOverride;
+} elseif ($demo === 'invite') {
+    $dailyLimit = 30;
+} elseif ($demo === 'yes') {
+    $dailyLimit = 100;
+} else {
+    $dailyLimit = 0;
+}
+
+if ($dailyLimit > 0) {
+    $rlStmt = $con->prepare("SELECT COUNT(*) AS c, UNIX_TIMESTAMP(MIN(created_at)) AS oldest FROM ai_usage_log WHERE user_id = ? AND created_at >= NOW() - INTERVAL 1 DAY");
+    $rlStmt->bind_param('i', $user_id);
+    $rlStmt->execute();
+    $rlRow = $rlStmt->get_result()->fetch_assoc() ?: ['c' => 0, 'oldest' => null];
+    $rlStmt->close();
+    if ((int)$rlRow['c'] >= $dailyLimit) {
+        $retryAfter = $rlRow['oldest'] ? max(1, ((int)$rlRow['oldest'] + 86400) - time()) : 3600;
+        http_response_code(429);
+        header('Retry-After: ' . $retryAfter);
+        echo json_encode([
+            'ok' => false,
+            'error' => 'rate_limit_exceeded',
+            'detail' => "Daily AI request limit reached ($dailyLimit / 24h). Please try again later.",
+            'retry_after_seconds' => $retryAfter,
+        ]);
+        exit;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Body parse + safety guards
 // -----------------------------------------------------------------------------
 
