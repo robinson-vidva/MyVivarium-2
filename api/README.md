@@ -4,6 +4,37 @@ Versioned JSON API over the same database that powers the MyVivarium-2 web
 UI. Designed as the single entry point for the upcoming AI chatbot, but
 usable from any HTTP client.
 
+## Specification
+
+The OpenAPI 3.1 spec at [`api/openapi.yaml`](openapi.yaml) is the single
+source of truth for the API surface. Three audiences read from it:
+
+- **Humans** — interactive Swagger UI at `/api/docs/` (admin only). Linked
+  from the admin menu next to "API Keys" and "AI Configuration".
+- **Developers** — the spec itself is served at `/api/v1/openapi.yaml` and
+  `/api/v1/openapi.json` (no auth required; the spec describes the surface
+  and contains no secrets).
+- **Chatbot** — `ai_chat.php` loads the spec on every turn and emits the
+  Groq / OpenAI tool array directly from the operations it finds. There
+  is no hardcoded tool list. `operationId` becomes the tool name,
+  `summary` + `description` becomes the tool description, and the
+  `x-mv-destructive` extension marks ops that need confirm-before-execute.
+
+### Workflow for adding a new endpoint
+
+1. Implement the route handler in `api/index.php` (delegating real work to
+   a function in `services/`).
+2. Add a matching path entry to `api/openapi.yaml`. Include `operationId`,
+   `summary`, `description`, `tags`, `parameters`, `requestBody`, and at
+   least the success response. Mark the op with `x-mv-destructive: true`
+   (PATCH/DELETE/move/sacrifice) or `x-mv-safe-write: true` (creates) or
+   `x-mv-read: true` (GETs) so the chatbot routes it correctly.
+3. Run `php tests/openapi_validate.php` to confirm router and spec agree.
+4. Run `php tests/chatbot_unit_test.php` to confirm the chatbot still
+   resolves every operationId.
+5. The chatbot picks up the new endpoint on the next request — no code
+   change needed in `ai_chat.php` or `includes/chatbot_helpers.php`.
+
 ## Setup
 
 Run the schema migrations once:

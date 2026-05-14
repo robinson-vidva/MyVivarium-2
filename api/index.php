@@ -181,6 +181,31 @@ if ($path === '/health' && $method === 'GET') {
 }
 
 // -----------------------------------------------------------------------------
+// OpenAPI spec — public, no auth. The spec describes the API surface; it
+// does not contain secrets. Both /openapi.yaml and /openapi.json are served
+// from the single YAML source.
+// -----------------------------------------------------------------------------
+
+if (($path === '/openapi.yaml' || $path === '/openapi.json') && $method === 'GET') {
+    $specPath = __DIR__ . '/openapi.yaml';
+    if (!is_readable($specPath)) {
+        api_error('not_found', 'OpenAPI spec missing', 404);
+    }
+    if ($path === '/openapi.yaml') {
+        header('Content-Type: application/yaml');
+        header('Cache-Control: public, max-age=300');
+        readfile($specPath);
+        exit;
+    }
+    require_once __DIR__ . '/../services/openapi_loader.php';
+    $spec = mv_openapi_load($specPath);
+    header('Content-Type: application/json');
+    header('Cache-Control: public, max-age=300');
+    echo json_encode($spec, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    exit;
+}
+
+// -----------------------------------------------------------------------------
 // Authentication
 // -----------------------------------------------------------------------------
 
