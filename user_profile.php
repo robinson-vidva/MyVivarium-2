@@ -107,7 +107,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
         die('CSRF token validation failed');
     }
 
-    $newUsername = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_EMAIL);
+    $submittedUsername = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_EMAIL);
+    // If the username field was not submitted (e.g. demo mode hides it) or is empty, keep the existing one
+    $newUsername = !empty($submittedUsername) ? $submittedUsername : $username;
     $name = trim($_POST['name'] ?? '');
     $initials = trim($_POST['initials'] ?? '');
     $position = trim($_POST['position'] ?? '');
