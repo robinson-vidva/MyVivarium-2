@@ -310,7 +310,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
                 </select>
             </div>
             <br>
-            <?php if ($demo !== "yes") : ?>
+            <?php if ($demo !== "yes" && $demo !== "invite") : ?>
                 <div class="mb-3">
                     <label for="username">Email Address</label>
                     <input type="email" class="form-control" id="username" name="username" value="<?php echo htmlspecialchars($user['username']); ?>" required>

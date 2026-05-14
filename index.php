@@ -498,7 +498,7 @@ mysqli_close($con);
 <body>
 
     <!-- Header Section -->
-    <?php if ($demo === "yes") include('demo/demo-banner.php'); ?>
+    <?php if ($demo === "yes") include('demo/demo-banner.php'); elseif ($demo === "invite") include('demo/invite-banner.php'); ?>
     <div class="header">
         <div class="logo-container">
             <a href="home.php">
@@ -625,7 +625,7 @@ mysqli_close($con);
                     <span class="visually-hidden">Next</span>
                 </button>
             </div>
-            <?php if ($demo === "yes") include('demo/demo-disclaimer.php'); ?>
+            <?php if ($demo === "yes") include('demo/demo-disclaimer.php'); elseif ($demo === "invite") include('demo/invite-disclaimer.php'); ?>
         </div>
     </div>
 
