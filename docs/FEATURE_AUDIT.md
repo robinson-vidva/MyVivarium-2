@@ -291,26 +291,21 @@ Grouped by feature area. Each gap lists the exact CRUD verb a chatbot would expe
 
 ## Recommended Priority Order
 
-Reasoning: prioritize features that are central to daily lab work, that a chatbot user is likely to ask about ("show my pending tasks", "remind me to weigh cage HC-12"), and that are read-only or low-risk first. Push admin-only and destructive operations to later tiers.
+Reasoning: prioritize features that are central to daily lab work, that a chatbot user is likely to ask about ("show my pending tasks", "remind me to weigh cage HC-12"), and that are read-only or low-risk first. A separate section below lists features that are deliberately kept off the roadmap because exposing them via an API key would create unacceptable security risk.
 
-### Tier 1 — do soon
+### Do Now
 
-These close the most painful gaps for a chatbot user doing normal lab work.
+All items below are in scope. Order is a recommended build sequence — earlier items are higher value or simpler to ship, later items depend on or extend the earlier ones.
 
-1. **Tasks — read & light write.** `listTasks`, `getTask`, `createTask`, `completeTask`. This is the single most natural chatbot question ("what do I need to do today?").
+1. **Tasks — read & light write.** `listTasks`, `getTask`, `createTask`, `completeTask`. The single most natural chatbot question ("what do I need to do today?").
 2. **Reminders — read.** `listReminders`, `getReminder`. Pairs with tasks for "what's coming up".
 3. **Calendar feed.** `listCalendarEvents` — single endpoint that backs "what's on my plate this week".
 4. **Notifications — read & mark.** `listMyNotifications`, `getUnreadNotificationCount`, `markNotificationRead`, `markAllNotificationsRead`. Cheap, useful, low risk.
 5. **Mouse cage history & offspring.** `listMouseCageHistory`, `listMouseOffspring`. Today `getMouse` shows the current cage but the page surfaces history and lineage; the chatbot will be asked "where has M042 lived" and "how many pups did M042 produce".
 6. **Strains — list/get.** `listStrains`, `getStrain`. The mouse-create endpoint already takes a strain string, but the chatbot needs to know what strings are valid.
-7. **IACUC — list/get.** `listIacuc`, `getIacuc`. Same reason — referenced by cages but invisible to the API today.
+7. **IACUC — list/get.** `listIacuc`, `getIacuc`. Referenced by cages but invisible to the API today.
 8. **Dashboard summary.** `getDashboardSummary`. Single read that mirrors `home.php` and gives the chatbot one cheap call to greet the user with their state.
-9. **Cage users & IACUC junction — list-only first.** `listCageUsers`, `listCageIacuc`. Read-only sidecars on existing cage endpoints; enables "who has access to BC-7" and "which protocol covers HC-12".
-
-### Tier 2 — medium term
-
-These are write operations on existing core features; they're useful but each one needs a small confirm flow and a permissions check.
-
+9. **Cage users & IACUC junction — list-only.** `listCageUsers`, `listCageIacuc`. Read-only sidecars on existing cage endpoints; enables "who has access to BC-7" and "which protocol covers HC-12".
 10. **Tasks — write.** `updateTask`, `assignTask`, `deleteTask`.
 11. **Reminders — write.** `createReminder`, `updateReminder`, `setReminderStatus`, `deleteReminder`.
 12. **Litter management on breeding cages.** `listLitters`, `addLitter`, `updateLitter`, `deleteLitter`. Today a user can read litters via `getBreedingCage` but not change them.
@@ -319,18 +314,25 @@ These are write operations on existing core features; they're useful but each on
 15. **Cage archive / restore.** `archiveHoldingCage`, `archiveBreedingCage`, `restoreHoldingCage`, `restoreBreedingCage`. Soft, reversible, supports the confirm-token flow.
 16. **Sticky notes — full CRUD.** `listStickyNotes`, `createStickyNote`, `updateStickyNote`, `deleteStickyNote`. Low-stakes user-scoped data; nice for "remind me later" patterns.
 17. **Strains & IACUC — write.** `createStrain`/`updateStrain`/`deleteStrain`, `createIacuc`/`updateIacuc`/`deleteIacuc`. Admin scope.
-18. **Self profile.** `updateMe`. Needed before exposing admin user CRUD.
+18. **Self profile.** `updateMe`. Self-service only — no admin user-CRUD endpoints (see security exclusions).
 19. **Cage lineage walk.** `getCageLineage`. Read-only; pairs nicely with mouse history/offspring.
-20. **File attachment read.** `listCageFiles` (read-only). Upload/delete can wait.
+20. **File attachment read.** `listCageFiles` (read-only). Upload/delete intentionally deferred (see security exclusions).
+21. **Cage card rendering.** `getCageCard` (or bulk `POST /cage-cards`). Niche but harmless — returns the same data the print view already exposes, so it adds no new attack surface.
 
-### Tier 3 — nice to have / risky / niche
+### Explicitly NOT planned — security risks
 
-21. **User administration.** `listUsers`, `getUser`, `approveUser`, `suspendUser`, `setUserRole`, `deleteUser`. Admin-only, destructive, sensitive — wire late and protect with a dedicated admin scope.
-22. **Hard delete endpoints.** `hardDeleteMouse`, `hardDeleteHoldingCage`, `hardDeleteBreedingCage`. Admin-only, irreversible — keep gated behind explicit confirm + admin scope.
-23. **File upload/delete.** `uploadCageFile`, `deleteCageFile`. Multipart; cross-cuts permissions and disk.
-24. **Lab and AI settings.** `getSettings`/`updateSettings`, `getAiConfig`/`updateAiConfig`. Admin-only; rarely needed via chat.
-25. **Admin API key management for other users.** `adminListApiKeys`, `adminCreateApiKey`, `adminRevokeApiKey`. Sensitive — leave to the web UI unless there's clear demand.
-26. **Cage card rendering.** `getCageCard`. Niche; print is a browser path, not a chatbot path.
-27. **IoT sensor URL passthrough.** `listIotSensors`. Trivial but rarely useful.
-28. **V1 import / full DB export.** `importV1Data`, `exportData`. Probably better left as file/CLI flows.
-29. **AI chatbot conversation history endpoints.** `listAiConversations`, `getAiConversation`. The chatbot already owns this data; only useful for an external client.
+These features exist as web pages today but should **not** be reachable via an API key. The shared property is that a leaked API key in any of these categories would either escalate privilege, mint new long-lived credentials, exfiltrate the whole dataset, or irreversibly destroy data. They stay web-UI-only behind session auth.
+
+- **User administration via API.** `listUsers`, `getUser`, `approveUser`, `suspendUser`, `setUserRole`, `deleteUser` (the `manage_users.php` page). A write-scoped key that can change roles or approve users is a direct privilege-escalation primitive. Keep behind the admin web UI.
+- **Hard delete of mice or cages.** `hardDeleteMouse`, `hardDeleteHoldingCage`, `hardDeleteBreedingCage` (the `*_drop.php` pages, hard-delete branch). Irreversible. Soft-delete / archive endpoints are already on the plan and cover the legitimate need. Hard delete stays admin-CLI / web-UI only.
+- **Admin API-key management for other users.** `adminListApiKeys`, `adminCreateApiKey`, `adminRevokeApiKey` (the `manage_api_keys.php` page). Letting a key mint or revoke other keys is privilege escalation and breaks the bootstrap model. Keep at the web UI only.
+- **Lab settings and AI config writes.** `updateSettings`, `updateAiConfig` (the `manage_lab.php` and `manage_ai_config.php` pages). The AI config row stores the (encrypted) LLM provider API key; rotating or replacing it via API enables credential theft and chatbot hijack. Lab settings include Turnstile keys with the same exposure. Reads are also off-limits since they would surface the encrypted values. Keep behind the admin web UI.
+- **Bulk V1 import and full DB export.** `importV1Data`, `exportData` (the `admin_import.php` and `export_data.php` pages). Each is a one-shot bulk-PII move; a leaked admin key would dump the entire colony database or overwrite it. Keep as file/CLI flows.
+
+### Deferred (not a security risk, just low value)
+
+These were dropped from the plan because the cost/benefit isn't there yet, not because they're dangerous. Revisit if a real chatbot use case appears.
+
+- **File upload / delete via API** (`uploadCageFile`, `deleteCageFile`). Multipart upload, path-traversal and content-type concerns; low chatbot demand.
+- **IoT sensor URL passthrough** (`listIotSensors`). Trivial — surfaces a couple of settings rows.
+- **AI chatbot conversation history endpoints** (`listAiConversations`, `getAiConversation`). The chatbot already owns this data internally; only useful for an external client.
