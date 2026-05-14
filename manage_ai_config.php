@@ -18,6 +18,7 @@ require 'dbcon.php';
 require_once 'log_activity.php';
 require_once __DIR__ . '/includes/ai_settings.php';
 require_once __DIR__ . '/includes/llm_provider.php';
+require_once __DIR__ . '/includes/ai_rate_limit.php';
 
 if (!isset($_SESSION['username']) || ($_SESSION['role'] ?? '') !== 'admin') {
     $_SESSION['message'] = 'Unauthorized: admin role required.';
@@ -100,6 +101,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             ai_settings_set('chatbot_enabled', $enabled, $userId);
 
+            // Rate-limit values — clamp to documented min/max.
+            if (isset($_POST['ai_rate_limit_messages_per_minute'])) {
+                $v = (int)$_POST['ai_rate_limit_messages_per_minute'];
+                if ($v < AI_RATE_LIMIT_PER_MINUTE_MIN) $v = AI_RATE_LIMIT_PER_MINUTE_MIN;
+                if ($v > AI_RATE_LIMIT_PER_MINUTE_MAX) $v = AI_RATE_LIMIT_PER_MINUTE_MAX;
+                ai_settings_set('ai_rate_limit_messages_per_minute', (string)$v, $userId);
+            }
+            if (isset($_POST['ai_rate_limit_messages_per_day'])) {
+                $v = (int)$_POST['ai_rate_limit_messages_per_day'];
+                if ($v < AI_RATE_LIMIT_PER_DAY_MIN) $v = AI_RATE_LIMIT_PER_DAY_MIN;
+                if ($v > AI_RATE_LIMIT_PER_DAY_MAX) $v = AI_RATE_LIMIT_PER_DAY_MAX;
+                ai_settings_set('ai_rate_limit_messages_per_day', (string)$v, $userId);
+            }
+
             $_SESSION['message'] = 'AI configuration saved.';
             header('Location: manage_ai_config.php');
             exit;
@@ -135,6 +150,9 @@ $currentOpenaiModel = $openaiCfg['model'];
 
 $currentPrompt  = ($envError === null && $promptMeta)  ? (ai_settings_get('system_prompt') ?? $DEFAULT_SYSTEM_PROMPT)    : $DEFAULT_SYSTEM_PROMPT;
 $currentEnabled = ($envError === null && $enabledMeta) ? (ai_settings_get('chatbot_enabled') === '1') : false;
+
+$currentRateMinute = $envError ? AI_RATE_LIMIT_PER_MINUTE_DEFAULT : ai_rate_limit_get_limit('minute');
+$currentRateDay    = $envError ? AI_RATE_LIMIT_PER_DAY_DEFAULT    : ai_rate_limit_get_limit('day');
 
 require 'header.php';
 ?>
@@ -280,6 +298,29 @@ require 'header.php';
         <div class="api-key-card">
             <h4>System Prompt</h4>
             <textarea name="system_prompt" class="form-control system-prompt" rows="6"><?= htmlspecialchars($currentPrompt); ?></textarea>
+        </div>
+
+        <div class="api-key-card">
+            <h4>Rate Limiting</h4>
+            <p class="text-muted">Per-user limit on AI chatbot messages. Counts user messages only; tool calls and LLM round-trips do not count. Independent of the REST API key limit.</p>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="ai_rate_limit_messages_per_minute">Messages per minute</label>
+                    <input type="number" class="form-control" id="ai_rate_limit_messages_per_minute" name="ai_rate_limit_messages_per_minute"
+                           min="<?= AI_RATE_LIMIT_PER_MINUTE_MIN; ?>"
+                           max="<?= AI_RATE_LIMIT_PER_MINUTE_MAX; ?>"
+                           value="<?= htmlspecialchars((string)$currentRateMinute); ?>">
+                    <small class="text-muted">Default <?= AI_RATE_LIMIT_PER_MINUTE_DEFAULT; ?>, min <?= AI_RATE_LIMIT_PER_MINUTE_MIN; ?>, max <?= AI_RATE_LIMIT_PER_MINUTE_MAX; ?>. Fixed 60-second window.</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="ai_rate_limit_messages_per_day">Messages per day</label>
+                    <input type="number" class="form-control" id="ai_rate_limit_messages_per_day" name="ai_rate_limit_messages_per_day"
+                           min="<?= AI_RATE_LIMIT_PER_DAY_MIN; ?>"
+                           max="<?= AI_RATE_LIMIT_PER_DAY_MAX; ?>"
+                           value="<?= htmlspecialchars((string)$currentRateDay); ?>">
+                    <small class="text-muted">Default <?= AI_RATE_LIMIT_PER_DAY_DEFAULT; ?>, min <?= AI_RATE_LIMIT_PER_DAY_MIN; ?>, max <?= AI_RATE_LIMIT_PER_DAY_MAX; ?>. Resets at midnight UTC.</small>
+                </div>
+            </div>
         </div>
 
         <div class="api-key-card">

@@ -112,6 +112,17 @@ CREATE TABLE IF NOT EXISTS `ai_usage_log` (
   CONSTRAINT `fk_ai_usage_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 );
 
+-- Per-user AI chatbot rate-limit counters. Separate from the per-API-key
+-- REST rate limit. One row per (user, window_kind, window_start) triple.
+CREATE TABLE IF NOT EXISTS `ai_chat_rate` (
+  `user_id` int NOT NULL,
+  `window_kind` enum('minute','day') NOT NULL,
+  `window_start` datetime NOT NULL,
+  `count` int NOT NULL DEFAULT 0,
+  PRIMARY KEY (`user_id`, `window_kind`, `window_start`),
+  KEY `idx_aicr_user_kind` (`user_id`, `window_kind`)
+);
+
 -- AI Configuration storage for the admin chatbot settings (Groq key, model, prompt, toggle).
 -- Values are stored encrypted with AES-256-CBC; key lives in AI_SETTINGS_ENCRYPTION_KEY.
 CREATE TABLE IF NOT EXISTS `ai_settings` (

@@ -35,6 +35,13 @@ require_once __DIR__ . '/../services/activity.php';
 require_once __DIR__ . '/../services/api_keys.php';
 require_once __DIR__ . '/../services/rate_limit.php';
 require_once __DIR__ . '/../services/pending_operations.php';
+require_once __DIR__ . '/../services/tasks.php';
+require_once __DIR__ . '/../services/reminders.php';
+require_once __DIR__ . '/../services/notifications.php';
+require_once __DIR__ . '/../services/strains.php';
+require_once __DIR__ . '/../services/iacuc.php';
+require_once __DIR__ . '/../services/dashboard.php';
+require_once __DIR__ . '/../services/calendar.php';
 
 // -----------------------------------------------------------------------------
 // Bootstrap: parse method, path, headers, body
@@ -485,5 +492,95 @@ function dispatch(string $method, string $path, array $body): void {
     // /activity-log
     if ($path === '/activity-log' && $method === 'GET') {
         api_list(activity_list($con, $authUserId, $_GET));
+    }
+
+    // -- batch 1 read-only endpoints --
+
+    // /tasks
+    if ($path === '/tasks' && $method === 'GET') {
+        api_list(tasks_list($con, $authUserId, $_GET));
+    }
+    if (preg_match('#^/tasks/(\d+)$#', $path, $m) && $method === 'GET') {
+        api_data(tasks_get($con, $authUserId, (int)$m[1]));
+    }
+
+    // /reminders
+    if ($path === '/reminders' && $method === 'GET') {
+        api_list(reminders_list($con, $authUserId, $_GET));
+    }
+    if (preg_match('#^/reminders/(\d+)$#', $path, $m) && $method === 'GET') {
+        api_data(reminders_get($con, $authUserId, (int)$m[1]));
+    }
+
+    // /calendar
+    if ($path === '/calendar' && $method === 'GET') {
+        api_list(calendar_list($con, $authUserId, $_GET));
+    }
+
+    // /notifications
+    if ($path === '/notifications' && $method === 'GET') {
+        api_list(notifications_list($con, $authUserId, $_GET));
+    }
+    if ($path === '/notifications/unread-count' && $method === 'GET') {
+        api_data(notifications_unread_count($con, $authUserId));
+    }
+
+    // /mice/{id}/history and /mice/{id}/offspring
+    if (preg_match('#^/mice/([^/]+)/history$#', $path, $m) && $method === 'GET') {
+        api_list(mice_history($con, $authUserId, urldecode($m[1])));
+    }
+    if (preg_match('#^/mice/([^/]+)/offspring$#', $path, $m) && $method === 'GET') {
+        api_list(mice_offspring($con, $authUserId, urldecode($m[1]), $_GET));
+    }
+
+    // /strains
+    if ($path === '/strains' && $method === 'GET') {
+        api_list(strains_list($con, $authUserId, $_GET));
+    }
+    if (preg_match('#^/strains/([^/]+)$#', $path, $m) && $method === 'GET') {
+        api_data(strains_get($con, $authUserId, urldecode($m[1])));
+    }
+
+    // /iacuc
+    if ($path === '/iacuc' && $method === 'GET') {
+        api_list(iacuc_list($con, $authUserId, $_GET));
+    }
+    if (preg_match('#^/iacuc/([^/]+)$#', $path, $m) && $method === 'GET') {
+        api_data(iacuc_get($con, $authUserId, urldecode($m[1])));
+    }
+
+    // /dashboard/summary
+    if ($path === '/dashboard/summary' && $method === 'GET') {
+        api_data(dashboard_summary($con, $authUserId));
+    }
+
+    // /cages/holding/{id}/users, /iacuc, /card-data
+    if (preg_match('#^/cages/holding/([^/]+)/users$#', $path, $m) && $method === 'GET') {
+        api_list(cage_list_users($con, $authUserId, urldecode($m[1]), 'holding'));
+    }
+    if (preg_match('#^/cages/holding/([^/]+)/iacuc$#', $path, $m) && $method === 'GET') {
+        api_list(cage_list_iacuc($con, $authUserId, urldecode($m[1]), 'holding'));
+    }
+    if (preg_match('#^/cages/holding/([^/]+)/card-data$#', $path, $m) && $method === 'GET') {
+        api_data(cage_card_data($con, $authUserId, urldecode($m[1]), 'holding'));
+    }
+
+    // /cages/breeding/{id}/users, /iacuc, /lineage, /card-data
+    if (preg_match('#^/cages/breeding/([^/]+)/users$#', $path, $m) && $method === 'GET') {
+        api_list(cage_list_users($con, $authUserId, urldecode($m[1]), 'breeding'));
+    }
+    if (preg_match('#^/cages/breeding/([^/]+)/iacuc$#', $path, $m) && $method === 'GET') {
+        api_list(cage_list_iacuc($con, $authUserId, urldecode($m[1]), 'breeding'));
+    }
+    if (preg_match('#^/cages/breeding/([^/]+)/lineage$#', $path, $m) && $method === 'GET') {
+        api_data(breeding_lineage($con, $authUserId, urldecode($m[1])));
+    }
+    if (preg_match('#^/cages/breeding/([^/]+)/card-data$#', $path, $m) && $method === 'GET') {
+        api_data(cage_card_data($con, $authUserId, urldecode($m[1]), 'breeding'));
+    }
+
+    // /me/profile (self-only)
+    if ($path === '/me/profile' && $method === 'GET') {
+        api_data(user_get_my_profile($con, $authUserId));
     }
 }

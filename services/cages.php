@@ -165,6 +165,224 @@ function breeding_get(mysqli $con, int $user_id, string $cage_id): array
     return $out;
 }
 
+/**
+ * Read-only sidecars: list users / IACUC protocols attached to a cage.
+ */
+function cage_list_users(mysqli $con, int $user_id, string $cage_id, string $kind): array
+{
+    $row = cage_load($con, $cage_id);
+    if (!$row) throw new ApiException('not_found', "Cage $cage_id not found", 404);
+    $isBreeding = cage_is_breeding($con, $cage_id);
+    if ($kind === 'holding' && $isBreeding) {
+        throw new ApiException('not_found', "Cage $cage_id is a breeding cage", 404);
+    }
+    if ($kind === 'breeding' && !$isBreeding) {
+        throw new ApiException('not_found', "Cage $cage_id is not a breeding cage", 404);
+    }
+
+    $stmt = $con->prepare("SELECT cu.user_id, u.name, u.username, u.role, u.position
+                             FROM cage_users cu
+                             LEFT JOIN users u ON u.id = cu.user_id
+                            WHERE cu.cage_id = ?
+                         ORDER BY u.name ASC");
+    $stmt->bind_param('s', $cage_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $items = [];
+    while ($r = $res->fetch_assoc()) {
+        $items[] = [
+            'user_id'  => (int)$r['user_id'],
+            'name'     => $r['name'],
+            'email'    => $r['username'],
+            'role'     => $r['role'],
+            'position' => $r['position'],
+        ];
+    }
+    $stmt->close();
+    return ['items' => $items, 'total' => count($items), 'limit' => count($items), 'offset' => 0];
+}
+
+function cage_list_iacuc(mysqli $con, int $user_id, string $cage_id, string $kind): array
+{
+    $row = cage_load($con, $cage_id);
+    if (!$row) throw new ApiException('not_found', "Cage $cage_id not found", 404);
+    $isBreeding = cage_is_breeding($con, $cage_id);
+    if ($kind === 'holding' && $isBreeding) {
+        throw new ApiException('not_found', "Cage $cage_id is a breeding cage", 404);
+    }
+    if ($kind === 'breeding' && !$isBreeding) {
+        throw new ApiException('not_found', "Cage $cage_id is not a breeding cage", 404);
+    }
+
+    $stmt = $con->prepare("SELECT ci.iacuc_id, i.iacuc_title, i.file_url
+                             FROM cage_iacuc ci
+                             LEFT JOIN iacuc i ON i.iacuc_id = ci.iacuc_id
+                            WHERE ci.cage_id = ?
+                         ORDER BY ci.iacuc_id ASC");
+    $stmt->bind_param('s', $cage_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $items = [];
+    while ($r = $res->fetch_assoc()) {
+        $items[] = [
+            'iacuc_id'    => $r['iacuc_id'],
+            'iacuc_title' => $r['iacuc_title'],
+            'file_url'    => $r['file_url'],
+        ];
+    }
+    $stmt->close();
+    return ['items' => $items, 'total' => count($items), 'limit' => count($items), 'offset' => 0];
+}
+
+/**
+ * Breeding-cage lineage walk: returns sire, dam, parent cages if known,
+ * litters produced, and offspring mice currently alive whose sire_id or
+ * dam_id is the cage's sire/dam.
+ */
+function breeding_lineage(mysqli $con, int $user_id, string $cage_id): array
+{
+    if (!cage_is_breeding($con, $cage_id)) {
+        throw new ApiException('not_found', "Breeding cage $cage_id not found", 404);
+    }
+
+    $stmt = $con->prepare("SELECT male_id, female_id, `cross` FROM breeding WHERE cage_id = ? LIMIT 1");
+    $stmt->bind_param('s', $cage_id);
+    $stmt->execute();
+    $br = $stmt->get_result()->fetch_assoc() ?: [];
+    $stmt->close();
+
+    $sireId   = $br['male_id']   ?? null;
+    $damId    = $br['female_id'] ?? null;
+
+    $loadParent = function (?string $mouseId) use ($con) {
+        if (!$mouseId) return null;
+        $s = $con->prepare("SELECT mouse_id, sex, dob, strain, genotype, current_cage_id, status FROM mice WHERE mouse_id = ?");
+        $s->bind_param('s', $mouseId);
+        $s->execute();
+        $row = $s->get_result()->fetch_assoc() ?: null;
+        $s->close();
+        return $row;
+    };
+    $sire = $loadParent($sireId);
+    $dam  = $loadParent($damId);
+
+    // Parent cages: the cage each parent originated from (their first
+    // mouse_cage_history row, if any).
+    $loadOriginCage = function (?string $mouseId) use ($con) {
+        if (!$mouseId) return null;
+        $s = $con->prepare("SELECT cage_id FROM mouse_cage_history WHERE mouse_id = ? ORDER BY moved_in_at ASC, id ASC LIMIT 1");
+        $s->bind_param('s', $mouseId);
+        $s->execute();
+        $row = $s->get_result()->fetch_assoc() ?: null;
+        $s->close();
+        return $row['cage_id'] ?? null;
+    };
+    $parentCages = [
+        'sire_origin_cage' => $loadOriginCage($sireId),
+        'dam_origin_cage'  => $loadOriginCage($damId),
+    ];
+
+    // Litters from this cage.
+    $stmt = $con->prepare("SELECT id, cage_id, dom, litter_dob, pups_alive, pups_dead, pups_male, pups_female, remarks
+                             FROM litters WHERE cage_id = ? ORDER BY dom DESC");
+    $stmt->bind_param('s', $cage_id);
+    $stmt->execute();
+    $litters = [];
+    while ($r = $stmt->get_result()->fetch_assoc()) $litters[] = $r;
+    $stmt->close();
+
+    // Offspring (alive only) sired/born from this pair.
+    $offspring = [];
+    if ($sireId || $damId) {
+        $stmt = $con->prepare("SELECT mouse_id, sex, dob, current_cage_id, strain, genotype, status
+                                 FROM mice
+                                WHERE status = 'alive'
+                                  AND ((sire_id IS NOT NULL AND sire_id = ?) OR (dam_id IS NOT NULL AND dam_id = ?))
+                             ORDER BY dob ASC, mouse_id ASC");
+        $stmt->bind_param('ss', $sireId, $damId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        while ($r = $res->fetch_assoc()) $offspring[] = $r;
+        $stmt->close();
+    }
+
+    return [
+        'cage_id'       => $cage_id,
+        'cross'         => $br['cross'] ?? null,
+        'sire'          => $sire,
+        'dam'           => $dam,
+        'parent_cages'  => $parentCages,
+        'litters'       => $litters,
+        'offspring'     => $offspring,
+    ];
+}
+
+/**
+ * Cage-card metadata payload used by prnt_crd.php (web) to render the
+ * printable cards. Returns the same structured fields, no HTML.
+ */
+function cage_card_data(mysqli $con, int $user_id, string $cage_id, string $kind): array
+{
+    $row = cage_load($con, $cage_id);
+    if (!$row) throw new ApiException('not_found', "Cage $cage_id not found", 404);
+    $isBreeding = cage_is_breeding($con, $cage_id);
+    if ($kind === 'holding' && $isBreeding) {
+        throw new ApiException('not_found', "Cage $cage_id is a breeding cage", 404);
+    }
+    if ($kind === 'breeding' && !$isBreeding) {
+        throw new ApiException('not_found', "Cage $cage_id is not a breeding cage", 404);
+    }
+
+    $out = cage_serialize($row);
+
+    // PI display name (cages.pi_name is a users.id reference).
+    if (!empty($row['pi_name'])) {
+        $s = $con->prepare("SELECT id, name, position FROM users WHERE id = ?");
+        $s->bind_param('i', $row['pi_name']);
+        $s->execute();
+        $out['pi'] = $s->get_result()->fetch_assoc() ?: null;
+        $s->close();
+    } else {
+        $out['pi'] = null;
+    }
+
+    // IACUC protocols.
+    $out['iacuc'] = cage_list_iacuc($con, $user_id, $cage_id, $kind)['items'];
+
+    // Assigned users.
+    $out['assigned_users'] = cage_list_users($con, $user_id, $cage_id, $kind)['items'];
+
+    if ($isBreeding) {
+        // Pairs + latest litter for breeding card.
+        $stmt = $con->prepare("SELECT id, `cross`, male_id, female_id FROM breeding WHERE cage_id = ?");
+        $stmt->bind_param('s', $cage_id);
+        $stmt->execute();
+        $pairs = [];
+        while ($r = $stmt->get_result()->fetch_assoc()) $pairs[] = $r;
+        $stmt->close();
+        $out['pairs'] = $pairs;
+
+        $stmt = $con->prepare("SELECT id, dom, litter_dob, pups_alive, pups_dead, pups_male, pups_female
+                                 FROM litters WHERE cage_id = ? ORDER BY dom DESC LIMIT 1");
+        $stmt->bind_param('s', $cage_id);
+        $stmt->execute();
+        $out['latest_litter'] = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+    } else {
+        // Holding: occupants for the card.
+        $stmt = $con->prepare("SELECT mouse_id, sex, dob, strain, genotype, ear_code
+                                 FROM mice WHERE current_cage_id = ? AND status = 'alive' ORDER BY mouse_id ASC");
+        $stmt->bind_param('s', $cage_id);
+        $stmt->execute();
+        $occupants = [];
+        while ($r = $stmt->get_result()->fetch_assoc()) $occupants[] = $r;
+        $stmt->close();
+        $out['occupants'] = $occupants;
+    }
+
+    return $out;
+}
+
 function holding_create(mysqli $con, int $user_id, array $body): array
 {
     $cage_id = svc_required_str($body, 'cage_id');
