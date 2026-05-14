@@ -116,7 +116,7 @@ require 'header.php';
             and publishes the admin credentials on the login page, so a separate
             "create a new admin" alarm is just noise.
         -->
-        <?php if ($_SESSION['username'] === 'admin@myvivarium.online' && $_SESSION['role'] === 'admin' && ($demo ?? '') !== 'yes'): ?>
+        <?php if ($_SESSION['username'] === 'admin@myvivarium.online' && $_SESSION['role'] === 'admin' && ($demo ?? '') !== 'yes' && ($demo ?? '') !== 'invite'): ?>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong><i class="fas fa-exclamation-triangle"></i> Security Warning:</strong> You are using the default admin account.
             For security reasons, please create a new admin user and delete this default account immediately.
