@@ -5,7 +5,20 @@
  *
  * Anything here MUST be a pure function of its inputs — no $_SESSION, no
  * mysqli, no global state.
+ *
+ * Tool definitions are loaded from MyVivarium's OpenAPI specification at
+ * api/openapi.yaml. The chatbot does NOT maintain a hardcoded tool list:
+ *   - chatbot_all_tool_defs()  reads the spec and emits the OpenAI/Groq
+ *     function-calling shape.
+ *   - chatbot_resolve_tool()   maps an operationId + arguments back to the
+ *     HTTP method, path, query, and body the API call should use.
+ *
+ * Adding a new endpoint means: implement it in api/index.php AND add the
+ * matching path entry to api/openapi.yaml. The chatbot picks it up
+ * automatically on the next request.
  */
+
+require_once __DIR__ . '/../services/openapi_loader.php';
 
 if (!function_exists('chatbot_resolve_tool')) {
 
@@ -14,111 +27,20 @@ if (!function_exists('chatbot_resolve_tool')) {
      *
      * Returns ['method', 'path', 'query' => array, 'body' => array,
      *          'destructive' => bool], or null if the tool name is unknown.
+     *
+     * The pseudo-tool listCapabilities is handled by the caller (it answers
+     * from the spec instead of hitting the API) so it returns null here.
      */
     function chatbot_resolve_tool(string $name, array $args): ?array
     {
-        switch ($name) {
-            case 'get_me':
-                return ['method' => 'GET', 'path' => '/me', 'query' => [], 'body' => [], 'destructive' => false];
-            case 'list_mice':
-                return ['method' => 'GET', 'path' => '/mice', 'query' => array_filter([
-                    'status'  => $args['status']  ?? null,
-                    'sex'     => $args['sex']     ?? null,
-                    'strain'  => $args['strain']  ?? null,
-                    'cage_id' => $args['cage_id'] ?? null,
-                    'limit'   => $args['limit']   ?? null,
-                ], fn($v) => $v !== null && $v !== ''), 'body' => [], 'destructive' => false];
-            case 'get_mouse':
-                return ['method' => 'GET', 'path' => '/mice/' . rawurlencode((string)($args['id'] ?? '')), 'query' => [], 'body' => [], 'destructive' => false];
-            case 'list_holding_cages':
-                return ['method' => 'GET', 'path' => '/cages/holding', 'query' => array_filter(['limit' => $args['limit'] ?? null], fn($v) => $v !== null && $v !== ''), 'body' => [], 'destructive' => false];
-            case 'get_holding_cage':
-                return ['method' => 'GET', 'path' => '/cages/holding/' . rawurlencode((string)($args['id'] ?? '')), 'query' => [], 'body' => [], 'destructive' => false];
-            case 'list_breeding_cages':
-                return ['method' => 'GET', 'path' => '/cages/breeding', 'query' => array_filter(['limit' => $args['limit'] ?? null], fn($v) => $v !== null && $v !== ''), 'body' => [], 'destructive' => false];
-            case 'get_breeding_cage':
-                return ['method' => 'GET', 'path' => '/cages/breeding/' . rawurlencode((string)($args['id'] ?? '')), 'query' => [], 'body' => [], 'destructive' => false];
-            case 'list_maintenance_notes':
-                return ['method' => 'GET', 'path' => '/maintenance-notes', 'query' => array_filter([
-                    'cage_id' => $args['cage_id'] ?? null,
-                    'from'    => $args['from']    ?? null,
-                    'to'      => $args['to']      ?? null,
-                    'limit'   => $args['limit']   ?? null,
-                ], fn($v) => $v !== null && $v !== ''), 'body' => [], 'destructive' => false];
-            case 'get_maintenance_note':
-                return ['method' => 'GET', 'path' => '/maintenance-notes/' . (int)($args['id'] ?? 0), 'query' => [], 'body' => [], 'destructive' => false];
-            case 'search_activity_log':
-                return ['method' => 'GET', 'path' => '/activity-log', 'query' => array_filter([
-                    'user_id' => $args['user_id'] ?? null,
-                    'action'  => $args['action']  ?? null,
-                    'from'    => $args['from']    ?? null,
-                    'to'      => $args['to']      ?? null,
-                    'limit'   => $args['limit']   ?? null,
-                ], fn($v) => $v !== null && $v !== ''), 'body' => [], 'destructive' => false];
-
-            // ---- safe writes ----
-            case 'add_maintenance_note':
-                return ['method' => 'POST', 'path' => '/maintenance-notes', 'query' => [], 'body' => array_filter([
-                    'cage_id'   => $args['cage_id']   ?? null,
-                    'note_text' => $args['note_text'] ?? null,
-                    'type'      => $args['type']      ?? null,
-                ], fn($v) => $v !== null), 'destructive' => false];
-            case 'create_holding_cage':
-                $remarks = (string)($args['notes'] ?? '');
-                if (!empty($args['capacity'])) {
-                    $remarks = trim($remarks . ' [capacity ' . (int)$args['capacity'] . ']');
-                }
-                return ['method' => 'POST', 'path' => '/cages/holding', 'query' => [], 'body' => array_filter([
-                    'cage_id' => $args['name'] ?? null,
-                    'room'    => $args['room'] ?? null,
-                    'remarks' => $remarks !== '' ? $remarks : null,
-                ], fn($v) => $v !== null), 'destructive' => false];
-            case 'create_breeding_cage':
-                return ['method' => 'POST', 'path' => '/cages/breeding', 'query' => [], 'body' => array_filter([
-                    'cage_id'   => $args['name']    ?? null,
-                    'room'      => $args['room']    ?? null,
-                    'male_id'   => $args['sire_id'] ?? null,
-                    'female_id' => $args['dam_id']  ?? null,
-                    'remarks'   => $args['notes']   ?? null,
-                ], fn($v) => $v !== null), 'destructive' => false];
-            case 'create_mouse':
-                return ['method' => 'POST', 'path' => '/mice', 'query' => [], 'body' => array_filter([
-                    'mouse_id' => $args['mouse_id'] ?? null,
-                    'cage_id'  => $args['cage_id']  ?? null,
-                    'sex'      => $args['sex']      ?? null,
-                    'strain'   => $args['strain']   ?? null,
-                    'dob'      => $args['dob']      ?? null,
-                    'genotype' => $args['genotype'] ?? null,
-                    'notes'    => $args['notes']    ?? null,
-                ], fn($v) => $v !== null && $v !== ''), 'destructive' => false];
-
-            // ---- destructive writes ----
-            case 'update_mouse':
-                return ['method' => 'PATCH', 'path' => '/mice/' . rawurlencode((string)($args['id'] ?? '')), 'query' => [], 'body' => is_array($args['fields'] ?? null) ? $args['fields'] : [], 'destructive' => true];
-            case 'move_mouse':
-                return ['method' => 'POST', 'path' => '/mice/' . rawurlencode((string)($args['id'] ?? '')) . '/move', 'query' => [], 'body' => array_filter([
-                    'to_cage_id' => $args['to_cage_id'] ?? null,
-                    'reason'     => $args['reason']     ?? null,
-                ], fn($v) => $v !== null), 'destructive' => true];
-            case 'sacrifice_mouse':
-                return ['method' => 'POST', 'path' => '/mice/' . rawurlencode((string)($args['id'] ?? '')) . '/sacrifice', 'query' => [], 'body' => array_filter([
-                    'date'   => $args['date']   ?? null,
-                    'reason' => $args['reason'] ?? null,
-                ], fn($v) => $v !== null), 'destructive' => true];
-            case 'delete_mouse':
-                return ['method' => 'DELETE', 'path' => '/mice/' . rawurlencode((string)($args['id'] ?? '')), 'query' => [], 'body' => [], 'destructive' => true];
-            case 'update_holding_cage':
-                return ['method' => 'PATCH', 'path' => '/cages/holding/' . rawurlencode((string)($args['id'] ?? '')), 'query' => [], 'body' => is_array($args['fields'] ?? null) ? $args['fields'] : [], 'destructive' => true];
-            case 'update_breeding_cage':
-                return ['method' => 'PATCH', 'path' => '/cages/breeding/' . rawurlencode((string)($args['id'] ?? '')), 'query' => [], 'body' => is_array($args['fields'] ?? null) ? $args['fields'] : [], 'destructive' => true];
-            case 'edit_maintenance_note':
-                return ['method' => 'PATCH', 'path' => '/maintenance-notes/' . (int)($args['id'] ?? 0), 'query' => [], 'body' => array_filter([
-                    'note_text' => $args['note_text'] ?? null,
-                ], fn($v) => $v !== null), 'destructive' => true];
-            case 'delete_maintenance_note':
-                return ['method' => 'DELETE', 'path' => '/maintenance-notes/' . (int)($args['id'] ?? 0), 'query' => [], 'body' => [], 'destructive' => true];
+        if ($name === 'listCapabilities') return null;
+        try {
+            $spec = mv_openapi_load();
+        } catch (Throwable $e) {
+            error_log('chatbot_resolve_tool spec load failed: ' . $e->getMessage());
+            return null;
         }
-        return null;
+        return mv_openapi_resolve_call($spec, $name, $args);
     }
 
     /**
@@ -163,13 +85,16 @@ if (!function_exists('chatbot_resolve_tool')) {
      */
     function chatbot_cap_list_result(string $toolName, string $rawJson, int $max = 25): string
     {
-        if (strncmp($toolName, 'list_', 5) !== 0 && $toolName !== 'search_activity_log') {
+        // Operation IDs that start with `list` (or `getActivityLog` style)
+        // tend to return paginated arrays. Be liberal here — false positives
+        // just no-op.
+        $prefix = strtolower(substr($toolName, 0, 4));
+        if ($prefix !== 'list' && $prefix !== 'sear') {
             return $rawJson;
         }
         $decoded = json_decode($rawJson, true);
         if (!is_array($decoded)) return $rawJson;
 
-        // The REST envelope is { ok, data: [...] } or { ok, data: { items: [...] } }.
         $list   = null;
         $setter = null;
         if (isset($decoded['data']) && is_array($decoded['data'])) {
@@ -196,253 +121,122 @@ if (!function_exists('chatbot_resolve_tool')) {
     }
 
     /**
-     * Build the full tool-definitions array Groq expects (OpenAI function-
-     * calling shape). Descriptions are kept short (40-80 chars) so the
-     * whole block stays well under 2k tokens. Parameter schemas drop verbose
-     * examples; only short field hints remain.
+     * Build the full OpenAI / Groq tool-definitions array from the OpenAPI
+     * spec. operationId becomes the tool name, summary + description become
+     * the tool description (capped to 200 chars), and the union of path /
+     * query / body parameters becomes the JSON schema.
      */
     function chatbot_all_tool_defs(): array
     {
-        return [
-            // ---- read_mice ----
-            ['type' => 'function', 'function' => [
-                'name' => 'get_me',
-                'description' => 'Get the signed-in user (id, name, email, role).',
-                'parameters' => ['type' => 'object', 'properties' => new stdClass(), 'additionalProperties' => false],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'list_mice',
-                'description' => 'List mice with optional status/sex/strain/cage filters.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'status'  => ['type' => 'string', 'description' => 'alive|sacrificed|transferred_out|archived'],
-                    'sex'     => ['type' => 'string', 'description' => 'male|female|unknown'],
-                    'strain'  => ['type' => 'string'],
-                    'cage_id' => ['type' => 'string'],
-                    'limit'   => ['type' => 'integer'],
-                ]],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'get_mouse',
-                'description' => 'Fetch full details for one mouse by id.',
-                'parameters' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']], 'required' => ['id']],
-            ]],
-
-            // ---- read_cages ----
-            ['type' => 'function', 'function' => [
-                'name' => 'list_holding_cages',
-                'description' => 'List active holding cages with optional limit.',
-                'parameters' => ['type' => 'object', 'properties' => ['limit' => ['type' => 'integer']]],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'get_holding_cage',
-                'description' => 'Fetch full details for one holding cage by id.',
-                'parameters' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']], 'required' => ['id']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'list_breeding_cages',
-                'description' => 'List active breeding cages with optional limit.',
-                'parameters' => ['type' => 'object', 'properties' => ['limit' => ['type' => 'integer']]],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'get_breeding_cage',
-                'description' => 'Fetch full details for one breeding cage by id.',
-                'parameters' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']], 'required' => ['id']],
-            ]],
-
-            // ---- maintenance reads ----
-            ['type' => 'function', 'function' => [
-                'name' => 'list_maintenance_notes',
-                'description' => 'List maintenance notes; filter by cage/date.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'cage_id' => ['type' => 'string'],
-                    'from'    => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
-                    'to'      => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
-                    'limit'   => ['type' => 'integer'],
-                ]],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'get_maintenance_note',
-                'description' => 'Fetch one maintenance note by id.',
-                'parameters' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']], 'required' => ['id']],
-            ]],
-
-            // ---- read_logs ----
-            ['type' => 'function', 'function' => [
-                'name' => 'search_activity_log',
-                'description' => 'Search the audit log by user, action, or date range.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'user_id' => ['type' => 'integer'],
-                    'action'  => ['type' => 'string'],
-                    'from'    => ['type' => 'string'],
-                    'to'      => ['type' => 'string'],
-                    'limit'   => ['type' => 'integer'],
-                ]],
-            ]],
-
-            // ---- write_safe ----
-            ['type' => 'function', 'function' => [
-                'name' => 'add_maintenance_note',
-                'description' => 'Add a maintenance note to a cage.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'cage_id'   => ['type' => 'string'],
-                    'note_text' => ['type' => 'string'],
-                    'type'      => ['type' => 'string', 'description' => 'category, e.g. water, bedding'],
-                ], 'required' => ['cage_id', 'note_text']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'create_holding_cage',
-                'description' => 'Create a new holding cage (name, room, notes).',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'name'     => ['type' => 'string', 'description' => 'cage_id label'],
-                    'room'     => ['type' => 'string'],
-                    'capacity' => ['type' => 'integer'],
-                    'notes'    => ['type' => 'string'],
-                ], 'required' => ['name']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'create_breeding_cage',
-                'description' => 'Create a breeding cage with a sire and dam.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'name'    => ['type' => 'string', 'description' => 'cage_id label'],
-                    'room'    => ['type' => 'string'],
-                    'sire_id' => ['type' => 'string', 'description' => 'male mouse_id'],
-                    'dam_id'  => ['type' => 'string', 'description' => 'female mouse_id'],
-                    'notes'   => ['type' => 'string'],
-                ], 'required' => ['name']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'create_mouse',
-                'description' => 'Register a new mouse in the colony.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'mouse_id' => ['type' => 'string'],
-                    'cage_id'  => ['type' => 'string'],
-                    'sex'      => ['type' => 'string'],
-                    'strain'   => ['type' => 'string'],
-                    'dob'      => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
-                    'genotype' => ['type' => 'string'],
-                    'notes'    => ['type' => 'string'],
-                ], 'required' => ['mouse_id']],
-            ]],
-
-            // ---- write_destructive (confirmation gated) ----
-            ['type' => 'function', 'function' => [
-                'name' => 'update_mouse',
-                'description' => 'Update mouse fields; needs user confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'id'     => ['type' => 'string'],
-                    'fields' => ['type' => 'object', 'description' => 'field => new value map'],
-                ], 'required' => ['id', 'fields']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'move_mouse',
-                'description' => 'Move a mouse to another cage; needs confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'id'         => ['type' => 'string'],
-                    'to_cage_id' => ['type' => 'string'],
-                    'reason'     => ['type' => 'string'],
-                ], 'required' => ['id', 'to_cage_id']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'sacrifice_mouse',
-                'description' => 'Mark a mouse sacrificed; needs confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'id'     => ['type' => 'string'],
-                    'date'   => ['type' => 'string'],
-                    'reason' => ['type' => 'string'],
-                ], 'required' => ['id']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'delete_mouse',
-                'description' => 'Archive a mouse; needs confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']], 'required' => ['id']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'update_holding_cage',
-                'description' => 'Update holding cage fields; needs confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'id'     => ['type' => 'string'],
-                    'fields' => ['type' => 'object'],
-                ], 'required' => ['id', 'fields']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'update_breeding_cage',
-                'description' => 'Update breeding cage fields; needs confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'id'     => ['type' => 'string'],
-                    'fields' => ['type' => 'object'],
-                ], 'required' => ['id', 'fields']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'edit_maintenance_note',
-                'description' => 'Edit a maintenance note; needs confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => [
-                    'id'        => ['type' => 'integer'],
-                    'note_text' => ['type' => 'string'],
-                ], 'required' => ['id', 'note_text']],
-            ]],
-            ['type' => 'function', 'function' => [
-                'name' => 'delete_maintenance_note',
-                'description' => 'Delete a maintenance note; needs confirmation.',
-                'parameters' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']], 'required' => ['id']],
-            ]],
-        ];
+        try {
+            $spec = mv_openapi_load();
+        } catch (Throwable $e) {
+            error_log('chatbot_all_tool_defs spec load failed: ' . $e->getMessage());
+            return [];
+        }
+        return mv_openapi_to_tools($spec);
     }
 
     /**
-     * Static map of group => tool-name list. Mirrors chatbot_all_tool_defs().
+     * Routing groups, derived from the OpenAPI tag of each operation. Used
+     * by chatbot_select_tools() to send a smaller per-turn subset.
+     * Returns ['group_name' => ['operationId', ...]].
      */
     function chatbot_tool_groups(): array
     {
-        return [
-            'read_mice'         => ['get_me', 'list_mice', 'get_mouse'],
-            'read_cages'        => ['list_holding_cages', 'get_holding_cage', 'list_breeding_cages', 'get_breeding_cage'],
-            'read_maintenance'  => ['list_maintenance_notes', 'get_maintenance_note'],
-            'read_logs'         => ['search_activity_log'],
-            'write_safe'        => ['add_maintenance_note', 'create_holding_cage', 'create_breeding_cage', 'create_mouse'],
-            'write_destructive' => ['update_mouse', 'move_mouse', 'sacrifice_mouse', 'delete_mouse',
-                                    'update_holding_cage', 'update_breeding_cage',
-                                    'edit_maintenance_note', 'delete_maintenance_note'],
-        ];
+        try {
+            $spec = mv_openapi_load();
+        } catch (Throwable $e) {
+            return [];
+        }
+        $byTag = [];
+        foreach (mv_openapi_operations($spec) as $op) {
+            if (!$op['operationId']) continue;
+            if ($op['method'] === 'GET' && $op['path'] === '/health') continue;
+            $tag = $op['tags'][0] ?? 'Other';
+            if (!isset($byTag[$tag])) $byTag[$tag] = [];
+            $byTag[$tag][] = $op['operationId'];
+        }
+        return $byTag;
     }
 
     /**
-     * Keyword router: pick the smallest group set that covers the user's
-     * intent. If nothing matches, return all tools so Groq isn't blind.
+     * Keyword router: pick the smallest tool subset that covers the user's
+     * intent. If nothing matches, return the full tool set so the model can
+     * still discover what's available.
      */
     function chatbot_select_tools(string $userMessage): array
     {
-        $all    = chatbot_all_tool_defs();
+        $all = chatbot_all_tool_defs();
+        if ($userMessage === '') return $all;
+
         $groups = chatbot_tool_groups();
         $msg    = strtolower($userMessage);
+        $keep   = [];
+        $hit    = false;
 
-        if ($msg === '') return $all;
-
-        $keep = [];
-        $hit  = false;
+        // Mice-related → mice + maintenance + identity (so AI can use
+        // listCapabilities / getMe in the same turn).
         if (preg_match('/\b(mouse|mice|pup|litter|sire|dam)\b/', $msg)) {
             $hit = true;
-            $keep = array_merge($keep, $groups['read_mice'], $groups['write_safe'], $groups['write_destructive']);
+            $keep = array_merge($keep,
+                $groups['Mice'] ?? [],
+                $groups['Holding Cages'] ?? [],
+                $groups['Breeding Cages'] ?? []);
         }
         if (preg_match('/\b(cage|cages|holding|breeding|room)\b/', $msg)) {
             $hit = true;
-            $keep = array_merge($keep, $groups['read_cages'], $groups['write_safe'], $groups['write_destructive']);
+            $keep = array_merge($keep,
+                $groups['Holding Cages'] ?? [],
+                $groups['Breeding Cages'] ?? [],
+                $groups['Maintenance Notes'] ?? [],
+                $groups['Mice'] ?? []);
         }
         if (preg_match('/\b(note|notes|maintenance|water|bedding|food)\b/', $msg)) {
             $hit = true;
-            $keep = array_merge($keep, $groups['read_maintenance'], $groups['write_safe'], $groups['write_destructive']);
+            $keep = array_merge($keep,
+                $groups['Maintenance Notes'] ?? [],
+                $groups['Holding Cages'] ?? [],
+                $groups['Breeding Cages'] ?? []);
         }
         if (preg_match('/\b(log|logs|history|activity|audit|who|when)\b/', $msg)) {
             $hit = true;
-            $keep = array_merge($keep, $groups['read_logs']);
+            $keep = array_merge($keep, $groups['Activity Log'] ?? []);
         }
         if (preg_match('/\b(me|my|profile|account|user)\b/', $msg)) {
             $hit = true;
-            $keep = array_merge($keep, $groups['read_mice']); // get_me lives here
+            $keep = array_merge($keep, $groups['Users'] ?? []);
+        }
+        if (preg_match('/\b(what|capabilities|help|can you|able)\b/', $msg)) {
+            $hit = true;
+            $keep[] = 'listCapabilities';
         }
 
         if (!$hit) return $all;
 
+        // listCapabilities is always useful; include it so the model can
+        // tell the user what tools it does have when the routed subset
+        // doesn't cover their ask.
+        $keep[] = 'listCapabilities';
         $keep = array_unique($keep);
-        return array_values(array_filter($all, fn($t) => in_array($t['function']['name'] ?? '', $keep, true)));
+
+        return array_values(array_filter($all,
+            fn($t) => in_array($t['function']['name'] ?? '', $keep, true)));
+    }
+
+    /**
+     * Pseudo-tool implementation: builds a short, categorized capability
+     * list so the AI can answer "what can you do?" without inventing tools.
+     * Returns the JSON body to feed back to the LLM as the tool result.
+     */
+    function chatbot_list_capabilities(): array
+    {
+        try {
+            $spec = mv_openapi_load();
+        } catch (Throwable $e) {
+            return ['ok' => false, 'error' => 'spec_unavailable'];
+        }
+        $cap = mv_openapi_capabilities($spec);
+        return ['ok' => true, 'data' => $cap];
     }
 }

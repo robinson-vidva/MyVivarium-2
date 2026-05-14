@@ -1,0 +1,1718 @@
+openapi: 3.1.0
+info:
+  title: "MyVivarium API"
+  version: "1.0"
+  description: "Versioned JSON REST API for the MyVivarium colony database. Single source of truth for both the human-facing docs at /api/docs and the AI chatbot's tool definitions. Endpoints cover mice, holding cages, breeding cages, maintenance notes, the audit log, and identity. All requests except /health require an API key."
+  x-base-url: "/api/v1"
+servers:
+  - url: "https://{host}/api/v1"
+    description: "Production deployment of MyVivarium."
+    variables:
+      host:
+        default: "myvivarium.example.org"
+        description: "The host serving MyVivarium."
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: "Per-user 64-hex-char token. Issue from Admin > API Keys."
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: "Max items per page. Default 50, max 200."
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        example: 50
+    OffsetParam:
+      name: offset
+      in: query
+      required: false
+      description: "Zero-based row offset for paging."
+      schema:
+        type: integer
+        minimum: 0
+        example: 0
+    IncludeDeletedParam:
+      name: include_deleted
+      in: query
+      required: false
+      description: "Admin-only flag to also return soft-deleted rows."
+      schema:
+        type: string
+        example: "false"
+  schemas:
+    Mouse:
+      type: object
+      description: "A single mouse in the colony."
+      properties:
+        mouse_id:
+          type: string
+          example: "M042"
+        sex:
+          type: string
+          enum: ["male", "female", "unknown"]
+        dob:
+          type: string
+          example: "2025-08-01"
+        current_cage_id:
+          type: string
+          nullable: true
+        strain:
+          type: string
+          nullable: true
+        genotype:
+          type: string
+          nullable: true
+        ear_code:
+          type: string
+          nullable: true
+        sire_id:
+          type: string
+          nullable: true
+        dam_id:
+          type: string
+          nullable: true
+        sire_external_ref:
+          type: string
+          nullable: true
+        dam_external_ref:
+          type: string
+          nullable: true
+        source_cage_label:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: ["alive", "sacrificed", "transferred_out", "archived"]
+        sacrificed_at:
+          type: string
+          nullable: true
+        sacrifice_reason:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        created_by:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          nullable: true
+    HoldingCage:
+      type: object
+      description: "A holding (non-breeding) cage."
+      properties:
+        cage_id:
+          type: string
+          example: "HC-12"
+        pi_name:
+          type: integer
+          nullable: true
+        quantity:
+          type: integer
+          nullable: true
+        remarks:
+          type: string
+          nullable: true
+        status:
+          type: string
+        room:
+          type: string
+          nullable: true
+        rack:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          nullable: true
+        occupants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mouse"
+        assigned_user_ids:
+          type: array
+          items:
+            type: integer
+        recent_maintenance_notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceNote"
+    BreedingCage:
+      type: object
+      description: "A breeding cage with mating pairs and litters."
+      properties:
+        cage_id:
+          type: string
+          example: "BC-7"
+        pi_name:
+          type: integer
+          nullable: true
+        remarks:
+          type: string
+          nullable: true
+        status:
+          type: string
+        room:
+          type: string
+          nullable: true
+        rack:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          nullable: true
+        pairs:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              cage_id:
+                type: string
+              cross:
+                type: string
+              male_id:
+                type: string
+              female_id:
+                type: string
+        litters:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              cage_id:
+                type: string
+              dom:
+                type: string
+              litter_dob:
+                type: string
+              pups_alive:
+                type: integer
+              pups_dead:
+                type: integer
+              pups_male:
+                type: integer
+              pups_female:
+                type: integer
+              remarks:
+                type: string
+        recent_maintenance_notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceNote"
+    MaintenanceNote:
+      type: object
+      description: "A maintenance / husbandry note attached to a cage."
+      properties:
+        id:
+          type: integer
+          example: 42
+        cage_id:
+          type: string
+          example: "HC-12"
+        user_id:
+          type: integer
+        note_text:
+          type: string
+        note_type:
+          type: string
+          nullable: true
+          example: "husbandry"
+        created_at:
+          type: string
+        updated_at:
+          type: string
+          nullable: true
+        deleted_at:
+          type: string
+          nullable: true
+    ActivityLogEntry:
+      type: object
+      description: "A row from the audit log."
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        action:
+          type: string
+          example: "api_request"
+        entity_type:
+          type: string
+          example: "mouse"
+        entity_id:
+          type: string
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+    User:
+      type: object
+      description: "Authenticated MyVivarium user (basic profile)."
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          example: "admin"
+        position:
+          type: string
+          nullable: true
+    PendingOperation:
+      type: object
+      description: "Returned by destructive endpoints in the confirm-before-execute flow when X-Confirm-Token is pending."
+      properties:
+        pending_operation_id:
+          type: string
+          example: "0c2f9c10-aaaa-bbbb-cccc-1234567890ab"
+        diff:
+          type: object
+          description: "Before/after preview of the change."
+          properties:
+            before:
+              type: object
+            after:
+              type: object
+            summary:
+              type: string
+        expires_at:
+          type: string
+          example: "2026-05-13T12:34:56+00:00"
+    ErrorEnvelope:
+      type: object
+      description: "Standard error response shape."
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "not_found"
+            message:
+              type: string
+              example: "Mouse M999 not found"
+    SuccessEnvelope:
+      type: object
+      description: "Standard success response shape; data is the operation-specific payload."
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          type: object
+        meta:
+          type: object
+          description: "Present on list endpoints; contains count, total, limit, offset."
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: "Health"
+    description: "Liveness probe; no auth required."
+  - name: "Users"
+    description: "Identity endpoints."
+  - name: "Mice"
+    description: "Read and modify individual mice."
+  - name: "Holding Cages"
+    description: "Read and modify holding (non-breeding) cages."
+  - name: "Breeding Cages"
+    description: "Read and modify breeding cages."
+  - name: "Maintenance Notes"
+    description: "Husbandry notes attached to cages."
+  - name: "Activity Log"
+    description: "Audit trail of read and write operations."
+  - name: "Admin"
+    description: "Admin-only endpoints (none yet documented; reserved)."
+paths:
+  /health:
+    get:
+      summary: "Liveness probe"
+      description: "Returns the API version and current server time. Use this once at the start of a session to verify /api/v1 is reachable and serving JSON. No auth, no rate limit, no database access."
+      operationId: getHealth
+      tags: ["Health"]
+      security: []
+      x-mv-read: true
+      responses:
+        "200":
+          description: "API is up."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      version:
+                        type: string
+                      time:
+                        type: string
+        "500":
+          description: "Server error."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /me:
+    get:
+      summary: "Get the authenticated user"
+      description: "Returns the user that owns the API key making the request. Use this to confirm identity, look up the caller's role, or display a personalized greeting."
+      operationId: getMe
+      tags: ["Users"]
+      x-mv-read: true
+      responses:
+        "200":
+          description: "The signed-in user."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/User"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "User row not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /mice:
+    get:
+      summary: "List mice"
+      description: "Returns a paginated list of mice with optional filters by status, sex, strain, or current cage. Soft-deleted (archived) mice are excluded by default; admins may opt in with include_deleted=true."
+      operationId: listMice
+      tags: ["Mice"]
+      x-mv-read: true
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: "Filter by lifecycle status."
+          schema:
+            type: string
+            enum: ["alive", "sacrificed", "transferred_out", "archived"]
+        - name: sex
+          in: query
+          required: false
+          description: "Filter by sex."
+          schema:
+            type: string
+            enum: ["male", "female", "unknown"]
+        - name: strain
+          in: query
+          required: false
+          description: "Filter by strain string (exact match)."
+          schema:
+            type: string
+            example: "C57BL/6J"
+        - name: cage_id
+          in: query
+          required: false
+          description: "Filter by current cage_id."
+          schema:
+            type: string
+            example: "HC-12"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - $ref: "#/components/parameters/IncludeDeletedParam"
+      responses:
+        "200":
+          description: "List of mice."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Mouse"
+                  meta:
+                    type: object
+        "400":
+          description: "Bad query parameter."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: "Rate limit hit."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      summary: "Create a mouse"
+      description: "Register a new mouse. Requires write scope. The caller must have write access to the target cage (or be an admin to create a cageless mouse). This is a safe write."
+      operationId: createMouse
+      tags: ["Mice"]
+      x-mv-safe-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["mouse_id"]
+              properties:
+                mouse_id:
+                  type: string
+                  description: "Unique mouse identifier (your colony's convention)."
+                  example: "M042"
+                cage_id:
+                  type: string
+                  description: "Cage to place the mouse in. Omit only as admin."
+                  example: "HC-12"
+                sex:
+                  type: string
+                  enum: ["male", "female", "unknown"]
+                dob:
+                  type: string
+                  example: "2025-08-01"
+                strain:
+                  type: string
+                  example: "C57BL/6J"
+                genotype:
+                  type: string
+                ear_code:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: "Created mouse (full row)."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Mouse"
+        "400":
+          description: "Validation failure."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write scope or cage permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "Mouse already exists."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: "Rate limit hit."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /mice/{id}:
+    get:
+      summary: "Get one mouse"
+      description: "Returns full details for a single mouse including current cage and parentage. Soft-deleted mice are hidden by default; admins can opt in with include_deleted=true."
+      operationId: getMouse
+      tags: ["Mice"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Mouse identifier."
+          schema:
+            type: string
+          example: "M042"
+        - $ref: "#/components/parameters/IncludeDeletedParam"
+      responses:
+        "200":
+          description: "Mouse detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Mouse"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Mouse not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      summary: "Update a mouse"
+      description: "Update editable fields on a mouse (sex, dob, strain, genotype, ear_code, parentage, notes). Destructive: supports the X-Confirm-Token confirm flow so the caller can preview a diff before committing."
+      operationId: updateMouse
+      tags: ["Mice"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Mouse identifier."
+          schema:
+            type: string
+          example: "M042"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "Provide only the fields to change."
+              properties:
+                sex:
+                  type: string
+                  enum: ["male", "female", "unknown"]
+                dob:
+                  type: string
+                strain:
+                  type: string
+                genotype:
+                  type: string
+                ear_code:
+                  type: string
+                sire_id:
+                  type: string
+                dam_id:
+                  type: string
+                sire_external_ref:
+                  type: string
+                dam_external_ref:
+                  type: string
+                source_cage_label:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: "Updated mouse."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Mouse"
+        "202":
+          description: "Pending operation; awaiting confirmation."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PendingOperation"
+        "400":
+          description: "Bad request."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write permission for this mouse."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Mouse not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "410":
+          description: "Pending operation token has expired."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      summary: "Soft-delete a mouse"
+      description: "Archive (soft-delete) a mouse by setting status=archived and clearing its current cage. Hard delete is not exposed here. Destructive: supports the confirm flow."
+      operationId: archiveMouse
+      tags: ["Mice"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Mouse identifier."
+          schema:
+            type: string
+          example: "M042"
+      responses:
+        "200":
+          description: "Archived mouse (full row)."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Mouse"
+        "202":
+          description: "Pending operation; awaiting confirmation."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PendingOperation"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Mouse not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "Mouse is already archived."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "410":
+          description: "Pending operation token has expired."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /mice/{id}/move:
+    post:
+      summary: "Move a mouse to another cage"
+      description: "Move a mouse to a different cage (or out of any cage with to_cage_id null). Closes the open cage-history row and opens a new one. Destructive: supports the confirm flow. Caller needs write access to both source and destination cages."
+      operationId: moveMouseToCage
+      tags: ["Mice"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Mouse identifier."
+          schema:
+            type: string
+          example: "M042"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["to_cage_id"]
+              properties:
+                to_cage_id:
+                  type: string
+                  description: "Destination cage_id, or null/omit to mark transferred_out."
+                  example: "HC-12"
+                reason:
+                  type: string
+                  example: "weaning"
+      responses:
+        "200":
+          description: "Mouse after the move."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Mouse"
+        "202":
+          description: "Pending operation; awaiting confirmation."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PendingOperation"
+        "400":
+          description: "Bad request (e.g. target cage missing)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Mouse not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "Mouse is sacrificed/archived or already in that cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "410":
+          description: "Pending operation token has expired."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /mice/{id}/sacrifice:
+    post:
+      summary: "Sacrifice a mouse"
+      description: "Mark a mouse as sacrificed and clear its cage assignment. Destructive: supports the confirm flow. Body must include the sacrifice date."
+      operationId: sacrificeMouse
+      tags: ["Mice"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Mouse identifier."
+          schema:
+            type: string
+          example: "M042"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["date"]
+              properties:
+                date:
+                  type: string
+                  example: "2026-05-14"
+                reason:
+                  type: string
+                  example: "endpoint reached"
+      responses:
+        "200":
+          description: "Sacrificed mouse (full row)."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Mouse"
+        "202":
+          description: "Pending operation; awaiting confirmation."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PendingOperation"
+        "400":
+          description: "Bad request (missing date)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Mouse not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "Already sacrificed."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "410":
+          description: "Pending operation token has expired."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/holding:
+    get:
+      summary: "List holding cages"
+      description: "Returns active holding (non-breeding) cages. Use this to browse the colony's housing inventory."
+      operationId: listHoldingCages
+      tags: ["Holding Cages"]
+      x-mv-read: true
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of holding cages."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HoldingCage"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: "Rate limit hit."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      summary: "Create a holding cage"
+      description: "Create a new holding (non-breeding) cage. Safe write. Caller is auto-added to cage_users so they retain write access (unless admin). Body: cage_id (required), pi_name, room, rack, remarks."
+      operationId: createHoldingCage
+      tags: ["Holding Cages"]
+      x-mv-safe-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["cage_id"]
+              properties:
+                cage_id:
+                  type: string
+                  example: "HC-12"
+                pi_name:
+                  type: integer
+                  description: "Numeric PI/lab identifier."
+                room:
+                  type: string
+                rack:
+                  type: string
+                remarks:
+                  type: string
+      responses:
+        "201":
+          description: "The created cage with occupants and recent notes."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/HoldingCage"
+        "400":
+          description: "Bad request."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write scope."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "Cage already exists."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/holding/{id}:
+    get:
+      summary: "Get one holding cage"
+      description: "Returns a holding cage with its current occupants, assigned users, and the 20 most recent maintenance notes."
+      operationId: getHoldingCage
+      tags: ["Holding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Cage identifier."
+          schema:
+            type: string
+          example: "HC-12"
+      responses:
+        "200":
+          description: "Holding cage detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/HoldingCage"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or is a breeding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      summary: "Update a holding cage"
+      description: "Update editable cage metadata (pi_name, remarks, room, rack). Destructive write. Caller needs write access to the cage."
+      operationId: updateHoldingCage
+      tags: ["Holding Cages"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Cage identifier."
+          schema:
+            type: string
+          example: "HC-12"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pi_name:
+                  type: integer
+                remarks:
+                  type: string
+                room:
+                  type: string
+                rack:
+                  type: string
+      responses:
+        "200":
+          description: "Updated cage."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/HoldingCage"
+        "400":
+          description: "Bad request (e.g. wrong cage type)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/breeding:
+    get:
+      summary: "List breeding cages"
+      description: "Returns active breeding cages. Each row tracks pairings and litters."
+      operationId: listBreedingCages
+      tags: ["Breeding Cages"]
+      x-mv-read: true
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of breeding cages."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BreedingCage"
+                  meta:
+                    type: object
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: "Rate limit hit."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      summary: "Create a breeding cage"
+      description: "Create a breeding cage with a sire and dam. Safe write. Caller is auto-added to cage_users. Body: cage_id (required), cross, male_id, female_id, plus optional cage metadata."
+      operationId: createBreedingCage
+      tags: ["Breeding Cages"]
+      x-mv-safe-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["cage_id"]
+              properties:
+                cage_id:
+                  type: string
+                  example: "BC-7"
+                cross:
+                  type: string
+                  description: "Free-text breeding cross label."
+                male_id:
+                  type: string
+                  description: "Sire mouse_id."
+                female_id:
+                  type: string
+                  description: "Dam mouse_id."
+                pi_name:
+                  type: integer
+                room:
+                  type: string
+                rack:
+                  type: string
+                remarks:
+                  type: string
+      responses:
+        "201":
+          description: "The created breeding cage."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BreedingCage"
+        "400":
+          description: "Bad request."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write scope."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "Cage already exists."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /cages/breeding/{id}:
+    get:
+      summary: "Get one breeding cage"
+      description: "Returns a breeding cage with its mating pairs, litters, and the 20 most recent maintenance notes."
+      operationId: getBreedingCage
+      tags: ["Breeding Cages"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Cage identifier."
+          schema:
+            type: string
+          example: "BC-7"
+      responses:
+        "200":
+          description: "Breeding cage detail."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BreedingCage"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found or is not a breeding cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      summary: "Update a breeding cage"
+      description: "Update editable cage and pair fields (pi_name, remarks, room, rack, cross, male_id, female_id). Destructive write. Caller needs write access."
+      operationId: updateBreedingCage
+      tags: ["Breeding Cages"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Cage identifier."
+          schema:
+            type: string
+          example: "BC-7"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pi_name:
+                  type: integer
+                remarks:
+                  type: string
+                room:
+                  type: string
+                rack:
+                  type: string
+                cross:
+                  type: string
+                male_id:
+                  type: string
+                female_id:
+                  type: string
+      responses:
+        "200":
+          description: "Updated breeding cage."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/BreedingCage"
+        "400":
+          description: "Bad request."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write permission."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Cage not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /maintenance-notes:
+    get:
+      summary: "List maintenance notes"
+      description: "Returns husbandry / maintenance notes attached to cages, optionally filtered by cage_id and a date range. Soft-deleted notes are hidden by default."
+      operationId: listMaintenanceNotes
+      tags: ["Maintenance Notes"]
+      x-mv-read: true
+      parameters:
+        - name: cage_id
+          in: query
+          required: false
+          description: "Filter by cage."
+          schema:
+            type: string
+            example: "HC-12"
+        - name: from
+          in: query
+          required: false
+          description: "Inclusive lower-bound date (YYYY-MM-DD)."
+          schema:
+            type: string
+            example: "2026-05-01"
+        - name: to
+          in: query
+          required: false
+          description: "Inclusive upper-bound date (YYYY-MM-DD)."
+          schema:
+            type: string
+            example: "2026-05-14"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - $ref: "#/components/parameters/IncludeDeletedParam"
+      responses:
+        "200":
+          description: "List of maintenance notes."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MaintenanceNote"
+                  meta:
+                    type: object
+        "400":
+          description: "Bad query parameter."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      summary: "Add a maintenance note"
+      description: "Attach a maintenance note to a cage. Safe write. Caller needs write access to the cage. Body: cage_id, note_text (both required), and optional type (e.g. water, bedding, husbandry)."
+      operationId: addMaintenanceNote
+      tags: ["Maintenance Notes"]
+      x-mv-safe-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["cage_id", "note_text"]
+              properties:
+                cage_id:
+                  type: string
+                  example: "HC-12"
+                note_text:
+                  type: string
+                  example: "changed bedding"
+                type:
+                  type: string
+                  example: "husbandry"
+      responses:
+        "201":
+          description: "The created note."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/MaintenanceNote"
+        "400":
+          description: "Bad request."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Lacks write permission for this cage."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Target cage not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /maintenance-notes/{id}:
+    get:
+      summary: "Get one maintenance note"
+      description: "Returns a single maintenance note. Soft-deleted notes are hidden unless the caller is admin and passes include_deleted=true."
+      operationId: getMaintenanceNote
+      tags: ["Maintenance Notes"]
+      x-mv-read: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Note identifier."
+          schema:
+            type: integer
+          example: 42
+        - $ref: "#/components/parameters/IncludeDeletedParam"
+      responses:
+        "200":
+          description: "The note."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/MaintenanceNote"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Note not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      summary: "Edit a maintenance note"
+      description: "Edit a maintenance note. Only the original author may edit, and only within 24 hours of creation. Destructive write."
+      operationId: updateMaintenanceNote
+      tags: ["Maintenance Notes"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Note identifier."
+          schema:
+            type: integer
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note_text:
+                  type: string
+                type:
+                  type: string
+      responses:
+        "200":
+          description: "Updated note."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/MaintenanceNote"
+        "400":
+          description: "Bad request."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Not the author or past the 24h window."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Note not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      summary: "Soft-delete a maintenance note"
+      description: "Soft-delete (set deleted_at) on a maintenance note. The original author or any admin may delete. Destructive: supports the confirm flow."
+      operationId: deleteMaintenanceNote
+      tags: ["Maintenance Notes"]
+      x-mv-destructive: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Note identifier."
+          schema:
+            type: integer
+          example: 42
+      responses:
+        "200":
+          description: "Soft-deleted note (id, deleted_at)."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      deleted_at:
+                        type: string
+        "202":
+          description: "Pending operation; awaiting confirmation."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PendingOperation"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: "Not the author and not admin."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: "Note not found."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "410":
+          description: "Pending operation token has expired."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /activity-log:
+    get:
+      summary: "Search the activity log"
+      description: "Returns the audit log of read/write operations. Non-admin callers only see their own entries; admins see everything and may filter by user_id."
+      operationId: listActivityLog
+      tags: ["Activity Log"]
+      x-mv-read: true
+      parameters:
+        - name: user_id
+          in: query
+          required: false
+          description: "Admin-only filter by acting user."
+          schema:
+            type: integer
+        - name: action
+          in: query
+          required: false
+          description: "Filter by action label (e.g. api_request, login, ai_chat_message)."
+          schema:
+            type: string
+            example: "api_request"
+        - name: from
+          in: query
+          required: false
+          description: "Inclusive lower-bound timestamp (YYYY-MM-DD)."
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: false
+          description: "Inclusive upper-bound timestamp (YYYY-MM-DD)."
+          schema:
+            type: string
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: "List of audit log entries."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ActivityLogEntry"
+                  meta:
+                    type: object
+        "400":
+          description: "Bad request."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "Missing or invalid API key."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"

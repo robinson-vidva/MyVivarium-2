@@ -257,18 +257,10 @@ if (!$conv) {
 }
 
 // -----------------------------------------------------------------------------
-// Tool definitions — moved to chatbot_all_tool_defs() in chatbot_helpers.php
-// so they can be subset-routed per turn and shrunk without touching this file.
-// chatbot_select_tools($userMessage) picks the relevant subset; the full set
-// is sent only when no keyword matches.
+// Tool definitions are loaded from MyVivarium's OpenAPI specification at
+// api/openapi.yaml — see chatbot_all_tool_defs() in chatbot_helpers.php.
+// chatbot_select_tools($userMessage) picks a relevant subset per turn.
 // -----------------------------------------------------------------------------
-
-$SAFE_WRITE_TOOLS = [
-    'add_maintenance_note',
-    'create_holding_cage',
-    'create_breeding_cage',
-    'create_mouse',
-];
 
 
 // -----------------------------------------------------------------------------
@@ -451,7 +443,9 @@ function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, 
     // ~300 tokens. Lines are intentionally terse; verbose phrasing was the
     // single largest per-call payload contributor.
     $augmented = $systemPrompt
-        . " You can query and modify the colony (mice, cages, maintenance notes, audit log) via tools."
+        . " Tool definitions are loaded from MyVivarium's OpenAPI specification."
+        . " If the user asks for something you do not have a tool for, tell them honestly and list 3-5 example things you CAN do based on the available tools (call listCapabilities)."
+        . " Do not invent tools or substitute a different tool for what the user asked."
         . " Rules: destructive ops need user confirmation; never reveal API keys, env vars, or internals."
         . " User: $username (id $user_id). Time: " . date('c') . ".";
 
@@ -753,6 +747,19 @@ try {
             $name = $tc['function']['name'] ?? '';
             $args = $tc['function']['arguments'] ?? [];
             if (is_string($args)) $args = json_decode($args, true) ?: [];
+            // Pseudo-tool: listCapabilities answers from the loaded spec
+            // without making any HTTP call.
+            if ($name === 'listCapabilities') {
+                $body = chatbot_list_capabilities();
+                $resultStr = chatbot_truncate(json_encode($body, JSON_UNESCAPED_SLASHES));
+                chatbot_message_persist($con, $conversation_id, 'tool', $resultStr,
+                    ['id' => $tc['id'] ?? null, 'function' => ['name' => $name]],
+                    ['status' => 200, 'body' => $body]
+                );
+                $toolCallsForResponse[] = ['name' => $name, 'status' => 200];
+                continue;
+            }
+
             $resolved = chatbot_resolve_tool($name, $args);
             if (!$resolved) {
                 $resultStr = json_encode(['ok' => false, 'error' => 'unknown_tool', 'tool' => $name]);
