@@ -1,11 +1,14 @@
 <?php
 /**
  * Admin-only AJAX endpoint: tests the stored API key for a specified
- * provider by hitting its GET /models endpoint via llm_test_connection().
+ * provider via llm_test_connection(). Groq / OpenAI hit GET /models;
+ * custom-provider presets use a minimal chat-completions probe (or
+ * /models for openai_compatible).
  *
- * Accepts ?provider=groq or ?provider=openai. Defaults to the active
+ * Accepts ?provider=groq | openai | custom. Defaults to the active
  * provider when no parameter is given. Returns small JSON with success
- * status, model count, or a verbatim provider error message.
+ * status, model count (when available), or a verbatim provider error
+ * message.
  *
  * **The API key itself is never included in any field of the response.**
  */
@@ -28,7 +31,7 @@ $provider = (string)($_GET['provider'] ?? '');
 if ($provider === '') {
     $provider = llm_get_active_provider();
 }
-if (!in_array($provider, [LLM_PROVIDER_GROQ, LLM_PROVIDER_OPENAI], true)) {
+if (!in_array($provider, [LLM_PROVIDER_GROQ, LLM_PROVIDER_OPENAI, LLM_PROVIDER_CUSTOM], true)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'message' => "Unknown provider '$provider'."]);
     exit;
