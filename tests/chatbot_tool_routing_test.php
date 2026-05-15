@@ -135,21 +135,86 @@ check('"who am I": pulls Account',           in_array('getMyProfile', $n, true))
 $n = names_for('what is my account info?');
 check('"my account": pulls Account',         in_array('getMyProfile', $n, true));
 
-// Negative / regression cases
-
-// Bare "my" with no domain word should fall through to "send all" so
-// the AI never refuses a valid request because the keyword router
-// guessed wrong. This was the BUG C class of failures.
+// Negative / regression cases — Layer 5 smart fallback (curated 15-20 tools).
 $all = chatbot_select_tools('do my thing');
-check('bare "my": falls through to full toolset', count($all) >= 45);
+check('bare "my": falls through to Layer 5 (15-20 tools)',
+    count($all) >= 15 && count($all) <= 20);
 
-// Empty message → all tools.
 $n = chatbot_select_tools('');
-check('empty message: all tools',                 count($n) >= 45);
+check('empty message: Layer 5 fallback',          count($n) >= 15 && count($n) <= 20);
 
-// Unknown words → all tools.
 $n = chatbot_select_tools('blarghnoise foobar quux');
-check('unknown words: all tools',                 count($n) >= 45);
+check('unknown words: Layer 5 fallback',          count($n) >= 15 && count($n) <= 20);
+
+// --- Layered selector cases (Layers 1a/1b/2/3/5) ---
+
+// Layer 1a: greetings → only getMe.
+$n = names_for('hi');
+check('Layer 1a: "hi" → 1 tool',                  count($n) === 1);
+check('Layer 1a: "hi" → getMe',                   in_array('getMe', $n, true));
+
+$n = names_for('hello');
+check('Layer 1a: "hello" → 1 tool (getMe)',
+    count($n) === 1 && in_array('getMe', $n, true));
+
+$n = names_for('good morning');
+check('Layer 1a: "good morning" → getMe only',
+    count($n) === 1 && in_array('getMe', $n, true));
+
+// Layer 1a vs 4: domain keyword wins.
+$n = names_for('hi I want to see my mice');
+check('"hi I want to see my mice": Layer 4 (domain wins, NOT Layer 1a)',
+    in_array('listMice', $n, true) && count($n) > 1);
+
+// Layer 1b: acknowledgments → 0 tools.
+$n = names_for('thanks');
+check('Layer 1b: "thanks" → 0 tools',             count($n) === 0);
+
+$n = names_for('ok');
+check('Layer 1b: "ok" → 0 tools',                 count($n) === 0);
+
+$n = names_for('bye');
+check('Layer 1b: "bye" → 0 tools',                count($n) === 0);
+
+// Layer 2: capability/help → only listCapabilities.
+$n = names_for('what can you do');
+check('Layer 2: "what can you do" → 1 tool (listCapabilities)',
+    count($n) === 1 && in_array('listCapabilities', $n, true));
+
+$n = names_for('capabilities');
+check('Layer 2: "capabilities" → listCapabilities only',
+    count($n) === 1 && in_array('listCapabilities', $n, true));
+
+// Layer 3: identity beyond greetings → getMe + getMyProfile (and only those).
+$n = names_for('who am I');
+check('Layer 3: "who am I" → 2 tools',            count($n) === 2);
+check('Layer 3: "who am I" → getMe',              in_array('getMe', $n, true));
+check('Layer 3: "who am I" → getMyProfile',       in_array('getMyProfile', $n, true));
+
+$n = names_for('my profile');
+check('Layer 3: "my profile" → 2 tools',          count($n) === 2);
+check('Layer 3: "my profile" → getMyProfile',     in_array('getMyProfile', $n, true));
+
+// Layer 4: existing domain behavior still works.
+$n = names_for('list my mice');
+check('Layer 4: "list my mice" → pulls listMice', in_array('listMice', $n, true));
+check('Layer 4: "list my mice" → > 1 tool',       count($n) > 1);
+
+// Layer 5: vague message → curated 15-20 tool set.
+$n = chatbot_select_tools('show me something');
+check('Layer 5: "show me something" → 15-20 tools',
+    count($n) >= 15 && count($n) <= 20);
+$names = array_map(fn($t) => $t['function']['name'], $n);
+check('Layer 5: includes listCapabilities',       in_array('listCapabilities', $names, true));
+check('Layer 5: includes getMe',                  in_array('getMe', $names, true));
+check('Layer 5: includes listMice + getMouse',
+    in_array('listMice', $names, true) && in_array('getMouse', $names, true));
+check('Layer 5: includes listTasks',              in_array('listTasks', $names, true));
+check('Layer 5: includes getDashboardSummary',    in_array('getDashboardSummary', $names, true));
+
+// "all" strategy bypasses every layer — for debugging.
+$n = chatbot_select_tools('hi', 'all');
+check('strategy=all: full toolset even for greeting', count($n) >= 45);
 
 // listCapabilities is always present when any group matched.
 $n = names_for('show my mice');
