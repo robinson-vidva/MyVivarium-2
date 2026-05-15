@@ -109,6 +109,114 @@ $cfg3 = llm_get_active_config();
 check('azure_openai: o3-mini deployment uses max_completion_tokens',
     $cfg3['token_field'] === 'max_completion_tokens');
 
+// ---------------------------------------------------------------------------
+// Temperature handling: Azure GPT-5 / o1 / o3 reject any non-default
+// temperature value, so the helper must report "omit temperature" for those
+// model/deployment names and "keep temperature" for everything else. The
+// rule is asserted both at the helper level (llm_model_omits_temperature)
+// and at the request-body level (llm_build_chat_request) so we know the
+// request actually leaves without a temperature key.
+// ---------------------------------------------------------------------------
+
+check('omit_temperature helper: gpt-5 → true',
+    llm_model_omits_temperature('gpt-5') === true);
+check('omit_temperature helper: gpt-5-preview → true',
+    llm_model_omits_temperature('gpt-5-preview') === true);
+check('omit_temperature helper: gpt-5.5 (with dot) → true',
+    llm_model_omits_temperature('gpt-5.5') === true);
+check('omit_temperature helper: GPT-5 uppercase → true (case-insensitive)',
+    llm_model_omits_temperature('GPT-5-Turbo') === true);
+check('omit_temperature helper: o1-mini → true',
+    llm_model_omits_temperature('o1-mini') === true);
+check('omit_temperature helper: o3-mini → true',
+    llm_model_omits_temperature('o3-mini') === true);
+check('omit_temperature helper: O3 uppercase → true',
+    llm_model_omits_temperature('O3-preview') === true);
+check('omit_temperature helper: gpt-4o-mini → false',
+    llm_model_omits_temperature('gpt-4o-mini') === false);
+check('omit_temperature helper: gpt-4o → false',
+    llm_model_omits_temperature('gpt-4o') === false);
+check('omit_temperature helper: gpt-3.5 → false',
+    llm_model_omits_temperature('gpt-3.5-turbo') === false);
+check('omit_temperature helper: claude-sonnet-4-6 → false',
+    llm_model_omits_temperature('claude-sonnet-4-6') === false);
+check('omit_temperature helper: empty → false',
+    llm_model_omits_temperature('') === false);
+
+// azure_openai: gpt-5 deployment → request body omits temperature
+_llm_test_reset();
+_llm_test_set('llm_provider', 'custom');
+_llm_test_set('custom_preset', 'azure_openai');
+_llm_test_set('custom_resource_url', 'https://r.openai.azure.com');
+_llm_test_set('custom_deployment', 'gpt-5');
+_llm_test_set('custom_api_key', 'k');
+$cfgGpt5 = llm_get_active_config();
+$reqGpt5 = llm_build_chat_request($cfgGpt5, [['role'=>'user','content'=>'hi']], [], 1);
+check('azure_openai gpt-5: request body has NO temperature key',
+    !array_key_exists('temperature', $reqGpt5['body_arr']));
+check('azure_openai gpt-5: serialized JSON has no temperature',
+    strpos($reqGpt5['body_str'], 'temperature') === false);
+
+// azure_openai: gpt-5.5 (with dot) → request body omits temperature
+_llm_test_set('custom_deployment', 'gpt-5.5');
+$cfgGpt55 = llm_get_active_config();
+$reqGpt55 = llm_build_chat_request($cfgGpt55, [['role'=>'user','content'=>'hi']], [], 1);
+check('azure_openai gpt-5.5: request body has NO temperature key',
+    !array_key_exists('temperature', $reqGpt55['body_arr']));
+
+// azure_openai: o1 deployment → request body omits temperature
+_llm_test_set('custom_deployment', 'o1-preview');
+$cfgO1 = llm_get_active_config();
+$reqO1 = llm_build_chat_request($cfgO1, [['role'=>'user','content'=>'hi']], [], 1);
+check('azure_openai o1-preview: request body has NO temperature key',
+    !array_key_exists('temperature', $reqO1['body_arr']));
+
+// azure_openai: o3 deployment → request body omits temperature
+_llm_test_set('custom_deployment', 'o3-mini');
+$cfgO3 = llm_get_active_config();
+$reqO3 = llm_build_chat_request($cfgO3, [['role'=>'user','content'=>'hi']], [], 1);
+check('azure_openai o3-mini: request body has NO temperature key',
+    !array_key_exists('temperature', $reqO3['body_arr']));
+
+// azure_openai: gpt-4o-mini deployment → request body STILL HAS temperature
+_llm_test_set('custom_deployment', 'gpt-4o-mini');
+$cfgGpt4o = llm_get_active_config();
+$reqGpt4o = llm_build_chat_request($cfgGpt4o, [['role'=>'user','content'=>'hi']], [], 1);
+check('azure_openai gpt-4o-mini: request body HAS temperature key',
+    array_key_exists('temperature', $reqGpt4o['body_arr'])
+    && $reqGpt4o['body_arr']['temperature'] === 0.2);
+
+// test_connection probe: gpt-5 deployment also omits temperature in the
+// minimal probe body that hits Azure.
+_llm_test_reset();
+_llm_test_set('llm_provider', 'custom');
+_llm_test_set('custom_preset', 'azure_openai');
+_llm_test_set('custom_resource_url', 'https://r.openai.azure.com');
+_llm_test_set('custom_deployment', 'gpt-5.5');
+_llm_test_set('custom_api_key', 'k');
+$probeBody = null;
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function ($url, $headers, $body) use (&$probeBody) {
+    $probeBody = $body;
+    return [200, json_encode(['choices'=>[['message'=>['role'=>'assistant','content'=>'']]]]), ''];
+};
+$res = llm_test_connection('custom');
+check('test_connection azure_openai gpt-5.5: probe body has no temperature',
+    is_string($probeBody) && strpos($probeBody, 'temperature') === false);
+check('test_connection azure_openai gpt-5.5: ok=true',
+    $res['ok'] === true);
+
+// openai_compatible with a gpt-5 model id → also omits temperature
+_llm_test_reset();
+_llm_test_set('llm_provider', 'custom');
+_llm_test_set('custom_preset', 'openai_compatible');
+_llm_test_set('custom_base_url', 'https://api.example.com/v1');
+_llm_test_set('custom_model', 'gpt-5-something');
+_llm_test_set('custom_api_key', 'k');
+$cfgOaiCompatGpt5 = llm_get_active_config();
+$reqOaiCompatGpt5 = llm_build_chat_request($cfgOaiCompatGpt5, [['role'=>'user','content'=>'hi']], [], 1);
+check('openai_compatible gpt-5-something: body has NO temperature key',
+    !array_key_exists('temperature', $reqOaiCompatGpt5['body_arr']));
+
 // Missing fields → config_errors
 _llm_test_reset();
 _llm_test_set('llm_provider', 'custom');

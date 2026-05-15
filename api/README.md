@@ -375,6 +375,16 @@ model). The token field is `max_tokens` for most deployments, or
 `max_completion_tokens` when the deployment name starts with `gpt-5`,
 `o1`, or `o3` (newer reasoning models reject the legacy field).
 
+Azure's GPT-5 family (`gpt-5`, `gpt-5.5`, …) and the reasoning models
+(`o1`, `o3`) reject any custom `temperature` value — only the model
+default (1) is accepted. MyVivarium handles this automatically: when the
+deployment name matches the same `gpt-5` / `o1` / `o3` case-insensitive
+prefix rule, the `temperature` field is omitted from the request body
+entirely (for both the chatbot path and the Test Connection probe). All
+other deployments continue to send `temperature: 0.2` as before. The
+Anthropic Messages translation (`azure_anthropic` preset) does not send
+`temperature` at all, so the rule does not apply there.
+
 **Azure Anthropic / Claude via APIM** — `custom_preset = "azure_anthropic"`.
 For Anthropic Messages format routed through Azure APIM or a similar gateway.
 

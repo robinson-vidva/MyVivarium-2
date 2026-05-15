@@ -321,15 +321,39 @@ function llm_active_provider_banner(array $cfg): string
 }
 
 /**
+ * Decide whether to omit the temperature field from an OpenAI-shape request
+ * body. Azure's GPT-5 family and the reasoning models (o1, o3) reject any
+ * temperature value other than the default 1 with an "Unsupported value"
+ * error, so MyVivarium omits the field entirely for those deployments /
+ * model ids and lets the provider apply its default. The detection rule is
+ * a case-insensitive prefix match — same as the one already used for
+ * picking max_completion_tokens vs max_tokens.
+ *
+ * Pure helper, unit-tested in tests/llm_provider_custom_test.php.
+ */
+function llm_model_omits_temperature(string $modelOrDeployment): bool
+{
+    $name = strtolower($modelOrDeployment);
+    return (
+        strpos($name, 'gpt-5') === 0 ||
+        strpos($name, 'o1')    === 0 ||
+        strpos($name, 'o3')    === 0
+    );
+}
+
+/**
  * Build the OpenAI-shape request body for groq / openai / custom-openai_chat
  * presets. Pure: no I/O.
  */
 function llm_build_openai_chat_payload(array $cfg, array $messages, array $tools, ?int $max_tokens): array
 {
     $payload = [
-        'messages'    => $messages,
-        'temperature' => 0.2,
+        'messages' => $messages,
     ];
+    $modelForName = (string)($cfg['model'] ?? '');
+    if (!llm_model_omits_temperature($modelForName)) {
+        $payload['temperature'] = 0.2;
+    }
     $includeModel = $cfg['include_model_in_body'] ?? true;
     if ($includeModel) {
         $payload['model'] = $cfg['model'];
@@ -649,10 +673,12 @@ function llm_build_chat_request(array $cfg, array $messages, array $tools, ?int 
         // groq/openai always speak OpenAI chat completions with model in body
         // and the standard max_tokens field.
         $body = [
-            'model'       => $cfg['model'],
-            'messages'    => $messages,
-            'temperature' => 0.2,
+            'model'    => $cfg['model'],
+            'messages' => $messages,
         ];
+        if (!llm_model_omits_temperature((string)($cfg['model'] ?? ''))) {
+            $body['temperature'] = 0.2;
+        }
         if (!empty($tools)) {
             $body['tools']       = $tools;
             $body['tool_choice'] = 'auto';
