@@ -145,6 +145,29 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
   }
   .mv-suggestion-chip:hover { background: #dee2e6; }
   .mv-suggestion-chip:disabled { cursor: not-allowed; }
+  /* Markdown body inside an assistant bubble. */
+  .mv-msg-assistant.mv-md { white-space: normal; }
+  .mv-md p { margin: 0 0 6px 0; }
+  .mv-md p:last-child { margin-bottom: 0; }
+  .mv-md ul, .mv-md ol { margin: 4px 0 6px 18px; padding: 0; }
+  .mv-md li { margin: 1px 0; }
+  .mv-md code { background: #f1f3f5; padding: 1px 4px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 12px; }
+  .mv-md pre { background: #f1f3f5; padding: 6px 8px; border-radius: 4px; overflow-x: auto; margin: 4px 0; }
+  .mv-md pre code { background: transparent; padding: 0; }
+  .mv-md strong { font-weight: 600; }
+  .mv-md em { font-style: italic; }
+  .mv-md a { color: #0d6efd; text-decoration: underline; }
+  .mv-md table {
+    width: 100%; border-collapse: collapse; margin: 6px 0;
+    font-size: 12px; table-layout: auto;
+  }
+  .mv-md th, .mv-md td {
+    border: 1px solid #dee2e6; padding: 4px 6px; text-align: left;
+    vertical-align: top; word-break: break-word;
+  }
+  .mv-md thead th { background: #e9ecef; font-weight: 600; }
+  .mv-md tbody tr:nth-child(even) td { background: #f8f9fa; }
+  .mv-md th.mv-num, .mv-md td.mv-num { text-align: right; }
   #mv-chat-typing { align-self: flex-start; color: #6c757d; font-size: 12px; padding: 4px 12px; font-style: italic; display: none; }
   #mv-chat-typing.show { display: block; }
   #mv-chat-input-row {
@@ -207,10 +230,148 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
   }
   function scrollBottom() { msgs.scrollTop = msgs.scrollHeight; }
 
+  // Minimal dependency-free Markdown renderer.
+  // Supports: paragraphs, **bold**, *italic*, `inline code`, ``` fenced
+  // code blocks ```, unordered (- ) and ordered (1. ) lists, GFM tables
+  // (| ... |), and [text](url) links. All other HTML is escaped so AI
+  // content cannot inject elements; <user_data> blocks from tool results
+  // (which the backend wraps for prompt-injection defense) render as
+  // literal escaped text — never as DOM nodes.
+  function mvRenderMarkdown(text) {
+    if (text == null) return '';
+    const src = String(text).replace(/\r\n?/g, '\n');
+    const fences = [];
+    // Step 1: pull out fenced code blocks first so their contents aren't
+    // touched by the rest of the parser.
+    let body = src.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (m, lang, code) => {
+      fences.push('<pre><code>' + escapeHtml(code.replace(/\n$/, '')) + '</code></pre>');
+      return '\0FENCE' + (fences.length - 1) + '\0';
+    });
+    // Escape the rest. From here on we re-inject HTML for the constructs
+    // we support; nothing the model produces can become a raw tag.
+    body = escapeHtml(body);
+
+    // Re-inject fences with their already-escaped code.
+    body = body.replace(/\0FENCE(\d+)\0/g, (m, i) => fences[+i]);
+
+    // Block-level pass: split into blocks separated by blank lines, then
+    // identify tables, lists, and paragraphs.
+    const blocks = body.split(/\n{2,}/);
+    const out = [];
+    const tableRowRe = /^\s*\|.*\|\s*$/;
+    const tableSepRe = /^\s*\|?\s*:?-+:?(\s*\|\s*:?-+:?)+\s*\|?\s*$/;
+
+    function inline(s) {
+      // Inline code first to protect its contents from emphasis parsing.
+      const codes = [];
+      s = s.replace(/`([^`\n]+)`/g, (m, c) => {
+        codes.push('<code>' + c + '</code>');
+        return '\0CODE' + (codes.length - 1) + '\0';
+      });
+      // Links [text](url) — only http(s)/relative URLs allowed.
+      s = s.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, t, u) => {
+        const safe = /^(https?:\/\/|\/|#)/.test(u) ? u : '#';
+        return '<a href="' + safe + '" target="_blank" rel="noopener noreferrer">' + t + '</a>';
+      });
+      // Bold then italic (order matters so ** isn't eaten by *).
+      s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+      // Restore inline code.
+      s = s.replace(/\0CODE(\d+)\0/g, (m, i) => codes[+i]);
+      return s;
+    }
+
+    function renderTable(lines) {
+      // lines: header, separator, ...body rows
+      const splitRow = (l) => {
+        let s = l.trim();
+        if (s.startsWith('|')) s = s.slice(1);
+        if (s.endsWith('|'))   s = s.slice(0, -1);
+        return s.split('|').map(c => c.trim());
+      };
+      const header = splitRow(lines[0]);
+      const seps   = splitRow(lines[1]);
+      const aligns = seps.map(c => {
+        if (/^:-+:$/.test(c)) return 'center';
+        if (/-+:$/.test(c))   return 'right';
+        return 'left';
+      });
+      const rows = lines.slice(2).map(splitRow);
+      let html = '<table><thead><tr>';
+      header.forEach((h, i) => {
+        const a = aligns[i] || 'left';
+        const cls = a === 'right' ? ' class="mv-num"' : (a === 'center' ? ' style="text-align:center"' : '');
+        html += '<th' + cls + '>' + inline(h) + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+      rows.forEach(r => {
+        html += '<tr>';
+        for (let i = 0; i < header.length; i++) {
+          const a = aligns[i] || 'left';
+          const cls = a === 'right' ? ' class="mv-num"' : (a === 'center' ? ' style="text-align:center"' : '');
+          html += '<td' + cls + '>' + inline(r[i] != null ? r[i] : '') + '</td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function renderList(lines, ordered) {
+      const tag = ordered ? 'ol' : 'ul';
+      const re  = ordered ? /^\s*\d+\.\s+(.*)$/ : /^\s*[-*]\s+(.*)$/;
+      let html = '<' + tag + '>';
+      lines.forEach(l => {
+        const m = l.match(re);
+        html += '<li>' + inline(m ? m[1] : l) + '</li>';
+      });
+      html += '</' + tag + '>';
+      return html;
+    }
+
+    blocks.forEach(block => {
+      if (!block.trim()) return;
+      // Pre-rendered fenced code block — pass through.
+      if (/^<pre><code>/.test(block.trim()) && /<\/code><\/pre>$/.test(block.trim())) {
+        out.push(block.trim());
+        return;
+      }
+      const lines = block.split('\n');
+      // Table?
+      if (lines.length >= 2 && tableRowRe.test(lines[0]) && tableSepRe.test(lines[1])) {
+        const t = [];
+        for (const l of lines) { if (tableRowRe.test(l) || tableSepRe.test(l)) t.push(l); else break; }
+        out.push(renderTable(t));
+        const rest = lines.slice(t.length).join('\n');
+        if (rest.trim()) out.push('<p>' + inline(rest).replace(/\n/g, '<br>') + '</p>');
+        return;
+      }
+      // Unordered list?
+      if (lines.every(l => /^\s*[-*]\s+/.test(l) || l.trim() === '')) {
+        out.push(renderList(lines.filter(l => l.trim()), false));
+        return;
+      }
+      // Ordered list?
+      if (lines.every(l => /^\s*\d+\.\s+/.test(l) || l.trim() === '')) {
+        out.push(renderList(lines.filter(l => l.trim()), true));
+        return;
+      }
+      // Paragraph (preserve single newlines as <br>).
+      out.push('<p>' + inline(lines.join('\n')).replace(/\n/g, '<br>') + '</p>');
+    });
+    return out.join('');
+  }
+
   function addMessage(role, content) {
     const div = document.createElement('div');
+    const isAssistant = role !== 'user' && role !== 'system_event';
     div.className = 'mv-msg mv-msg-' + (role === 'user' ? 'user' : role === 'system_event' ? 'event' : 'assistant');
-    div.textContent = content;
+    if (isAssistant) {
+      div.classList.add('mv-md');
+      div.innerHTML = mvRenderMarkdown(content);
+    } else {
+      div.textContent = content;
+    }
     msgs.appendChild(div);
     scrollBottom();
   }
@@ -420,22 +581,11 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
         conversationId = j.conversation.id;
         msgs.innerHTML = '';
         const list = j.messages || [];
-        // Find the index of the most recent assistant message that has
-        // content (not a tool-call dispatch). Only THAT row's suggestions
-        // are restored on reload — older suggestions are obsolete.
-        let latestAssistantIdx = -1;
-        for (let i = list.length - 1; i >= 0; i--) {
-          const m = list[i];
-          if (m.role === 'assistant' && m.content) { latestAssistantIdx = i; break; }
-        }
-        list.forEach((m, i) => {
+        list.forEach(m => {
           if (m.role === 'user' || m.role === 'assistant') {
             if (m.content) addMessage(m.role, m.content);
             if (m.tool_call_json && m.tool_call_json.tool_calls) {
               m.tool_call_json.tool_calls.forEach(tc => addToolCard({ name: (tc.function && tc.function.name) || 'tool' }));
-            }
-            if (i === latestAssistantIdx && Array.isArray(m.suggestions) && m.suggestions.length > 0) {
-              addSuggestions(m.suggestions);
             }
           } else if (m.role === 'system_event') {
             addEvent(m.content || '');
@@ -443,6 +593,17 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
             addToolCard({ name: (m.tool_call_json && m.tool_call_json.function && m.tool_call_json.function.name) || 'tool', request: m.tool_result_json });
           }
         });
+        // After all messages are in the DOM, restore chips beneath the
+        // most recent assistant turn that has suggestions. Defensive on
+        // the field name so the server can spell it suggestions /
+        // suggested without breaking the UI.
+        for (let i = list.length - 1; i >= 0; i--) {
+          const m = list[i];
+          if (m.role !== 'assistant') continue;
+          const sugg = Array.isArray(m.suggestions) ? m.suggestions
+                     : (Array.isArray(m.suggested)  ? m.suggested  : []);
+          if (sugg.length > 0) { addSuggestions(sugg); break; }
+        }
       }).catch(() => {});
   }
 

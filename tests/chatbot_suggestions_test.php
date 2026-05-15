@@ -197,5 +197,63 @@ check('ai_chat.php uses fallback suggestions',
 check('ai_chat.php returns suggestions in JSON',
     strpos($aiChat, "'suggestions'") !== false);
 
+// ---------------------------------------------------------------------------
+// History JSON shape — suggestions must be returned as an array per message
+// so the chatbot widget can restore chips on page reload (BUG A).
+// ---------------------------------------------------------------------------
+
+$histSrc = (string)file_get_contents(__DIR__ . '/../ai_chat_history.php');
+check('history endpoint decodes suggestions_json',
+    strpos($histSrc, "json_decode(\$m['suggestions_json']") !== false);
+check('history endpoint emits messages[].suggestions as an array',
+    strpos($histSrc, "\$m['suggestions'] = is_array(\$decoded)") !== false);
+check('history endpoint defaults missing suggestions to []',
+    strpos($histSrc, "\$m['suggestions'] = []") !== false);
+check('history endpoint strips suggestions_json from the response',
+    strpos($histSrc, "unset(\$m['suggestions_json'])") !== false);
+check('history endpoint filters non-strings out of the array',
+    strpos($histSrc, "array_filter(\$decoded, 'is_string')") !== false);
+
+// Simulate the per-row transformation the history endpoint applies.
+function simulate_history_row(array $row): array {
+    if (isset($row['suggestions_json']) && $row['suggestions_json'] !== null && $row['suggestions_json'] !== '') {
+        $decoded = json_decode($row['suggestions_json'], true);
+        $row['suggestions'] = is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+    } else {
+        $row['suggestions'] = [];
+    }
+    unset($row['suggestions_json']);
+    return $row;
+}
+
+$r = simulate_history_row(['id'=>1,'role'=>'assistant','content'=>'hi','suggestions_json'=>'["Show alive","Filter by sex"]']);
+check('history shape: assistant row has suggestions array',
+    is_array($r['suggestions']) && count($r['suggestions']) === 2);
+check('history shape: assistant row first suggestion string',
+    $r['suggestions'][0] === 'Show alive');
+check('history shape: assistant row suggestions_json is stripped',
+    !array_key_exists('suggestions_json', $r));
+
+$r = simulate_history_row(['id'=>2,'role'=>'assistant','content'=>'no chips','suggestions_json'=>null]);
+check('history shape: NULL suggestions_json => empty array',
+    $r['suggestions'] === []);
+
+$r = simulate_history_row(['id'=>3,'role'=>'user','content'=>'show mice','suggestions_json'=>'']);
+check('history shape: user row gets empty suggestions',
+    $r['suggestions'] === []);
+
+$r = simulate_history_row(['id'=>4,'role'=>'assistant','content'=>'mixed','suggestions_json'=>'["ok",42,"go"]']);
+check('history shape: non-strings filtered out',
+    $r['suggestions'] === ['ok','go']);
+
+// Widget restore path
+$widget = (string)file_get_contents(__DIR__ . '/../includes/chatbot_widget.php');
+check('widget loadConversation reads m.suggestions on restore',
+    strpos($widget, 'Array.isArray(m.suggestions)') !== false);
+check('widget loadConversation calls addSuggestions on restore',
+    preg_match('/loadConversation[\s\S]*?addSuggestions\(/m', $widget) === 1);
+check('widget addSuggestions function exists',
+    strpos($widget, 'function addSuggestions(') !== false);
+
 echo "\n$pass passed, $fail failed\n";
 exit($fail === 0 ? 0 : 1);

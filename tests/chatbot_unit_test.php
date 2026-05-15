@@ -143,6 +143,28 @@ check('select_tools log keyword includes listActivityLog',    in_array('listActi
 check('select_tools fallback returns all',                    count($noneNames) === count($defs));
 check('select_tools mice keyword keeps listCapabilities',     in_array('listCapabilities', $miceNames, true));
 
+// Coverage: all 45 spec endpoints reachable through at least one keyword
+// route. If a new endpoint is added in api/openapi.yaml without an
+// accompanying keyword wire-up, this assertion fails (BUG C class).
+$allDefs  = chatbot_all_tool_defs();
+$allNames = array_map(fn($t) => $t['function']['name'], $allDefs);
+$probes   = [
+    'show my mice', 'show offspring of M-1', 'list cages', 'add a maintenance note',
+    'show activity log', 'history of M-1', 'list my open tasks', 'show my reminders',
+    'what is on the calendar?', 'show my notifications', 'list strains',
+    'list iacuc protocols', 'show me a dashboard summary',
+    'show my profile', 'help',
+];
+$reached = [];
+foreach ($probes as $p) {
+    foreach (array_map(fn($t) => $t['function']['name'], chatbot_select_tools($p)) as $n) {
+        $reached[$n] = true;
+    }
+}
+$missing = array_values(array_diff($allNames, array_keys($reached)));
+check('all ' . count($allNames) . ' spec endpoints reachable through some keyword (missing: '
+    . implode(', ', $missing) . ')', count($missing) === 0);
+
 // --- listCapabilities pseudo-tool ---
 $cap = chatbot_list_capabilities();
 check('listCapabilities returns ok=true',     $cap['ok'] === true);
