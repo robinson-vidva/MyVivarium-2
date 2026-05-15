@@ -452,21 +452,87 @@ $res = llm_test_connection('custom');
 check('test_connection azure_openai: ok=true via chat probe',
     $res['ok'] === true && strpos((string)$probedUrl, '/openai/deployments/gpt-4o-mini/chat/completions') !== false);
 
-// azure_anthropic → POST to /anthropic/v1/messages
+// azure_anthropic → POST to /anthropic/v1/messages.
+// The probe MUST send max_tokens=50, not 1: with max_tokens=1 Claude
+// returns the specific "Could not finish the message because max_tokens
+// or model output limit was reached" error rather than HTTP 200, which
+// previously made Test Connection unusable for the Azure Anthropic preset.
 _llm_test_reset();
 _llm_test_set('llm_provider', 'custom');
 _llm_test_set('custom_preset', 'azure_anthropic');
 _llm_test_set('custom_base_url', 'https://apim.example.com');
 _llm_test_set('custom_model', 'claude-haiku-4-5');
 _llm_test_set('custom_api_key', 'k');
-$probedUrl = null;
-$GLOBALS['LLM_HTTP_POST_HOOK'] = function ($url, $headers, $body) use (&$probedUrl) {
-    $probedUrl = $url;
+$probedUrl  = null;
+$probedBody = null;
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function ($url, $headers, $body) use (&$probedUrl, &$probedBody) {
+    $probedUrl  = $url;
+    $probedBody = $body;
     return [200, json_encode(['id'=>'msg_1','content'=>[['type'=>'text','text'=>'ok']],'usage'=>['input_tokens'=>1,'output_tokens'=>1]]), ''];
 };
 $res = llm_test_connection('custom');
 check('test_connection azure_anthropic: ok=true via Anthropic Messages POST',
     $res['ok'] === true && $probedUrl === 'https://apim.example.com/anthropic/v1/messages');
+$probedDecoded = json_decode((string)$probedBody, true);
+check('test_connection azure_anthropic: probe sends max_tokens=50 (not 1)',
+    is_array($probedDecoded) && ($probedDecoded['max_tokens'] ?? null) === 50);
+
+// Azure OpenAI gpt-5 deployment: probe must use max_completion_tokens=50,
+// not 1 — reasoning models burn reasoning tokens against the same budget
+// and won't finish a reply at 1.
+_llm_test_reset();
+_llm_test_set('llm_provider', 'custom');
+_llm_test_set('custom_preset', 'azure_openai');
+_llm_test_set('custom_resource_url', 'https://r.openai.azure.com');
+_llm_test_set('custom_deployment', 'gpt-5');
+_llm_test_set('custom_api_key', 'k');
+$probedBody = null;
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function ($url, $headers, $body) use (&$probedBody) {
+    $probedBody = $body;
+    return [200, json_encode(['choices'=>[['message'=>['role'=>'assistant','content'=>'ok']]]]), ''];
+};
+$res = llm_test_connection('custom');
+$probedDecoded = json_decode((string)$probedBody, true);
+check('test_connection azure_openai gpt-5: probe sends max_completion_tokens=50',
+    is_array($probedDecoded) && ($probedDecoded['max_completion_tokens'] ?? null) === 50);
+check('test_connection azure_openai gpt-5: probe omits max_tokens (uses max_completion_tokens)',
+    is_array($probedDecoded) && !array_key_exists('max_tokens', $probedDecoded));
+
+// Azure OpenAI gpt-4o-mini (non-reasoning): probe stays at max_tokens=1.
+_llm_test_reset();
+_llm_test_set('llm_provider', 'custom');
+_llm_test_set('custom_preset', 'azure_openai');
+_llm_test_set('custom_resource_url', 'https://r.openai.azure.com');
+_llm_test_set('custom_deployment', 'gpt-4o-mini');
+_llm_test_set('custom_api_key', 'k');
+$probedBody = null;
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function ($url, $headers, $body) use (&$probedBody) {
+    $probedBody = $body;
+    return [200, json_encode(['choices'=>[['message'=>['role'=>'assistant','content'=>'ok']]]]), ''];
+};
+$res = llm_test_connection('custom');
+$probedDecoded = json_decode((string)$probedBody, true);
+check('test_connection azure_openai gpt-4o-mini: probe stays at max_tokens=1',
+    is_array($probedDecoded) && ($probedDecoded['max_tokens'] ?? null) === 1);
+
+// openai_compatible chat fallback (after /models 404): also stays at
+// max_tokens=1 because the default token_field is max_tokens.
+_llm_test_reset();
+_llm_test_set('llm_provider', 'custom');
+_llm_test_set('custom_preset', 'openai_compatible');
+_llm_test_set('custom_base_url', 'https://api.example.com/v1');
+_llm_test_set('custom_model', 'foo/bar');
+_llm_test_set('custom_api_key', 'k');
+$probedBody = null;
+$GLOBALS['LLM_HTTP_GET_HOOK']  = function () { return [404, '{}', '']; };
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function ($url, $headers, $body) use (&$probedBody) {
+    $probedBody = $body;
+    return [200, json_encode(['choices'=>[['message'=>['role'=>'assistant','content'=>'']]]]), ''];
+};
+$res = llm_test_connection('custom');
+$probedDecoded = json_decode((string)$probedBody, true);
+check('test_connection openai_compatible fallback probe: max_tokens=1 unchanged',
+    is_array($probedDecoded) && ($probedDecoded['max_tokens'] ?? null) === 1);
 
 // openai_compatible → GET /models first; 200 with data array reports count
 _llm_test_reset();

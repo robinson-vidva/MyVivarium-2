@@ -85,12 +85,166 @@ const LLM_CUSTOM_DEFAULT_AZURE_API_VERSION = '2024-10-21';
 const LLM_CUSTOM_ANTHROPIC_VERSION         = '2023-06-01';
 const LLM_CUSTOM_ANTHROPIC_DEFAULT_MAX_TOKENS = 1024;
 
+const LLM_PROVIDER_ALL = [LLM_PROVIDER_GROQ, LLM_PROVIDER_OPENAI, LLM_PROVIDER_CUSTOM];
+
 /**
- * Returns the active provider id ("groq", "openai", or "custom"),
- * defaulting to groq if unset or invalid.
+ * Read the raw provider chain stored in ai_settings.llm_provider_chain.
+ * If the new key is absent, fall back to the legacy single-provider
+ * llm_provider key: build a chain with the legacy provider at priority 1
+ * (enabled) and the other two appended (disabled). Returns an ordered list
+ * of ['provider', 'enabled', 'priority'] entries.
+ *
+ * Never persists — callers that want to migrate the storage should call
+ * llm_save_provider_chain() once they have a user_id (typically on the
+ * first admin save).
+ */
+function llm_get_provider_chain_raw(): array
+{
+    $raw = null;
+    try {
+        $raw = ai_settings_get('llm_provider_chain');
+    } catch (Throwable $e) {
+        $raw = null;
+    }
+    if (is_string($raw) && $raw !== '') {
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return llm_normalize_chain($decoded);
+        }
+    }
+    return llm_chain_from_legacy();
+}
+
+/**
+ * Normalize a stored or submitted chain: ensures each known provider is
+ * represented exactly once, sorts by priority ascending, and renumbers
+ * priorities 1..N. Unknown providers are dropped.
+ */
+function llm_normalize_chain(array $chain): array
+{
+    $seen = [];
+    foreach ($chain as $entry) {
+        if (!is_array($entry)) continue;
+        $p = (string)($entry['provider'] ?? '');
+        if (!in_array($p, LLM_PROVIDER_ALL, true)) continue;
+        if (isset($seen[$p])) continue;
+        $seen[$p] = [
+            'provider' => $p,
+            'enabled'  => !empty($entry['enabled']),
+            'priority' => (int)($entry['priority'] ?? 99),
+        ];
+    }
+    // Append any missing providers at the end, disabled.
+    $maxPriority = 0;
+    foreach ($seen as $e) {
+        if ($e['priority'] > $maxPriority) $maxPriority = $e['priority'];
+    }
+    foreach (LLM_PROVIDER_ALL as $p) {
+        if (!isset($seen[$p])) {
+            $maxPriority++;
+            $seen[$p] = ['provider' => $p, 'enabled' => false, 'priority' => $maxPriority];
+        }
+    }
+    $list = array_values($seen);
+    usort($list, function ($a, $b) {
+        if ($a['priority'] === $b['priority']) {
+            return array_search($a['provider'], LLM_PROVIDER_ALL, true)
+                 - array_search($b['provider'], LLM_PROVIDER_ALL, true);
+        }
+        return $a['priority'] - $b['priority'];
+    });
+    // Renumber.
+    foreach ($list as $i => &$e) {
+        $e['priority'] = $i + 1;
+    }
+    unset($e);
+    return $list;
+}
+
+/**
+ * Build a chain from the legacy llm_provider key for backward compatibility.
+ * If the legacy value is one of the known providers, that provider goes to
+ * priority 1 enabled and the others follow at priority 2-3 disabled. If the
+ * legacy value is absent or unknown (fresh install), all three providers
+ * land at priority 1-3 with enabled=false — the admin must enable at least
+ * one before the chatbot will accept any traffic.
+ */
+function llm_chain_from_legacy(): array
+{
+    $legacy = '';
+    try {
+        $legacy = (string)(ai_settings_get('llm_provider') ?? '');
+    } catch (Throwable $e) {
+        $legacy = '';
+    }
+    if (!in_array($legacy, LLM_PROVIDER_ALL, true)) {
+        // Fresh install — no chain, no legacy. All disabled.
+        $chain = [];
+        $p = 1;
+        foreach (LLM_PROVIDER_ALL as $prov) {
+            $chain[] = ['provider' => $prov, 'enabled' => false, 'priority' => $p++];
+        }
+        return $chain;
+    }
+    $chain = [['provider' => $legacy, 'enabled' => true, 'priority' => 1]];
+    $p = 2;
+    foreach (LLM_PROVIDER_ALL as $prov) {
+        if ($prov === $legacy) continue;
+        $chain[] = ['provider' => $prov, 'enabled' => false, 'priority' => $p++];
+    }
+    return $chain;
+}
+
+/**
+ * Persist a chain to ai_settings.llm_provider_chain (encrypted) and remove
+ * the legacy llm_provider key. Used by manage_ai_config.php at save time.
+ */
+function llm_save_provider_chain(array $chain, int $userId): void
+{
+    if (!function_exists('ai_settings_set')) return;
+    $normalized = llm_normalize_chain($chain);
+    ai_settings_set('llm_provider_chain', json_encode($normalized, JSON_UNESCAPED_SLASHES), $userId);
+}
+
+/**
+ * Returns the ordered list of providers that are enabled in the chain AND
+ * fully configured (key present and, for custom, no config_errors). Each
+ * entry is ['provider' => string, 'config' => array]. Disabled or
+ * misconfigured entries are skipped silently. Highest priority first.
+ */
+function llm_get_provider_chain(): array
+{
+    $raw = llm_get_provider_chain_raw();
+    $resolved = [];
+    foreach ($raw as $entry) {
+        if (empty($entry['enabled'])) continue;
+        $prov = (string)$entry['provider'];
+        try {
+            $cfg = llm_get_provider_config($prov);
+        } catch (Throwable $e) {
+            continue;
+        }
+        if (($cfg['api_key'] ?? '') === '') continue;
+        if (($cfg['provider'] ?? '') === LLM_PROVIDER_CUSTOM && !empty($cfg['config_errors'])) continue;
+        $resolved[] = ['provider' => $prov, 'config' => $cfg];
+    }
+    return $resolved;
+}
+
+/**
+ * Returns the active provider id — defined as the highest-priority
+ * enabled-and-configured provider in the chain. Falls back to the legacy
+ * llm_provider key (or 'groq') when no chain entry qualifies, so existing
+ * code paths and unit tests that only set 'llm_provider' keep working.
  */
 function llm_get_active_provider(): string
 {
+    $chain = llm_get_provider_chain();
+    if (!empty($chain)) {
+        return $chain[0]['provider'];
+    }
+    // Legacy fallback for backward compatibility with the old single-provider
+    // setup and the existing unit tests that just set llm_provider.
     try {
         $p = ai_settings_get('llm_provider');
     } catch (Throwable $e) {
@@ -733,9 +887,11 @@ function llm_build_auth_headers(array $cfg): array
  * The active provider's API key is the only place the secret lives during
  * the call; it is never logged.
  */
-function llm_chat_completions(array $messages, array $tools, ?int $max_tokens = null): array
+function llm_chat_completions(array $messages, array $tools, ?int $max_tokens = null, ?array $cfg = null): array
 {
-    $cfg = llm_get_active_config();
+    if ($cfg === null) {
+        $cfg = llm_get_active_config();
+    }
     // For custom: report the full list of missing fields (which includes
     // "API key" when it's missing) so the admin sees everything at once.
     if (($cfg['provider'] ?? '') === LLM_PROVIDER_CUSTOM && !empty($cfg['config_errors'])) {
@@ -797,6 +953,107 @@ function llm_chat_completions(array $messages, array $tools, ?int $max_tokens = 
         'provider' => $cfg['provider'],
         'model'    => $cfg['model'],
     ];
+}
+
+/**
+ * HTTP status codes (plus the synthetic status=0 for network failures) that
+ * should trigger failover to the next provider in the chain. Anything else
+ * (400/401/403/404/etc.) is treated as a deterministic, configuration-level
+ * error that retrying with a different provider won't fix.
+ */
+function llm_is_failover_status(int $status): bool
+{
+    if ($status === 0)   return true;   // curl_exec returned false: network / DNS / connection refused / timeout
+    if ($status === 429) return true;   // rate limited
+    if ($status >= 500 && $status <= 599) return true;
+    return false;
+}
+
+/**
+ * Public entry point that the chatbot calls. Iterates the configured
+ * provider chain in priority order, returning the first successful
+ * response. On 429 / 5xx / network failures it falls back to the next
+ * provider; on 400 / 401 / 403 / 404 it returns the error immediately
+ * since those are deterministic and another provider won't fix them.
+ *
+ * Adds three keys to the returned envelope that downstream callers
+ * (ai_chat.php, ai_usage_log, the chat widget) can show to the admin:
+ *   served_by_provider  → 'groq' | 'openai' | 'custom' | '' (none worked)
+ *   served_by_model     → model id of the provider that actually responded
+ *   fell_back_from      → ['groq', ...] providers attempted before success
+ */
+function llm_chat_completions_with_fallback(array $messages, array $tools, ?int $max_tokens = null): array
+{
+    $chain = llm_get_provider_chain();
+    if (empty($chain)) {
+        return [
+            'ok'                 => false,
+            'status'             => 0,
+            'error'              => 'no_provider_available',
+            'body'               => null,
+            'raw'                => '',
+            'provider'           => '',
+            'model'              => '',
+            'served_by_provider' => '',
+            'served_by_model'    => '',
+            'fell_back_from'     => [],
+            'chain_attempted'    => [],
+        ];
+    }
+
+    $fellBackFrom = [];
+    $attempted    = [];
+    $lastResp     = null;
+    $count        = count($chain);
+
+    for ($i = 0; $i < $count; $i++) {
+        $entry = $chain[$i];
+        $provider = $entry['provider'];
+        $cfg      = $entry['config'];
+        $attempted[] = $provider;
+
+        $resp = llm_chat_completions($messages, $tools, $max_tokens, $cfg);
+
+        if ($resp['ok']) {
+            $resp['served_by_provider'] = $provider;
+            $resp['served_by_model']    = (string)($cfg['model'] ?? '');
+            $resp['fell_back_from']     = $fellBackFrom;
+            $resp['chain_attempted']    = $attempted;
+            return $resp;
+        }
+
+        $status = (int)$resp['status'];
+        if (!llm_is_failover_status($status)) {
+            // Deterministic error — surface it without trying other providers.
+            $resp['served_by_provider'] = $provider;
+            $resp['served_by_model']    = (string)($cfg['model'] ?? '');
+            $resp['fell_back_from']     = $fellBackFrom;
+            $resp['chain_attempted']    = $attempted;
+            return $resp;
+        }
+
+        // Failover-worthy. Log the reason and move on.
+        $reason = $status === 0
+            ? ('network: ' . ($resp['error'] ?? 'unknown'))
+            : ('HTTP ' . $status);
+        $nextName = isset($chain[$i + 1]) ? $chain[$i + 1]['provider'] : 'none';
+        error_log("Chatbot fallback: provider {$provider} returned {$reason}, trying provider {$nextName}");
+        $fellBackFrom[] = $provider;
+        $lastResp = $resp;
+    }
+
+    // All providers failed. Return the last error with chain context.
+    if ($lastResp === null) {
+        $lastResp = [
+            'ok' => false, 'status' => 0, 'error' => 'all_providers_failed',
+            'body' => null, 'raw' => '', 'provider' => '', 'model' => '',
+        ];
+    }
+    $lastResp['served_by_provider'] = '';
+    $lastResp['served_by_model']    = '';
+    $lastResp['fell_back_from']     = $fellBackFrom;
+    $lastResp['chain_attempted']    = $attempted;
+    return $lastResp;
 }
 
 /**
@@ -862,15 +1119,58 @@ function llm_test_connection(string $provider): array
 }
 
 /**
- * Minimal POST probe: one user message, max_tokens=1. For Anthropic-shape
- * presets we POST the Anthropic Messages body; for OpenAI-shape we POST a
- * single-turn chat completions body. A 2xx response counts as a connection
- * success.
+ * Token budget for a connection-test probe. Most providers accept and
+ * return cleanly at max_tokens=1, but two paths need more headroom:
+ *
+ *   - Anthropic Messages (azure_anthropic preset): Claude returns the
+ *     specific error "Could not finish the message because max_tokens or
+ *     model output limit was reached" rather than HTTP 200 when the limit
+ *     is below ~10 tokens. 50 is plenty for the model to produce a "ok"
+ *     reply and stop naturally on its own end-turn signal.
+ *
+ *   - Azure OpenAI deployments backed by the GPT-5 family or the o1 / o3
+ *     reasoning models. These bill reasoning tokens against the same
+ *     budget that caps visible output, so max_completion_tokens=1 leaves
+ *     no room for any user-visible reply and the deployment errors out.
+ *     50 lets the model produce one short token of output.
+ *
+ * Everything else (Groq /models GET, openai_compatible /models GET, the
+ * older openai_compatible chat-completion fallback, and azure_openai
+ * non-reasoning deployments like gpt-4o-mini) continues to use 1. The
+ * extra spend on the two paths above is a few output tokens per probe
+ * — probes are rare (manual admin click), so the cost is negligible.
+ */
+function llm_probe_max_tokens(array $cfg): int
+{
+    $bodyFormat = (string)($cfg['body_format'] ?? 'openai_chat');
+    if ($bodyFormat === 'anthropic_messages') {
+        return 50;
+    }
+    $tokField = (string)($cfg['token_field'] ?? 'max_tokens');
+    if ($tokField === 'max_completion_tokens') {
+        // Azure GPT-5 / o1 / o3 (or any openai_compatible model the admin
+        // pointed at a reasoning model with that override).
+        return 50;
+    }
+    return 1;
+}
+
+/**
+ * Minimal POST probe: one user message. For Anthropic-shape presets we POST
+ * the Anthropic Messages body; for OpenAI-shape we POST a single-turn chat
+ * completions body. The probe token budget comes from llm_probe_max_tokens()
+ * so models that can't finish a coherent reply at max_tokens=1 still get a
+ * 2xx success on the probe. A 2xx response counts as a connection success.
  */
 function llm_test_chat_probe(array $cfg, string $provider): array
 {
-    $messages = [['role' => 'user', 'content' => 'hi']];
-    $req = llm_build_chat_request($cfg, $messages, [], 1);
+    $maxTokens = llm_probe_max_tokens($cfg);
+    // Anthropic + Azure GPT-5/o1/o3 use a slightly more directive prompt so
+    // the model produces a deterministic short reply; the cheaper providers
+    // keep the original one-word "hi" body for size and speed.
+    $userText = ($maxTokens > 1) ? "Reply with 'ok'." : 'hi';
+    $messages = [['role' => 'user', 'content' => $userText]];
+    $req = llm_build_chat_request($cfg, $messages, [], $maxTokens);
     [$code, $body, $err] = llm_http_post($req['url'], $req['headers'], $req['body_str']);
     if ($code === 0) {
         return ['ok' => false, 'model_count' => null, 'error' => 'Network error: ' . ($err ?: 'unknown'), 'http_status' => 0];

@@ -34,11 +34,14 @@ if ($__chat_authed) {
     require_once __DIR__ . '/llm_provider.php';
     try {
         $__chat_enabled = ai_settings_get('chatbot_enabled') === '1';
-        $__cfg          = llm_get_active_config();
-        $__chat_key_set = $__cfg['api_key'] !== '';
-        $__chat_provider       = $__cfg['provider'];
-        $__chat_provider_label = llm_provider_label($__cfg['provider']);
-        $__chat_model          = $__cfg['model'];
+        $__chain        = llm_get_provider_chain();
+        $__chat_key_set = !empty($__chain);
+        if ($__chat_key_set) {
+            $__cfg = $__chain[0]['config'];
+            $__chat_provider       = $__chain[0]['provider'];
+            $__chat_provider_label = llm_provider_label($__chain[0]['provider']);
+            $__chat_model          = (string)($__cfg['model'] ?? '');
+        }
     } catch (Throwable $e) {
         // Swallow — debug comment below still reports authed/enabled/key_set.
     }
@@ -87,6 +90,7 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
   }
   #mv-chat-header .mv-chat-title { flex: 1; font-weight: 600; font-size: 14px; }
   #mv-chat-header .mv-chat-title .mv-chat-subtitle { display: block; font-weight: 400; font-size: 11px; color: rgba(255,255,255,0.8); line-height: 1.2; margin-top: 1px; }
+  #mv-chat-header .mv-chat-title .mv-chat-subtitle .mv-fallback-tag { color: rgba(255,255,255,0.55); margin-left: 4px; font-style: italic; }
   #mv-chat-header button {
     background: transparent; border: none; color: #fff; cursor: pointer;
     font-size: 18px; padding: 2px 6px; line-height: 1;
@@ -194,7 +198,7 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
 <button id="mv-chat-fab" type="button" aria-label="Open MyVivarium AI chat" title="MyVivarium AI">💬</button>
 <div id="mv-chat-panel" role="dialog" aria-label="MyVivarium AI">
   <div id="mv-chat-header">
-    <span class="mv-chat-title">MyVivarium AI<span class="mv-chat-subtitle">powered by <?= htmlspecialchars($__chat_provider_label); ?> <?= htmlspecialchars($__chat_model); ?></span></span>
+    <span class="mv-chat-title">MyVivarium AI<span class="mv-chat-subtitle" id="mv-chat-served-by" data-default-provider="<?= htmlspecialchars($__chat_provider_label); ?>" data-default-model="<?= htmlspecialchars($__chat_model); ?>">powered by <?= htmlspecialchars($__chat_provider_label); ?> <?= htmlspecialchars($__chat_model); ?></span></span>
     <button type="button" id="mv-chat-new"     title="New conversation" aria-label="New conversation">＋</button>
     <button type="button" id="mv-chat-history" title="History"          aria-label="History">≡</button>
     <button type="button" id="mv-chat-close"   title="Close"            aria-label="Close">×</button>
@@ -220,10 +224,32 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
   const histBtn  = document.getElementById('mv-chat-history');
   const histDrop = document.getElementById('mv-chat-history-dropdown');
   const typing   = document.getElementById('mv-chat-typing');
+  const subtitle = document.getElementById('mv-chat-served-by');
 
   let conversationId = '';
   let pendingOpId    = null;
   let busy           = false;
+
+  // Provider label map for the served-by subtitle. Keys match the
+  // backend's served_by_provider strings.
+  const PROVIDER_LABELS = { groq: 'Groq', openai: 'OpenAI', custom: 'Custom' };
+  function updateSubtitle(provider, model, fellBackFrom) {
+    if (!subtitle) return;
+    let label, mdl;
+    if (provider && PROVIDER_LABELS[provider]) {
+      label = PROVIDER_LABELS[provider];
+      mdl   = model || '';
+    } else {
+      label = subtitle.getAttribute('data-default-provider') || '';
+      mdl   = subtitle.getAttribute('data-default-model') || '';
+    }
+    let html = 'powered by ' + escapeHtml(label);
+    if (mdl) html += ' ' + escapeHtml(mdl);
+    if (Array.isArray(fellBackFrom) && fellBackFrom.length > 0) {
+      html += '<span class="mv-fallback-tag">(fallback)</span>';
+    }
+    subtitle.innerHTML = html;
+  }
 
   function escapeHtml(s) {
     return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -493,6 +519,8 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
           return;
         }
         conversationId = body.conversation_id || conversationId;
+        // Reflect which provider in the chain actually served this reply.
+        updateSubtitle(body.served_by_provider, body.served_by_model, body.fell_back_from);
         (body.tool_calls || []).forEach(addToolCard);
         if (body.pending_confirmation) {
           addConfirmCard(body.pending_confirmation);
