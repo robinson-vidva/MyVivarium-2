@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS `ai_messages` (
   `tool_call_json` text,
   `tool_result_json` text,
   `pending_op_id` varchar(36) DEFAULT NULL,
+  `suggestions_json` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_ai_msg_conv_created` (`conversation_id`, `created_at`),

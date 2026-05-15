@@ -240,6 +240,16 @@ if (table_exists($con, 'ai_usage_log') && !column_exists($con, 'ai_usage_log', '
     echo "[ok]    ai_usage_log.provider added\n";
 }
 
+// Migration: add suggestions_json to ai_messages so AI-generated follow-up
+// chips persist across page reloads. Idempotent.
+if (table_exists($con, 'ai_messages') && !column_exists($con, 'ai_messages', 'suggestions_json')) {
+    if ($con->query("ALTER TABLE `ai_messages` ADD COLUMN `suggestions_json` text DEFAULT NULL AFTER `pending_op_id`") === false) {
+        fwrite(STDERR, "[error] ai_messages.suggestions_json: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    ai_messages.suggestions_json added\n";
+}
+
 // AI settings storage for the admin chatbot configuration.
 if (!table_exists($con, 'ai_settings')) {
     $aiSql = "CREATE TABLE `ai_settings` (

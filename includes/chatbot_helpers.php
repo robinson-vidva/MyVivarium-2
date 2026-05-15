@@ -73,6 +73,175 @@ if (!function_exists('chatbot_resolve_tool')) {
     }
 
     /**
+     * Hardcoded response-formatting rules block. NOT admin-editable so the
+     * chatbot's output stays consistent regardless of which admin-configured
+     * system prompt is in use.
+     */
+    function chatbot_response_formatting_rules_block(): string
+    {
+        return "RESPONSE FORMATTING RULES:\n"
+            . "Format every response using these rules. Apply them consistently to every reply, regardless of which tool was called.\n\n"
+            . "1. Lead with a one-sentence summary in plain text. No header, no formatting. State the answer first.\n\n"
+            . "2. For results containing 2 or more records (list_mice, list_tasks, list_cages, etc.):\n"
+            . "   - Use a markdown table if the records have 2 or more comparable fields\n"
+            . "   - Show maximum 10 rows. If more results exist, end the table with a row '... and N more — ask me to filter or show more.'\n"
+            . "   - Pick the 3-5 most useful columns. Always include the ID column. Prefer name, status, date, count over verbose descriptions.\n"
+            . "   - Right-align numeric columns\n\n"
+            . "3. For results containing exactly 1 record (get_mouse, get_task, get_cage):\n"
+            . "   - One-sentence summary\n"
+            . "   - Bold the entity name or ID on its own line\n"
+            . "   - Use a bulleted list of key fields, format 'Field name: value'\n"
+            . "   - Group related fields under sub-bullets if there are more than 6 fields\n\n"
+            . "4. For results containing 0 records:\n"
+            . "   - Single sentence: 'No results found for <criteria>.'\n"
+            . "   - Suggest one filter change in a second sentence if appropriate\n\n"
+            . "5. For successful write operations (create, update, move, delete):\n"
+            . "   - One-sentence confirmation stating exactly what changed, with the entity ID\n"
+            . "   - Bold the verb ('Created', 'Updated', 'Moved', 'Archived')\n"
+            . "   - No table, no extra commentary\n\n"
+            . "6. For pending confirmations (destructive ops):\n"
+            . "   - State exactly what will happen using the verb in present tense\n"
+            . "   - Show the affected entity ID in bold\n"
+            . "   - Do NOT add 'are you sure' or 'please confirm' — the confirmation UI handles that\n\n"
+            . "7. For errors:\n"
+            . "   - Single sentence stating what went wrong in plain language\n"
+            . "   - Do NOT include error codes, stack traces, or internal IDs unless they help the user act\n\n"
+            . "8. Never use:\n"
+            . "   - Emojis (the lab is a professional context)\n"
+            . "   - Excessive markdown decoration (no horizontal rules, no nested headers)\n"
+            . "   - Repetition of the user's question back to them\n"
+            . "   - 'I'd be happy to help' or other filler openers\n\n"
+            . "9. Always use:\n"
+            . "   - Plain numbers (no '1.0' when '1' suffices)\n"
+            . "   - Real dates in YYYY-MM-DD format\n"
+            . "   - Local lab terminology that appears in the data ('breeding cage', 'sire', 'dam', 'IACUC protocol')\n"
+            . "   - The user's tone level — terse if their query was terse, conversational only if they were conversational";
+    }
+
+    /**
+     * Hardcoded follow-up suggestions block. Tells the LLM to emit a
+     * machine-parseable SUGGESTIONS:: marker after its main reply so the
+     * frontend can render up to two follow-up chips.
+     */
+    function chatbot_follow_up_suggestions_block(): string
+    {
+        return "FOLLOW-UP SUGGESTIONS:\n"
+            . "After your main response, on a new line, output a special marker followed by 1-2 short follow-up questions the user is likely to ask next. Format:\n\n"
+            . "SUGGESTIONS::[\"question 1\",\"question 2\"]\n\n"
+            . "Rules for suggestions:\n"
+            . "- Maximum 2 suggestions\n"
+            . "- Each suggestion under 50 characters\n"
+            . "- Each suggestion is a complete user message, written as if the user typed it (no 'You could ask...')\n"
+            . "- Suggestions must be actionable — they should map to a real tool you have access to\n"
+            . "- If the previous turn was a destructive operation pending confirmation, do NOT suggest follow-ups (the confirm/cancel buttons handle it)\n"
+            . "- If no meaningful follow-ups apply, output: SUGGESTIONS::[]\n"
+            . "- The marker must be on a single line, valid JSON, no extra characters\n\n"
+            . "This marker is stripped from the user's view by the frontend. Do not omit it.";
+    }
+
+    /**
+     * Parse the SUGGESTIONS:: marker out of an assistant reply.
+     *
+     * Returns ['content' => string, 'suggestions' => array<string>], where
+     * content is the original reply with the marker line stripped and
+     * suggestions is a validated list of up to 2 strings (each <= 50 chars).
+     *
+     * Validation rules:
+     *   - Marker must be on its own line, matching /^SUGGESTIONS::(\[.*?\])$/m
+     *   - Inner payload must parse as JSON
+     *   - Must be a JSON array of strings
+     *   - At most 2 entries; entries over 50 chars are dropped
+     *   - On any validation failure, returns suggestions=[] AND still strips
+     *     any malformed SUGGESTIONS:: line so it never reaches the user
+     */
+    function chatbot_parse_suggestions(string $reply): array
+    {
+        $suggestions = [];
+        $content     = $reply;
+
+        if (preg_match('/^SUGGESTIONS::(\[.*?\])$/m', $reply, $m, PREG_OFFSET_CAPTURE)) {
+            $jsonPayload = $m[1][0];
+            $matchStart  = $m[0][1];
+            $matchLen    = strlen($m[0][0]);
+
+            $decoded = json_decode($jsonPayload, true);
+            if (is_array($decoded) && array_is_list($decoded)) {
+                $kept = [];
+                foreach ($decoded as $item) {
+                    if (!is_string($item)) continue;
+                    $trim = trim($item);
+                    if ($trim === '') continue;
+                    if (strlen($trim) > 50) continue;
+                    $kept[] = $trim;
+                    if (count($kept) >= 2) break;
+                }
+                $suggestions = $kept;
+            }
+
+            // Strip the marker line regardless of validation outcome so the
+            // user never sees the raw SUGGESTIONS::[...] text.
+            $content = substr($reply, 0, $matchStart) . substr($reply, $matchStart + $matchLen);
+            // Clean up dangling blank lines around the strip point.
+            $content = preg_replace("/\n{3,}/", "\n\n", $content);
+            $content = rtrim($content);
+        }
+
+        // Defensive sweep: if any other SUGGESTIONS:: text survived (malformed
+        // or unmatched), strip those lines too.
+        $content = preg_replace('/^SUGGESTIONS::.*$/m', '', $content);
+        $content = preg_replace("/\n{3,}/", "\n\n", $content);
+        $content = rtrim($content);
+
+        return ['content' => $content, 'suggestions' => $suggestions];
+    }
+
+    /**
+     * Rule-based follow-up suggestion generator. Invoked ONLY when the AI did
+     * not return a valid SUGGESTIONS:: block. Looks at the last tool called
+     * (if any) and emits up to 2 plausible next-question chips.
+     *
+     * AI-provided suggestions always win over the fallback.
+     *
+     * $toolCalls is the per-turn tool_calls log shape from ai_chat.php:
+     *   [['name' => 'listMice', 'status' => 200], ...]
+     */
+    function chatbot_fallback_suggestions(array $toolCalls, string $reply): array
+    {
+        $map = [
+            'listMice'              => ['Show details of the first mouse', 'Filter by alive status'],
+            'getMouse'              => ["Show this mouse's offspring",     "Show this mouse's cage history"],
+            'listHoldingCages'      => ['Show one of these cages in detail','Which cages have open tasks?'],
+            'getHoldingCage'        => ['List the mice in this cage',       'Add a maintenance note here'],
+            'listBreedingCages'     => ['Show lineage of the first one',    'Which have pups currently?'],
+            'getBreedingCage'       => ["Show this cage's lineage",         'List recent litters'],
+            'listTasks'             => ['Show only tasks assigned to me',   "What's due today?"],
+            'listReminders'         => ['Show this week only',              "What's overdue?"],
+            'listMyNotifications'   => ['Show only unread',                 'Mark all as read'],
+            'listMaintenanceNotes'  => ['Show notes for one cage',          'Show only recent notes'],
+            'getDashboardSummary'   => ['What needs my attention today?',   'Show recent activity'],
+            'listStrains'           => ['How many mice per strain?'],
+            'listIacuc'             => ['Which cages use this protocol?'],
+        ];
+
+        // Pick the last named tool call in this turn.
+        $lastTool = null;
+        for ($i = count($toolCalls) - 1; $i >= 0; $i--) {
+            $name = $toolCalls[$i]['name'] ?? '';
+            if ($name !== '' && $name !== 'listCapabilities') {
+                $lastTool = $name;
+                break;
+            }
+        }
+
+        if ($lastTool !== null && isset($map[$lastTool])) {
+            return array_slice($map[$lastTool], 0, 2);
+        }
+
+        // Default — no tool called.
+        return ['What can you do?', 'Show me a dashboard summary'];
+    }
+
+    /**
      * Wrap user-generated free-text fields inside a tool result with
      * <user_data> markers so the LLM is reminded that the wrapped substring
      * is data, not instructions.

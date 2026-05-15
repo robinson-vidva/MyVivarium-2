@@ -154,5 +154,32 @@ check('rejects 16 special chars', (bool)preg_match('/[^A-Za-z0-9]{11,}/', '@@@@@
 check('allows normal sentence',   !preg_match('/[^A-Za-z0-9]{11,}/', "list my mice please."));
 check('rejects 2500-char message', strlen(str_repeat('a', 2500)) > 2000);
 
+// --- new system prompt blocks (formatting + follow-up suggestions) ---
+$aiChat = (string)file_get_contents(__DIR__ . '/../ai_chat.php');
+check('chatbot_build_messages includes RESPONSE FORMATTING RULES block',
+    strpos($aiChat, 'chatbot_response_formatting_rules_block()') !== false);
+check('chatbot_build_messages includes FOLLOW-UP SUGGESTIONS block',
+    strpos($aiChat, 'chatbot_follow_up_suggestions_block()') !== false);
+
+$fmt = chatbot_response_formatting_rules_block();
+check('RESPONSE FORMATTING RULES header verbatim',
+    strpos($fmt, 'RESPONSE FORMATTING RULES:') === 0);
+check('RESPONSE FORMATTING RULES rule 1 verbatim',
+    strpos($fmt, '1. Lead with a one-sentence summary in plain text.') !== false);
+check('RESPONSE FORMATTING RULES rule 8 verbatim (no emojis)',
+    strpos($fmt, '8. Never use:') !== false
+    && strpos($fmt, 'Emojis (the lab is a professional context)') !== false);
+check('RESPONSE FORMATTING RULES rule 9 verbatim (YYYY-MM-DD)',
+    strpos($fmt, '9. Always use:') !== false
+    && strpos($fmt, 'YYYY-MM-DD') !== false);
+
+$sug = chatbot_follow_up_suggestions_block();
+check('FOLLOW-UP SUGGESTIONS header verbatim',
+    strpos($sug, 'FOLLOW-UP SUGGESTIONS:') === 0);
+check('FOLLOW-UP SUGGESTIONS marker example verbatim',
+    strpos($sug, 'SUGGESTIONS::["question 1","question 2"]') !== false);
+check('FOLLOW-UP SUGGESTIONS empty marker documented',
+    strpos($sug, 'SUGGESTIONS::[]') !== false);
+
 echo "\n$pass passed, $fail failed\n";
 exit($fail === 0 ? 0 : 1);

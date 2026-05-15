@@ -132,6 +132,19 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
   .mv-confirm-card button.mv-btn-confirm { background: #198754; color: #fff; }
   .mv-confirm-card button.mv-btn-cancel  { background: #6c757d; color: #fff; }
   .mv-confirm-card.done { opacity: 0.6; pointer-events: none; }
+  .mv-suggestions {
+    align-self: flex-start; display: flex; flex-wrap: wrap; gap: 6px;
+    max-width: 85%; margin-top: 2px; transition: opacity 0.15s ease;
+  }
+  .mv-suggestions.disabled { opacity: 0.4; pointer-events: none; }
+  .mv-suggestion-chip {
+    background: #e9ecef; color: #212529; border: 1px solid #ced4da;
+    border-radius: 999px; padding: 4px 12px; font-size: 12px;
+    cursor: pointer; line-height: 1.3; font-family: inherit;
+    max-width: 100%; text-align: left; white-space: normal;
+  }
+  .mv-suggestion-chip:hover { background: #dee2e6; }
+  .mv-suggestion-chip:disabled { cursor: not-allowed; }
   #mv-chat-typing { align-self: flex-start; color: #6c757d; font-size: 12px; padding: 4px 12px; font-style: italic; display: none; }
   #mv-chat-typing.show { display: block; }
   #mv-chat-input-row {
@@ -201,6 +214,36 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
     msgs.appendChild(div);
     scrollBottom();
   }
+
+  // Strip any prior suggestion rows so only the most recent assistant
+  // turn shows chips (rule per spec: chips live below the LAST AI bubble).
+  function clearOldSuggestions() {
+    msgs.querySelectorAll('.mv-suggestions').forEach(el => el.remove());
+  }
+
+  function addSuggestions(list) {
+    if (!Array.isArray(list) || list.length === 0) return;
+    clearOldSuggestions();
+    const row = document.createElement('div');
+    row.className = 'mv-suggestions';
+    list.slice(0, 2).forEach(text => {
+      if (typeof text !== 'string' || !text.trim()) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mv-suggestion-chip';
+      btn.textContent = text;
+      btn.addEventListener('click', () => {
+        if (busy) return;
+        input.value = text;
+        input.style.height = 'auto';
+        send();
+      });
+      row.appendChild(btn);
+    });
+    if (row.childNodes.length === 0) return;
+    msgs.appendChild(row);
+    scrollBottom();
+  }
   function addEvent(text) {
     const div = document.createElement('div');
     div.className = 'mv-msg mv-msg-event';
@@ -258,12 +301,21 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
     busy = state;
     sendBtn.disabled = state;
     typing.classList.toggle('show', state);
+    // Fade and disable existing suggestion chips while a request is in
+    // flight so the user can't double-fire.
+    msgs.querySelectorAll('.mv-suggestions').forEach(el => {
+      el.classList.toggle('disabled', state);
+      el.querySelectorAll('button').forEach(b => { b.disabled = state; });
+    });
     if (state) scrollBottom();
   }
 
   function sendBackend(extra) {
     if (busy) return;
     pendingOpId = null;
+    // Clear suggestions from the previous AI turn — they apply only to
+    // the most recent reply. New ones (if any) render after this call.
+    clearOldSuggestions();
     setBusy(true);
     const payload = Object.assign({ conversation_id: conversationId || undefined }, extra);
     fetch('ai_chat.php', {
@@ -285,6 +337,10 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
           addConfirmCard(body.pending_confirmation);
         } else if (body.reply) {
           addMessage('assistant', body.reply);
+        }
+        if (Array.isArray(body.suggestions) && body.suggestions.length > 0
+            && !body.pending_confirmation) {
+          addSuggestions(body.suggestions);
         }
       })
       .catch(err => {
@@ -363,11 +419,23 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
         if (!j.ok) return;
         conversationId = j.conversation.id;
         msgs.innerHTML = '';
-        (j.messages || []).forEach(m => {
+        const list = j.messages || [];
+        // Find the index of the most recent assistant message that has
+        // content (not a tool-call dispatch). Only THAT row's suggestions
+        // are restored on reload — older suggestions are obsolete.
+        let latestAssistantIdx = -1;
+        for (let i = list.length - 1; i >= 0; i--) {
+          const m = list[i];
+          if (m.role === 'assistant' && m.content) { latestAssistantIdx = i; break; }
+        }
+        list.forEach((m, i) => {
           if (m.role === 'user' || m.role === 'assistant') {
             if (m.content) addMessage(m.role, m.content);
             if (m.tool_call_json && m.tool_call_json.tool_calls) {
               m.tool_call_json.tool_calls.forEach(tc => addToolCard({ name: (tc.function && tc.function.name) || 'tool' }));
+            }
+            if (i === latestAssistantIdx && Array.isArray(m.suggestions) && m.suggestions.length > 0) {
+              addSuggestions(m.suggestions);
             }
           } else if (m.role === 'system_event') {
             addEvent(m.content || '');

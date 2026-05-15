@@ -45,8 +45,16 @@ if (!$conv) {
     exit;
 }
 
-$stmt = $con->prepare("SELECT id, role, content, tool_call_json, tool_result_json, pending_op_id, created_at
-                         FROM ai_messages WHERE conversation_id = ? ORDER BY id ASC");
+// suggestions_json column may not exist on older deployments; degrade gracefully.
+$hasSuggestions = false;
+$probe = @$con->query("SHOW COLUMNS FROM ai_messages LIKE 'suggestions_json'");
+if ($probe) {
+    $hasSuggestions = $probe->num_rows > 0;
+    $probe->close();
+}
+$columns = "id, role, content, tool_call_json, tool_result_json, pending_op_id, created_at"
+    . ($hasSuggestions ? ", suggestions_json" : "");
+$stmt = $con->prepare("SELECT $columns FROM ai_messages WHERE conversation_id = ? ORDER BY id ASC");
 $stmt->bind_param('s', $id);
 $stmt->execute();
 $msgs = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -57,6 +65,14 @@ $stmt->close();
 foreach ($msgs as &$m) {
     if ($m['tool_call_json'])   $m['tool_call_json']   = json_decode($m['tool_call_json'], true);
     if ($m['tool_result_json']) $m['tool_result_json'] = json_decode($m['tool_result_json'], true);
+    if (isset($m['suggestions_json']) && $m['suggestions_json'] !== null && $m['suggestions_json'] !== '') {
+        $decoded = json_decode($m['suggestions_json'], true);
+        $m['suggestions'] = is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+    } else {
+        $m['suggestions'] = [];
+    }
+    unset($m['suggestions_json']);
 }
+unset($m);
 
 echo json_encode(['ok' => true, 'conversation' => $conv, 'messages' => $msgs], JSON_UNESCAPED_SLASHES);
