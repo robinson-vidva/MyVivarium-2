@@ -183,6 +183,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ai_settings_set('ai_rate_limit_messages_per_day', (string)$v, $userId);
             }
 
+            $toolStrategyIn = (string)($_POST['chatbot_default_tool_strategy'] ?? 'minimal');
+            if (!in_array($toolStrategyIn, ['minimal', 'all'], true)) $toolStrategyIn = 'minimal';
+            ai_settings_set('chatbot_default_tool_strategy', $toolStrategyIn, $userId);
+
             $_SESSION['message'] = 'AI configuration saved.';
             header('Location: manage_ai_config.php');
             exit;
@@ -283,6 +287,12 @@ $currentEnabled = ($envError === null && $enabledMeta) ? (ai_settings_get('chatb
 
 $currentRateMinute = $envError ? AI_RATE_LIMIT_PER_MINUTE_DEFAULT : ai_rate_limit_get_limit('minute');
 $currentRateDay    = $envError ? AI_RATE_LIMIT_PER_DAY_DEFAULT    : ai_rate_limit_get_limit('day');
+
+$currentToolStrategy = 'minimal';
+if ($envError === null) {
+    $stored = ai_settings_get('chatbot_default_tool_strategy');
+    if ($stored === 'all') $currentToolStrategy = 'all';
+}
 
 require 'header.php';
 ?>
@@ -656,6 +666,22 @@ require 'header.php';
                 <input class="form-check-input" type="checkbox" id="chatbot_enabled" name="chatbot_enabled" value="1"
                        <?= $currentEnabled ? 'checked' : ''; ?>>
                 <label class="form-check-label" for="chatbot_enabled">Enable chatbot</label>
+            </div>
+
+            <div class="mt-3">
+                <label class="form-label" for="chatbot_default_tool_strategy">Tool selection strategy</label>
+                <select class="form-control" id="chatbot_default_tool_strategy" name="chatbot_default_tool_strategy">
+                    <option value="minimal" <?= $currentToolStrategy === 'minimal' ? 'selected' : ''; ?>>Minimal (layered) — recommended</option>
+                    <option value="all"     <?= $currentToolStrategy === 'all'     ? 'selected' : ''; ?>>All tools (debug)</option>
+                </select>
+                <small class="text-muted">
+                    <strong>Minimal</strong> picks a per-turn tool subset by intent: greetings get only <code>getMe</code>,
+                    acknowledgements get zero tools, capability questions get only <code>listCapabilities</code>,
+                    domain queries get the matching group, and vague queries get a curated 15–20 tool fallback.
+                    Typical small messages spend 1,500–3,000 prompt tokens instead of 9,000+.
+                    Switch to <strong>All tools</strong> only when debugging tool routing — it forces every turn to
+                    send all 45 tool definitions and is far more expensive.
+                </small>
             </div>
         </div>
 

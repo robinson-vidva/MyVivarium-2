@@ -140,7 +140,11 @@ $noneNames = array_map(fn($t) => $t['function']['name'], chatbot_select_tools(''
 check('select_tools mice keyword includes listMice',          in_array('listMice', $miceNames, true));
 check('select_tools cage keyword includes listHoldingCages',  in_array('listHoldingCages', $cageNames, true));
 check('select_tools log keyword includes listActivityLog',    in_array('listActivityLog', $logNames, true));
-check('select_tools fallback returns all',                    count($noneNames) === count($defs));
+// Empty / no-keyword input now hits the Layer 5 smart fallback — a curated
+// 15-20 tool set rather than every tool. The layered selector intentionally
+// shrinks the per-turn prompt for vague queries.
+check('select_tools fallback returns Layer 5 (15-20 tools)',
+    count($noneNames) >= 15 && count($noneNames) <= 20);
 check('select_tools mice keyword keeps listCapabilities',     in_array('listCapabilities', $miceNames, true));
 
 // Coverage: all 45 spec endpoints reachable through at least one keyword

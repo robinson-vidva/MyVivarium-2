@@ -189,3 +189,94 @@ estimation hits the ceiling during testing, the existing
 `error_log("Chatbot turn estimated $est tokens (cap $hardCap, after
 trim)")` line surfaces it — investigate and tune real signals rather
 than silently dropping context.
+
+---
+
+## Token efficiency — layered tool selection
+
+The chatbot does NOT send all 45 tool definitions on every turn. Instead,
+`chatbot_select_tools()` in `includes/chatbot_helpers.php` picks a per-turn
+subset based on the user's message. Layers are evaluated in priority order:
+
+| Layer | Trigger | Tools sent | Approx prompt savings |
+| ----- | ------- | ---------- | --------------------- |
+| 1a | Greeting (`hi`, `hello`, `good morning`, `who are you`, …) when message is short and has no domain keyword | `getMe` only (1) | ~6,500 tokens vs all-45 |
+| 1b | Acknowledgement (`ok`, `thanks`, `bye`, `yes`, `no`, …) when message is short and has no domain keyword | none (0) | ~7,000 tokens |
+| 2 | Capability question (`what can you do`, `help`, `capabilities`, …) with no domain keyword | `listCapabilities` only (1) | ~6,500 tokens |
+| 3 | Self-identity (`who am I`, `my profile`, `my account`, `my info`, …) | `getMe` + `getMyProfile` (2) | ~6,500 tokens |
+| 4 | Domain keyword router (mice / cages / tasks / reminders / notifications / strains / IACUC / dashboard / activity log / maintenance) | Matching tag groups (typically 3–25) | Varies |
+| 5 | Smart fallback for vague messages (no layer matched) | Curated 15–20 tool starter set | ~3,500 tokens |
+
+The result: typical small messages spend 1,500–3,000 prompt tokens
+instead of 9,000+.
+
+### Layer 4 versus Layer 1/2
+
+Domain keywords always beat the conversational regexes. "hi I want to see
+my mice" routes to Layer 4 (Mice + Cages tools) because the word `mice`
+is in the domain keyword set — Layer 1a does not fire.
+
+### Layer 5 starter set
+
+When none of Layers 1a/1b/2/3/4 match, the chatbot still wants to be
+useful, so it sends a curated starter set: orientation tools
+(`listCapabilities`, `getMe`, `getMyProfile`, `getDashboardSummary`),
+the most common list reads (mice, holding cages, breeding cages, tasks,
+maintenance notes) with their `get_one` drill-in counterparts, and the
+frequent follow-ups (reminders, calendar events, notifications). The
+TOOL USE DISCIPLINE block in the system prompt tells the model: if it
+cannot find an appropriate tool, suggest the user be more specific
+rather than fabricating one.
+
+### Safety of aggressive trimming
+
+OpenAI's prompt caching automatically caches the system prompt and tool
+definitions at a 50% discount when they are identical across calls.
+Trimming the tool list shrinks the static prefix but is otherwise
+**safe with respect to data freshness**: tool RESULTS (live database
+queries via `/api/v1`) are never cached — every tool invocation hits a
+fresh database query. Reducing tool count only changes the prefix the
+model sees, not the data it gets back.
+
+### Per-turn debug logging
+
+Every chatbot turn writes one line to the PHP error log so the admin
+can audit the prefix budget:
+
+```
+Chatbot tool strategy: layer=4, tools=11, estimated_prefix_tokens=2873
+```
+
+`layer` is one of `1a`, `1b`, `2`, `3`, `4`, `5`, or `all`.
+
+### Admin override: `chatbot_default_tool_strategy`
+
+The AI Configuration page exposes a **Tool selection strategy** dropdown
+under the Chatbot section:
+
+- **Minimal (layered)** — default. Uses the table above.
+- **All tools (debug)** — forces every turn to send all 45 tool
+  definitions, bypassing every layer. Useful when chasing a routing bug
+  or comparing model behavior with and without the trim; significantly
+  more expensive in tokens. Switch back to **Minimal** once debugging
+  is done.
+
+The setting persists in `ai_settings.chatbot_default_tool_strategy`
+(encrypted like other AI settings) and is read on every turn by
+`ai_chat.php` before invoking `chatbot_select_tools()`.
+
+### System prompt — TOOL USE DISCIPLINE
+
+A "TOOL USE DISCIPLINE" block, defined in
+`chatbot_tool_use_discipline_block()` and prepended to every system
+prompt, instructs the model to:
+
+1. For greetings, casual chat, and identity questions, call `getMe`
+   once at most.
+2. Skip tools entirely for capability questions and casual chat.
+3. Call data-fetching tools only when the user is asking for data.
+4. Plan tool use — at most 3 calls per user message unless the user
+   explicitly asks for a sequence.
+
+The block is **not admin-editable** so an admin cannot accidentally
+remove the discipline rules.

@@ -508,13 +508,15 @@ function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, 
     // admin-configured system prompt so an admin can't accidentally remove
     // the safety rules, formatting rules, or follow-up suggestion contract.
     $hardcoded   = chatbot_security_rules_block();
+    $discipline  = chatbot_tool_use_discipline_block();
     $formatting  = chatbot_response_formatting_rules_block();
     $suggestions = chatbot_follow_up_suggestions_block();
 
     // Compact admin-configurable system prompt — role / capabilities /
     // runtime — under ~300 tokens. Verbose phrasing was the single largest
-    // per-call payload contributor.
-    $augmented = $hardcoded . "\n\n" . $formatting . "\n\n" . $suggestions . "\n\n" . $systemPrompt
+    // per-call payload contributor. TOOL USE DISCIPLINE is near the top so
+    // the model reads it before any concrete tool definition.
+    $augmented = $hardcoded . "\n\n" . $discipline . "\n\n" . $formatting . "\n\n" . $suggestions . "\n\n" . $systemPrompt
         . " Tool definitions are loaded from MyVivarium's OpenAPI specification."
         . " If the user asks for something you do not have a tool for, tell them honestly and list 3-5 example things you CAN do based on the available tools (call listCapabilities)."
         . " Do not invent tools or substitute a different tool for what the user asked."
@@ -743,7 +745,11 @@ $lastFellBackFrom = [];
 // persistence to the end of the script so we can strip the SUGGESTIONS::
 // marker and store the parsed suggestions in the same row.
 $finalReplyDeferred = false;
-$toolsForTurn = chatbot_select_tools($incomingMessage);
+// Admin-configurable tool-selection strategy. "minimal" (default) uses the
+// layered selector; "all" sends every tool every turn — for debugging only.
+$toolStrategy = ai_settings_get('chatbot_default_tool_strategy');
+if ($toolStrategy !== 'all') $toolStrategy = 'minimal';
+$toolsForTurn = chatbot_select_tools($incomingMessage, $toolStrategy);
 
 // Health pre-check: if /api/v1 is unreachable or returning HTML, abort
 // before we burn Groq tokens looping on bad tool results.
@@ -820,7 +826,7 @@ try {
         // afterwards just keep the same set so Groq can finish a multi-call
         // workflow without losing visibility on tools it already used.
         if ($iter === 0) {
-            $toolsForTurn = chatbot_select_tools($incomingMessage);
+            $toolsForTurn = chatbot_select_tools($incomingMessage, $toolStrategy);
         }
         $messages = chatbot_fit_to_budget($messages, $toolsForTurn);
         $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($toolsForTurn);

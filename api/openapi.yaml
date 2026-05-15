@@ -652,7 +652,7 @@ paths:
   /health:
     get:
       summary: "Liveness probe"
-      description: "Returns the API version and current server time. Use this once at the start of a session to verify /api/v1 is reachable and serving JSON. No auth, no rate limit, no database access."
+      description: "API up + version and server time. No auth."
       operationId: getHealth
       tags: ["Health"]
       security: []
@@ -683,7 +683,7 @@ paths:
   /me:
     get:
       summary: "Get the authenticated user"
-      description: "Returns the user that owns the API key making the request. Use this to confirm identity, look up the caller's role, or display a personalized greeting."
+      description: "Identity of the API key owner. Use to greet by name."
       operationId: getMe
       tags: ["Users"]
       x-mv-read: true
@@ -714,7 +714,7 @@ paths:
   /mice:
     get:
       summary: "List mice"
-      description: "Returns a paginated list of mice with optional filters by status, sex, strain, or current cage. Soft-deleted (archived) mice are excluded by default; admins may opt in with include_deleted=true."
+      description: "List mice with optional filters (status, sex, strain, cage_id)."
       operationId: listMice
       tags: ["Mice"]
       x-mv-read: true
@@ -786,7 +786,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     post:
       summary: "Create a mouse"
-      description: "Register a new mouse. Requires write scope. The caller must have write access to the target cage (or be an admin to create a cageless mouse). This is a safe write."
+      description: "Register a new mouse. Safe write; needs cage access."
       operationId: createMouse
       tags: ["Mice"]
       x-mv-safe-write: true
@@ -866,7 +866,7 @@ paths:
   /mice/{id}:
     get:
       summary: "Get one mouse"
-      description: "Returns full details for a single mouse including current cage and parentage. Soft-deleted mice are hidden by default; admins can opt in with include_deleted=true."
+      description: "Get one mouse with cage and parent details."
       operationId: getMouse
       tags: ["Mice"]
       x-mv-read: true
@@ -905,7 +905,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     patch:
       summary: "Update a mouse"
-      description: "Update editable fields on a mouse (sex, dob, strain, genotype, ear_code, parentage, notes). Destructive: supports the X-Confirm-Token confirm flow so the caller can preview a diff before committing."
+      description: "Update editable mouse fields. Destructive; supports confirm flow."
       operationId: updateMouse
       tags: ["Mice"]
       x-mv-destructive: true
@@ -1003,7 +1003,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     delete:
       summary: "Soft-delete a mouse"
-      description: "Archive (soft-delete) a mouse by setting status=archived and clearing its current cage. Hard delete is not exposed here. Destructive: supports the confirm flow."
+      description: "Archive (soft-delete) a mouse. Destructive; supports confirm flow."
       operationId: archiveMouse
       tags: ["Mice"]
       x-mv-destructive: true
@@ -1071,7 +1071,7 @@ paths:
   /mice/{id}/move:
     post:
       summary: "Move a mouse to another cage"
-      description: "Move a mouse to a different cage (or out of any cage with to_cage_id null). Closes the open cage-history row and opens a new one. Destructive: supports the confirm flow. Caller needs write access to both source and destination cages."
+      description: "Move a mouse to another cage. Destructive; supports confirm flow."
       operationId: moveMouseToCage
       tags: ["Mice"]
       x-mv-destructive: true
@@ -1160,7 +1160,7 @@ paths:
   /mice/{id}/sacrifice:
     post:
       summary: "Sacrifice a mouse"
-      description: "Mark a mouse as sacrificed and clear its cage assignment. Destructive: supports the confirm flow. Body must include the sacrifice date."
+      description: "Mark a mouse sacrificed. Body requires date. Destructive; confirm flow."
       operationId: sacrificeMouse
       tags: ["Mice"]
       x-mv-destructive: true
@@ -1248,7 +1248,7 @@ paths:
   /cages/holding:
     get:
       summary: "List holding cages"
-      description: "Returns active holding (non-breeding) cages. Use this to browse the colony's housing inventory."
+      description: "List active holding (non-breeding) cages."
       operationId: listHoldingCages
       tags: ["Holding Cages"]
       x-mv-read: true
@@ -1285,7 +1285,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     post:
       summary: "Create a holding cage"
-      description: "Create a new holding (non-breeding) cage. Safe write. Caller is auto-added to cage_users so they retain write access (unless admin). Body: cage_id (required), pi_name, room, rack, remarks."
+      description: "Create a holding cage. Safe write."
       operationId: createHoldingCage
       tags: ["Holding Cages"]
       x-mv-safe-write: true
@@ -1348,7 +1348,7 @@ paths:
   /cages/holding/{id}:
     get:
       summary: "Get one holding cage"
-      description: "Returns a holding cage with its current occupants, assigned users, and the 20 most recent maintenance notes."
+      description: "Get one holding cage with occupants, users, recent notes."
       operationId: getHoldingCage
       tags: ["Holding Cages"]
       x-mv-read: true
@@ -1386,7 +1386,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     patch:
       summary: "Update a holding cage"
-      description: "Update editable cage metadata (pi_name, remarks, room, rack). Destructive write. Caller needs write access to the cage."
+      description: "Update holding cage metadata. Destructive write."
       operationId: updateHoldingCage
       tags: ["Holding Cages"]
       x-mv-destructive: true
@@ -1452,7 +1452,7 @@ paths:
   /cages/breeding:
     get:
       summary: "List breeding cages"
-      description: "Returns active breeding cages. Each row tracks pairings and litters."
+      description: "List active breeding cages."
       operationId: listBreedingCages
       tags: ["Breeding Cages"]
       x-mv-read: true
@@ -1489,7 +1489,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     post:
       summary: "Create a breeding cage"
-      description: "Create a breeding cage with a sire and dam. Safe write. Caller is auto-added to cage_users. Body: cage_id (required), cross, male_id, female_id, plus optional cage metadata."
+      description: "Create a breeding cage with sire and dam. Safe write."
       operationId: createBreedingCage
       tags: ["Breeding Cages"]
       x-mv-safe-write: true
@@ -1560,7 +1560,7 @@ paths:
   /cages/breeding/{id}:
     get:
       summary: "Get one breeding cage"
-      description: "Returns a breeding cage with its mating pairs, litters, and the 20 most recent maintenance notes."
+      description: "Get one breeding cage with pairs, litters, recent notes."
       operationId: getBreedingCage
       tags: ["Breeding Cages"]
       x-mv-read: true
@@ -1598,7 +1598,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     patch:
       summary: "Update a breeding cage"
-      description: "Update editable cage and pair fields (pi_name, remarks, room, rack, cross, male_id, female_id). Destructive write. Caller needs write access."
+      description: "Update breeding cage and pair fields. Destructive write."
       operationId: updateBreedingCage
       tags: ["Breeding Cages"]
       x-mv-destructive: true
@@ -1670,7 +1670,7 @@ paths:
   /maintenance-notes:
     get:
       summary: "List maintenance notes"
-      description: "Returns husbandry / maintenance notes attached to cages, optionally filtered by cage_id and a date range. Soft-deleted notes are hidden by default."
+      description: "List maintenance notes; filter by cage_id and date range."
       operationId: listMaintenanceNotes
       tags: ["Maintenance Notes"]
       x-mv-read: true
@@ -1729,7 +1729,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     post:
       summary: "Add a maintenance note"
-      description: "Attach a maintenance note to a cage. Safe write. Caller needs write access to the cage. Body: cage_id, note_text (both required), and optional type (e.g. water, bedding, husbandry)."
+      description: "Add a maintenance note to a cage. Safe write."
       operationId: addMaintenanceNote
       tags: ["Maintenance Notes"]
       x-mv-safe-write: true
@@ -1789,7 +1789,7 @@ paths:
   /maintenance-notes/{id}:
     get:
       summary: "Get one maintenance note"
-      description: "Returns a single maintenance note. Soft-deleted notes are hidden unless the caller is admin and passes include_deleted=true."
+      description: "Get one maintenance note."
       operationId: getMaintenanceNote
       tags: ["Maintenance Notes"]
       x-mv-read: true
@@ -1828,7 +1828,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     patch:
       summary: "Edit a maintenance note"
-      description: "Edit a maintenance note. Only the original author may edit, and only within 24 hours of creation. Destructive write."
+      description: "Edit a maintenance note (author only, 24h window). Destructive."
       operationId: updateMaintenanceNote
       tags: ["Maintenance Notes"]
       x-mv-destructive: true
@@ -1889,7 +1889,7 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
     delete:
       summary: "Soft-delete a maintenance note"
-      description: "Soft-delete (set deleted_at) on a maintenance note. The original author or any admin may delete. Destructive: supports the confirm flow."
+      description: "Soft-delete a maintenance note. Destructive; supports confirm flow."
       operationId: deleteMaintenanceNote
       tags: ["Maintenance Notes"]
       x-mv-destructive: true
@@ -1956,7 +1956,7 @@ paths:
   /activity-log:
     get:
       summary: "Search the activity log"
-      description: "Returns the audit log of read/write operations. Non-admin callers only see their own entries; admins see everything and may filter by user_id."
+      description: "List audit log entries; admins see all, others see own."
       operationId: listActivityLog
       tags: ["Activity Log"]
       x-mv-read: true
@@ -2019,7 +2019,7 @@ paths:
   /tasks:
     get:
       summary: "List visible tasks"
-      description: "Returns tasks the caller can see. Non-admins see only tasks they authored or are assigned to. Query: status (open|done|all, default open), assigned_to_me (bool), cage_id, limit, offset."
+      description: "List visible tasks. Filters: status, assigned_to_me, cage_id."
       operationId: listTasks
       tags: ["Tasks"]
       x-mv-read: true
@@ -2081,7 +2081,7 @@ paths:
   /tasks/{id}:
     get:
       summary: "Get one task"
-      description: "Fetch a single task by ID. Non-admins must be the author or an assignee; otherwise 404."
+      description: "Get one task by ID."
       operationId: getTask
       tags: ["Tasks"]
       x-mv-read: true
@@ -2124,7 +2124,7 @@ paths:
   /reminders:
     get:
       summary: "List visible reminders"
-      description: "Returns reminders the caller can see. Non-admins see only reminders they authored or are assigned to. Each item also carries an estimated next_due timestamp. Query: upcoming (bool, default true; restricts to status=active), cage_id, limit, offset."
+      description: "List visible reminders with next_due timestamps."
       operationId: listReminders
       tags: ["Reminders"]
       x-mv-read: true
@@ -2172,7 +2172,7 @@ paths:
   /reminders/{id}:
     get:
       summary: "Get one reminder"
-      description: "Fetch a single reminder by ID. Non-admins must be the author or an assignee; otherwise 404."
+      description: "Get one reminder by ID."
       operationId: getReminder
       tags: ["Reminders"]
       x-mv-read: true
@@ -2215,7 +2215,7 @@ paths:
   /calendar:
     get:
       summary: "List calendar events"
-      description: "Returns a unified, time-ordered feed of upcoming tasks and reminders. Each event carries source_type=task|reminder and source_id. Query: from (YYYY-MM-DD), to (YYYY-MM-DD), limit."
+      description: "Unified feed of upcoming tasks and reminders by date."
       operationId: listCalendarEvents
       tags: ["Calendar"]
       x-mv-read: true
@@ -2257,7 +2257,7 @@ paths:
   /notifications:
     get:
       summary: "List my notifications"
-      description: "Returns notifications belonging strictly to the current user. Query: read (all|unread|read, default unread), limit, offset."
+      description: "List notifications for the current user."
       operationId: listMyNotifications
       tags: ["Notifications"]
       x-mv-read: true
@@ -2301,7 +2301,7 @@ paths:
   /notifications/unread-count:
     get:
       summary: "Get my unread notification count"
-      description: "Returns the count of unread notifications for the current user."
+      description: "Count of unread notifications for the current user."
       operationId: getUnreadNotificationCount
       tags: ["Notifications"]
       x-mv-read: true
@@ -2328,7 +2328,7 @@ paths:
   /mice/{id}/history:
     get:
       summary: "List mouse cage history"
-      description: "Chronological cage-move history for one mouse. Each row is one interval the mouse spent in a cage (or out of any cage)."
+      description: "Chronological cage-move history for one mouse."
       operationId: listMouseCageHistory
       tags: ["Mice"]
       x-mv-read: true
@@ -2369,7 +2369,7 @@ paths:
   /mice/{id}/offspring:
     get:
       summary: "List mouse offspring"
-      description: "Returns mice whose sire_id or dam_id equals the given mouse. Inherits visibility from the parent mouse."
+      description: "List mice whose sire or dam equals the given mouse."
       operationId: listMouseOffspring
       tags: ["Mice"]
       x-mv-read: true
@@ -2412,7 +2412,7 @@ paths:
   /strains:
     get:
       summary: "List strains"
-      description: "Returns the global strain dictionary. Strains are visible to every authenticated user. Query: search (matches str_id, name, aka, or rrid), limit, offset."
+      description: "List strain dictionary entries; supports search query."
       operationId: listStrains
       tags: ["Strains"]
       x-mv-read: true
@@ -2448,7 +2448,7 @@ paths:
   /strains/{id}:
     get:
       summary: "Get one strain"
-      description: "Returns a strain dictionary entry by its str_id."
+      description: "Get one strain by str_id."
       operationId: getStrain
       tags: ["Strains"]
       x-mv-read: true
@@ -2485,7 +2485,7 @@ paths:
   /iacuc:
     get:
       summary: "List IACUC protocols"
-      description: "Returns IACUC protocols visible to the caller. Non-admins only see protocols linked to at least one cage they have access to. Query: status (accepted for forward compatibility but currently a no-op), limit, offset."
+      description: "List IACUC protocols visible to the caller."
       operationId: listIacuc
       tags: ["IACUC"]
       x-mv-read: true
@@ -2521,7 +2521,7 @@ paths:
   /iacuc/{id}:
     get:
       summary: "Get one IACUC protocol"
-      description: "Returns a single IACUC protocol. Non-admins must have access to at least one cage linked to the protocol; otherwise 404."
+      description: "Get one IACUC protocol by ID."
       operationId: getIacuc
       tags: ["IACUC"]
       x-mv-read: true
@@ -2557,8 +2557,8 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
   /dashboard/summary:
     get:
-      summary: "Get dashboard summary counts"
-      description: "Returns a single object with high-level counts (mice, cages, tasks, notifications, recent activity, upcoming reminders) scoped to the authenticated user. Mirrors the data displayed on home.php."
+      summary: "Get dashboard summary"
+      description: "High-level counts (mice, cages, tasks, notifications) for the user."
       operationId: getDashboardSummary
       tags: ["Dashboard"]
       x-mv-read: true
@@ -2582,7 +2582,7 @@ paths:
   /cages/holding/{id}/users:
     get:
       summary: "List users assigned to a holding cage"
-      description: "Returns the users in cage_users for this holding cage."
+      description: "List users assigned to a holding cage."
       operationId: listHoldingCageUsers
       tags: ["Holding Cages"]
       x-mv-read: true
@@ -2623,7 +2623,7 @@ paths:
   /cages/holding/{id}/iacuc:
     get:
       summary: "List IACUC protocols attached to a holding cage"
-      description: "Returns the IACUC protocols linked via cage_iacuc for this holding cage."
+      description: "List IACUC protocols attached to a holding cage."
       operationId: listHoldingCageIacuc
       tags: ["Holding Cages"]
       x-mv-read: true
@@ -2663,8 +2663,8 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
   /cages/holding/{id}/card-data:
     get:
-      summary: "Get card-rendering metadata for a holding cage"
-      description: "Structured payload for printing a cage card: PI, IACUC, assigned users, and current occupants. Equivalent to prnt_crd.php but as JSON."
+      summary: "Get cage-card data (holding)"
+      description: "Cage-card payload for a holding cage (PI, IACUC, occupants)."
       operationId: getHoldingCageCardData
       tags: ["Holding Cages"]
       x-mv-read: true
@@ -2701,7 +2701,7 @@ paths:
   /cages/breeding/{id}/users:
     get:
       summary: "List users assigned to a breeding cage"
-      description: "Returns the users in cage_users for this breeding cage."
+      description: "List users assigned to a breeding cage."
       operationId: listBreedingCageUsers
       tags: ["Breeding Cages"]
       x-mv-read: true
@@ -2742,7 +2742,7 @@ paths:
   /cages/breeding/{id}/iacuc:
     get:
       summary: "List IACUC protocols attached to a breeding cage"
-      description: "Returns the IACUC protocols linked via cage_iacuc for this breeding cage."
+      description: "List IACUC protocols attached to a breeding cage."
       operationId: listBreedingCageIacuc
       tags: ["Breeding Cages"]
       x-mv-read: true
@@ -2783,7 +2783,7 @@ paths:
   /cages/breeding/{id}/lineage:
     get:
       summary: "Get breeding cage lineage"
-      description: "Returns the sire, dam, parent (origin) cages if known, all litters produced in this breeding cage, and offspring mice currently alive."
+      description: "Get sire, dam, parent cages, litters, and offspring."
       operationId: getBreedingCageLineage
       tags: ["Breeding Cages"]
       x-mv-read: true
@@ -2819,8 +2819,8 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
   /cages/breeding/{id}/card-data:
     get:
-      summary: "Get card-rendering metadata for a breeding cage"
-      description: "Structured payload for printing a breeding cage card: PI, IACUC, assigned users, pairs, and latest litter."
+      summary: "Get cage-card data (breeding)"
+      description: "Cage-card payload for a breeding cage (PI, IACUC, pairs)."
       operationId: getBreedingCageCardData
       tags: ["Breeding Cages"]
       x-mv-read: true
@@ -2857,7 +2857,7 @@ paths:
   /me/profile:
     get:
       summary: "Get my profile"
-      description: "Returns the current user's editable profile. Whitelists only safe columns (id, name, email, position, role, status, email_verified, initials). Never returns password hashes, reset tokens, or any third-party / session tokens."
+      description: "Current user's editable profile (safe whitelisted columns)."
       operationId: getMyProfile
       tags: ["Account"]
       x-mv-read: true

@@ -433,16 +433,92 @@ if (!function_exists('chatbot_resolve_tool')) {
     }
 
     /**
-     * Keyword router: pick the smallest tool subset that covers the user's
-     * intent. If nothing matches, return the full tool set so the model can
-     * still discover what's available — during the testing phase we err
-     * toward including more tools (small token cost) over refusing valid
-     * requests because a group wasn't pre-selected.
+     * Layered tool selection. Picks the smallest tool subset that covers the
+     * user's intent. Five layers, evaluated in priority order:
+     *
+     *   1a. Greetings ("hi", "hello", identity-casual) → only getMe so the
+     *       AI can address the user by name (~1 tool).
+     *   1b. Pure acknowledgments ("thanks", "ok", "bye") → 0 tools, replies
+     *       conversationally.
+     *   2.  Capability/help questions → only listCapabilities (1 tool).
+     *   3.  Self/identity queries beyond greetings → getMe + getMyProfile.
+     *   4.  Domain-specific keyword router (mice/cages/tasks/...) — the
+     *       existing behavior, lifted into chatbot_select_tools_by_keywords.
+     *   5.  Smart fallback — a curated 15-20 tool starter set for vague
+     *       queries that don't trigger any layer above.
+     *
+     * The "all" strategy bypasses every layer and returns the full toolset
+     * (debugging only). Domain keywords beat greeting/ack/capability regexes
+     * so "hi I want to see my mice" goes to Layer 4, not Layer 1a.
      */
-    function chatbot_select_tools(string $userMessage): array
+    function chatbot_select_tools(string $userMessage, string $strategy = 'minimal'): array
     {
         $all = chatbot_all_tool_defs();
-        if ($userMessage === '') return $all;
+
+        if ($strategy === 'all') {
+            chatbot_log_tool_strategy('all', $all);
+            return $all;
+        }
+
+        $msg = strtolower(trim($userMessage));
+
+        // Try Layer 4 (domain router) up-front so domain keywords win over
+        // greeting/ack/capability patterns even when the message is short
+        // (e.g. "hi I want to see my mice").
+        $domainTools = chatbot_select_tools_by_keywords($userMessage, $all);
+
+        // Layer 3: self/identity queries. Beats Layer 4 because "who am I"
+        // and "my profile" should answer with just identity, not the whole
+        // Users+Account group.
+        if ($msg !== '' && preg_match('/(who am i|my profile|my info|my account|show my details|what(?:\'?s|\s+is)\s+my\s+role)/i', $msg)) {
+            $tools = chatbot_filter_tools_by_names($all, ['getMe', 'getMyProfile']);
+            chatbot_log_tool_strategy('3', $tools);
+            return $tools;
+        }
+
+        // Without a domain match, evaluate the conversational layers.
+        if ($domainTools === null) {
+            $shortMsg = $msg !== '' && strlen($msg) < 30;
+
+            // Layer 1a: greetings + identity-casual.
+            if ($shortMsg && preg_match('/^(hi|hello|hey+|yo|good\s+morning|good\s+afternoon|good\s+evening|sup|hiya|who\s+are\s+you|what\s+are\s+you|how\s+are\s+you|are\s+you\s+there)\b[\s,.!?]*$/i', $msg)) {
+                $tools = chatbot_filter_tools_by_names($all, ['getMe']);
+                chatbot_log_tool_strategy('1a', $tools);
+                return $tools;
+            }
+
+            // Layer 1b: pure acknowledgments.
+            if ($shortMsg && preg_match('/^(ok|okay|got\s+it|sure|alright|cool|nice|great|thanks|thank\s+you|thx|bye|goodbye|yes|no|yep|yup|nope)\b[\s.,!?]*$/i', $msg)) {
+                chatbot_log_tool_strategy('1b', []);
+                return [];
+            }
+
+            // Layer 2: capability/help questions.
+            if (preg_match('/^(what\s+can\s+you\s+do|help|capabilities|what\s+are\s+you\s+capable\s+of|list\s+features|what\s+do\s+you\s+support)\b[\s.,!?]*$/i', $msg)) {
+                $tools = chatbot_filter_tools_by_names($all, ['listCapabilities']);
+                chatbot_log_tool_strategy('2', $tools);
+                return $tools;
+            }
+
+            // Layer 5: smart fallback — a curated starter set, not the full 45.
+            $fallback = chatbot_filter_tools_by_names($all, chatbot_fallback_tool_names());
+            chatbot_log_tool_strategy('5', $fallback);
+            return $fallback;
+        }
+
+        // Layer 4: domain router matched.
+        chatbot_log_tool_strategy('4', $domainTools);
+        return $domainTools;
+    }
+
+    /**
+     * Domain keyword router. Returns the matched tool subset, or null when
+     * no keyword fires. Lifted out of chatbot_select_tools so the layered
+     * selector can probe for a domain match without running it twice.
+     */
+    function chatbot_select_tools_by_keywords(string $userMessage, array $all): ?array
+    {
+        if ($userMessage === '') return null;
 
         $groups = chatbot_tool_groups();
         $msg    = strtolower($userMessage);
@@ -458,97 +534,109 @@ if (!function_exists('chatbot_resolve_tool')) {
             }
         };
 
-        // Mice-related → mice + cages (so AI can answer "which cage is this
-        // mouse in", lineage, etc.).
         $route('/\b(mouse|mice|pup|litter|sire|dam|offspring|pups|lineage|parent)\b/',
             ['Mice', 'Holding Cages', 'Breeding Cages'], 'Mice');
-
-        // Cages.
         $route('/\b(cage|cages|holding|breeding|room)\b/',
             ['Holding Cages', 'Breeding Cages', 'Maintenance Notes', 'Mice'], 'Cages');
-
-        // Maintenance notes.
         $route('/\b(note|notes|maintenance|water|bedding|food)\b/',
             ['Maintenance Notes', 'Holding Cages', 'Breeding Cages'], 'Notes');
-
-        // Activity log / history. "history" / "moved" also routes to Mice
-        // (cage-history endpoint lives under Mice).
         $route('/\b(log|logs|activity|audit|who|when)\b/',
             ['Activity Log'], 'ActivityLog');
         $route('/\b(history|moved)\b/',
             ['Mice', 'Activity Log'], 'History');
-
-        // Account / profile / user identity.
         $route('/\b(profile|account|user|users)\b/',
             ['Users', 'Account'], 'Account');
         $route('/(my profile|my account|who am i|my info)/',
             ['Account', 'Users'], 'MyAccount');
-
-        // Tasks — the bug that motivated this routing pass. "task" or
-        // "todo" must always pull the Tasks tools, plus the adjacent
-        // Reminders/Calendar groups since users mix the terms.
         $route('/\b(task|tasks|todo|pending|open task)\b/',
             ['Tasks', 'Reminders', 'Calendar'], 'Tasks');
         $route('/(to-do|to do)/',
             ['Tasks', 'Reminders', 'Calendar'], 'Tasks');
-
-        // Reminders.
         $route('/\b(reminder|reminders)\b/',
             ['Reminders', 'Tasks'], 'Reminders');
-
-        // Calendar / scheduling.
         $route('/\b(calendar|schedule|upcoming|due|deadline)\b/',
             ['Calendar', 'Tasks', 'Reminders'], 'Calendar');
-
-        // Notifications.
         $route('/\b(notification|notifications|alert|alerts)\b/',
             ['Notifications'], 'Notifications');
-
-        // Strains.
         $route('/\b(strain|strains)\b/',
             ['Strains'], 'Strains');
-
-        // IACUC / protocols.
         $route('/\b(iacuc|protocol|protocols)\b/',
             ['IACUC', 'Holding Cages', 'Breeding Cages'], 'IACUC');
-
-        // Dashboard / overview.
         $route('/\b(dashboard|summary|overview)\b/',
             ['Dashboard', 'Mice', 'Holding Cages', 'Breeding Cages'], 'Dashboard');
 
-        // Capabilities.
-        if (preg_match('/\b(what|capabilities|help|can you|able)\b/', $msg)) {
-            $matched[] = 'Capabilities';
-            $keep[] = 'listCapabilities';
-        }
-
-        // "my" alone is ambiguous (could be "my mice", "my tasks", "my
-        // notifications" — already covered above). If "my" matched but no
-        // domain keyword did, fall through to "send all" rather than
-        // restrict to Users only. That regression is the BUG C class of
-        // failures.
-        if (empty($matched) && preg_match('/\b(me|my)\b/', $msg)) {
-            // No domain — let the LLM see the full toolset.
-        }
-
         if (empty($matched)) {
-            error_log("Chatbot tool selection: no keyword match, sending all " . count($all) . " tools");
-            return $all;
+            return null;
         }
 
-        // listCapabilities is always useful so the model can tell the user
-        // what's available when the routed subset doesn't cover their ask.
+        // listCapabilities is always useful as a fallback when the routed
+        // subset doesn't cover what the user asked.
         $keep[] = 'listCapabilities';
         $keep = array_values(array_unique($keep));
 
         $filtered = array_values(array_filter($all,
             fn($t) => in_array($t['function']['name'] ?? '', $keep, true)));
 
-        if (count($filtered) < count($all)) {
-            error_log("Chatbot tool selection: matched groups [" . implode(', ', array_unique($matched)) . "], tools sent: " . count($filtered) . " of " . count($all));
-        }
-
         return $filtered;
+    }
+
+    /**
+     * Curated Layer 5 fallback set. ~17 tools covering orientation, the
+     * common list reads, their get_one variants, and the most likely
+     * follow-ups. Sized to stay under 3,000 prefix tokens.
+     */
+    function chatbot_fallback_tool_names(): array
+    {
+        return [
+            // Orientation
+            'listCapabilities',
+            'getMe',
+            'getMyProfile',
+            'getDashboardSummary',
+            // Most common list reads + their get_one drill-ins
+            'listMice',            'getMouse',
+            'listHoldingCages',    'getHoldingCage',
+            'listBreedingCages',   'getBreedingCage',
+            'listTasks',           'getTask',
+            'listMaintenanceNotes','getMaintenanceNote',
+            // Frequent follow-ups
+            'listMyNotifications',
+            'listReminders',
+            'listCalendarEvents',
+        ];
+    }
+
+    function chatbot_filter_tools_by_names(array $all, array $names): array
+    {
+        $set = array_flip($names);
+        return array_values(array_filter($all,
+            fn($t) => isset($set[$t['function']['name'] ?? ''])));
+    }
+
+    /**
+     * Emit a single structured log line per turn so the admin can see, per
+     * user message, which layer fired and how big the prefix is.
+     */
+    function chatbot_log_tool_strategy(string $layer, array $tools): void
+    {
+        $count = count($tools);
+        $estimate = $count === 0 ? 0 : chatbot_estimate_tokens($tools);
+        error_log("Chatbot tool strategy: layer=$layer, tools=$count, estimated_prefix_tokens=$estimate");
+    }
+
+    /**
+     * Hardcoded "TOOL USE DISCIPLINE" block. Prepended to every system prompt
+     * so the model keeps tool use proportionate to the user's ask. NOT
+     * admin-editable so the discipline can't be removed by accident.
+     */
+    function chatbot_tool_use_discipline_block(): string
+    {
+        return "TOOL USE DISCIPLINE:\n"
+            . "- For greetings, casual chat, and identity questions, you may call getMe ONCE to personalize but should not call other tools.\n"
+            . "- Do NOT call tools for capability questions, casual chat, or curiosity about the system. Answer conversationally.\n"
+            . "- Only call data-fetching tools when the user is asking for specific data or asking you to do something.\n"
+            . "- Maximum 3 tool calls per user message unless the user explicitly asks for a sequence. Plan tool use, do not stack.\n"
+            . "- If no available tool matches the user's ask, tell them honestly and suggest they be more specific.";
     }
 
     /**
