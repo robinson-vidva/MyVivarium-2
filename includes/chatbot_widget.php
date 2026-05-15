@@ -120,11 +120,31 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
   .mv-msg-event { align-self: center; background: #fff3cd; color: #664d03; font-size: 12px; padding: 4px 10px; border-radius: 6px; max-width: 95%; }
   .mv-tool-card {
     align-self: flex-start; background: #e9ecef; border: 1px solid #ced4da;
-    border-radius: 8px; padding: 6px 10px; font-size: 12px; max-width: 95%; cursor: pointer;
+    border-radius: 8px; padding: 4px 10px; font-size: 12px; max-width: 95%; cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, padding 0.15s ease;
+    user-select: none;
+  }
+  .mv-tool-card:hover { background: #dee2e6; }
+  .mv-tool-card.expanded {
+    background: #fff; border-color: #6c757d;
+    padding: 8px 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
   .mv-tool-card.expanded .mv-tool-body { display: block; }
-  .mv-tool-card .mv-tool-body { display: none; margin-top: 6px; font-family: ui-monospace, monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto; background: #f1f3f5; padding: 6px; border-radius: 4px; }
-  .mv-tool-card .mv-tool-head { font-weight: 600; }
+  .mv-tool-card .mv-tool-body {
+    display: none; margin-top: 8px; padding-top: 8px;
+    border-top: 1px dashed #ced4da;
+    font-family: ui-monospace, monospace; font-size: 11px;
+    white-space: pre-wrap; max-height: 240px; overflow-y: auto;
+    user-select: text; cursor: text;
+  }
+  .mv-tool-card .mv-tool-body .mv-tool-row { margin: 2px 0; }
+  .mv-tool-card .mv-tool-body .mv-tool-label { color: #6c757d; font-weight: 600; }
+  .mv-tool-card .mv-tool-body pre { margin: 4px 0 0 0; padding: 6px; background: #f1f3f5; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
+  .mv-tool-card .mv-tool-head { font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .mv-tool-card .mv-tool-head .mv-tool-caret { color: #6c757d; font-size: 10px; margin-left: auto; }
+  .mv-tool-card.mv-tool-error { border-color: #dc3545; background: #f8d7da; color: #842029; }
+  .mv-tool-card.mv-tool-error:hover { background: #f5c2c7; }
+  .mv-tool-card.mv-tool-error.expanded { background: #fff; border-color: #dc3545; }
   .mv-confirm-card {
     align-self: stretch; background: #fff3cd; border: 1px solid #ffe69c;
     border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #664d03;
@@ -482,20 +502,88 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
     msgs.appendChild(div);
     scrollBottom();
   }
+  // Render a tool-call card. By default the card is collapsed and shows
+  // only the wrench, operationId, and HTTP status — the raw request /
+  // response JSON is hidden as debug noise. Clicking the card toggles a
+  // details panel containing the HTTP method, path, parameters, and a
+  // truncated response. Cards for non-2xx responses (or no status, which
+  // means the call never completed) start expanded so the user sees what
+  // went wrong without an extra click. Toggle state lives on the DOM node
+  // and therefore persists for the lifetime of the open chat panel.
   function addToolCard(call) {
     if (!call || !call.name) return;
     const wrap = document.createElement('div');
     wrap.className = 'mv-tool-card';
+
+    const statusNum = (call.status != null && call.status !== '') ? Number(call.status) : null;
+    const hasStatus = statusNum !== null && !Number.isNaN(statusNum) && statusNum > 0;
+    const isError   = !hasStatus || statusNum < 200 || statusNum >= 300;
+    if (isError) wrap.classList.add('mv-tool-error');
+
     const head = document.createElement('div');
     head.className = 'mv-tool-head';
-    head.textContent = '🔧 ' + call.name + (call.status ? ' (HTTP ' + call.status + ')' : '');
+    const headText = document.createElement('span');
+    headText.textContent = '🔧 ' + call.name + (hasStatus ? ' (HTTP ' + statusNum + ')' : (call.error ? ' (' + call.error + ')' : ''));
+    const caret = document.createElement('span');
+    caret.className = 'mv-tool-caret';
+    caret.textContent = '▾';
+    head.appendChild(headText);
+    head.appendChild(caret);
+
     const body = document.createElement('div');
     body.className = 'mv-tool-body';
-    body.textContent = JSON.stringify(call.request || call, null, 2);
-    wrap.appendChild(head); wrap.appendChild(body);
-    wrap.addEventListener('click', () => wrap.classList.toggle('expanded'));
+
+    const req = (call.request && typeof call.request === 'object') ? call.request : {};
+    function row(label, value, asBlock) {
+      const r = document.createElement('div');
+      r.className = 'mv-tool-row';
+      const l = document.createElement('span');
+      l.className = 'mv-tool-label';
+      l.textContent = label + ': ';
+      r.appendChild(l);
+      if (asBlock) {
+        const pre = document.createElement('pre');
+        pre.textContent = value;
+        r.appendChild(pre);
+      } else {
+        r.appendChild(document.createTextNode(value));
+      }
+      return r;
+    }
+    if (req.method) body.appendChild(row('Method', String(req.method), false));
+    if (req.path)   body.appendChild(row('Path',   String(req.path),   false));
+    if (req.params && typeof req.params === 'object' && Object.keys(req.params).length > 0) {
+      body.appendChild(row('Params', JSON.stringify(req.params, null, 2), true));
+    }
+    if (call.response !== undefined && call.response !== null && call.response !== '') {
+      let resp = call.response;
+      if (typeof resp !== 'string') {
+        try { resp = JSON.stringify(resp, null, 2); } catch (e) { resp = String(resp); }
+      }
+      const max = 1000;
+      if (resp.length > max) resp = resp.slice(0, max) + '\n…[truncated]';
+      body.appendChild(row('Response', resp, true));
+    }
+    if (body.childNodes.length === 0) {
+      body.textContent = '(no request / response details)';
+    }
+
+    wrap.appendChild(head);
+    wrap.appendChild(body);
+
+    // Auto-expand failed calls so the user sees the error without a click.
+    if (isError) wrap.classList.add('expanded');
+
+    // Click anywhere on the card toggles, but don't toggle when the user
+    // is selecting text inside the body (selection breaks otherwise).
+    wrap.addEventListener('click', (e) => {
+      if (window.getSelection && window.getSelection().toString().length > 0) return;
+      wrap.classList.toggle('expanded');
+    });
+
     msgs.appendChild(wrap);
     scrollBottom();
+    return wrap;
   }
   function addConfirmCard(pc) {
     pendingOpId = pc.pending_operation_id;
@@ -667,7 +755,16 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
           } else if (m.role === 'system_event') {
             addEvent(m.content || '');
           } else if (m.role === 'tool') {
-            addToolCard({ name: (m.tool_call_json && m.tool_call_json.function && m.tool_call_json.function.name) || 'tool', request: m.tool_result_json });
+            // History row: tool_call_json holds {function:{name}}, tool_result_json
+            // holds {status, body}. Surface status + body so the rebuilt card
+            // matches the live shape (and auto-expands on errors).
+            const tcj = m.tool_call_json || {};
+            const trj = m.tool_result_json || {};
+            addToolCard({
+              name: (tcj.function && tcj.function.name) || 'tool',
+              status: (trj && typeof trj === 'object' && trj.status != null) ? trj.status : undefined,
+              response: (trj && typeof trj === 'object' && 'body' in trj) ? trj.body : trj,
+            });
           }
         });
         // After all messages are in the DOM, restore chips beneath the

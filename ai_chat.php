@@ -781,7 +781,17 @@ try {
                 break;
             }
             $apiRes = chatbot_api_call_with_retry($con, $user_id, $username, $resolved['method'], $resolved['path'], $resolved['query'], $resolved['body'], $confirm_pending_op);
-            $toolCallsForResponse[] = ['name' => $replayToolName, 'status' => $apiRes['status'], 'request' => ['method' => $resolved['method'], 'path' => $resolved['path']]];
+            $replayParams = array_merge((array)($resolved['query'] ?? []), (array)($resolved['body'] ?? []));
+            $toolCallsForResponse[] = [
+                'name'    => $replayToolName,
+                'status'  => $apiRes['status'],
+                'request' => [
+                    'method' => $resolved['method'],
+                    'path'   => $resolved['path'],
+                    'params' => $replayParams,
+                ],
+                'response' => chatbot_compact_response_for_ui($apiRes['body']),
+            ];
             log_activity($con, 'ai_chat_write', 'ai_conversation', $conversation_id, $replayToolName . ' pending_op=' . $confirm_pending_op);
 
             if ($apiRes['status'] === 410) {
@@ -817,13 +827,24 @@ try {
         $llm = llm_chat_completions_with_fallback($messages, $toolsForTurn);
 
         if (!$llm['ok']) {
+            // Log the verbatim provider error so admins can diagnose. The
+            // user gets a categorized, friendlier reply via the helper.
             $attempted = is_array($llm['chain_attempted'] ?? null) ? implode(',', $llm['chain_attempted']) : '';
-            error_log('chatbot llm error attempted=[' . $attempted . '] status=' . $llm['status'] . ' err=' . ($llm['error'] ?? '') . ' raw=' . ($llm['raw'] ?? ''));
-            if ($llm['status'] === 429) {
-                $finalReply = 'I am getting too many requests right now, try again in a minute.';
-            } else {
-                $finalReply = 'AI assistant is temporarily unavailable.';
+            error_log('chatbot llm error attempted=[' . $attempted . '] status=' . (int)($llm['status'] ?? 0)
+                . ' err=' . ($llm['error'] ?? '') . ' raw=' . ($llm['raw'] ?? ''));
+
+            $toolsSucceeded = false;
+            foreach ($toolCallsForResponse as $tc) {
+                $s = (int)($tc['status'] ?? 0);
+                if ($s >= 200 && $s < 300) { $toolsSucceeded = true; break; }
             }
+            $hasFallback = count($providerChain) > 1;
+            $finalReply = chatbot_format_llm_failure_reply(
+                (int)($llm['status'] ?? 0),
+                (string)($llm['error']  ?? ''),
+                $toolsSucceeded,
+                $hasFallback
+            );
             chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
             break;
         }
@@ -886,7 +907,12 @@ try {
                     ['id' => $tc['id'] ?? null, 'function' => ['name' => $name]],
                     ['status' => 200, 'body' => $body]
                 );
-                $toolCallsForResponse[] = ['name' => $name, 'status' => 200];
+                $toolCallsForResponse[] = [
+                    'name'    => $name,
+                    'status'  => 200,
+                    'request' => ['method' => 'INTERNAL', 'path' => '(listCapabilities)'],
+                    'response' => chatbot_compact_response_for_ui($body),
+                ];
                 continue;
             }
 
@@ -907,7 +933,12 @@ try {
             $toolCallsForResponse[] = [
                 'name'   => $name,
                 'status' => $apiRes['status'],
-                'request' => ['method' => $resolved['method'], 'path' => $resolved['path']],
+                'request' => [
+                    'method' => $resolved['method'],
+                    'path'   => $resolved['path'],
+                    'params' => array_merge((array)($resolved['query'] ?? []), (array)($resolved['body'] ?? [])),
+                ],
+                'response' => chatbot_compact_response_for_ui($apiRes['body']),
             ];
 
             // Loop guard: if the same tool keeps coming back with a
@@ -994,7 +1025,13 @@ try {
     }
 } catch (Throwable $e) {
     error_log('ai_chat fatal: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-    $finalReply = 'AI assistant is temporarily unavailable.';
+    $toolsSucceeded = false;
+    foreach ($toolCallsForResponse as $tc) {
+        $s = (int)($tc['status'] ?? 0);
+        if ($s >= 200 && $s < 300) { $toolsSucceeded = true; break; }
+    }
+    $hasFallback = isset($providerChain) && count($providerChain) > 1;
+    $finalReply = chatbot_format_llm_failure_reply(0, 'internal_error: ' . $e->getMessage(), $toolsSucceeded, $hasFallback);
 }
 
 // Suggestion parsing + fallback. Only applies when the LLM produced a real

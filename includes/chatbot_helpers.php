@@ -566,4 +566,70 @@ if (!function_exists('chatbot_resolve_tool')) {
         $cap = mv_openapi_capabilities($spec);
         return ['ok' => true, 'data' => $cap];
     }
+
+    /**
+     * Categorize an LLM provider failure into one of five buckets:
+     * rate_limit, server_error, timeout, network, other. Returns
+     * ['category' => string, 'message' => string] where message is the
+     * user-facing short explanation.
+     */
+    function chatbot_categorize_llm_error(int $status, string $error): array
+    {
+        $err = strtolower($error);
+        if ($status === 429) {
+            return ['category' => 'rate_limit', 'message' => 'AI provider rate limit hit. Try again in a minute.'];
+        }
+        if ($status >= 500 && $status <= 599) {
+            return ['category' => 'server_error', 'message' => 'AI provider returned ' . $status . '. Try again.'];
+        }
+        if ($status === 0) {
+            // curl_error strings for timeouts contain "timed out" / "timeout".
+            if (strpos($err, 'timed out') !== false || strpos($err, 'timeout') !== false) {
+                return ['category' => 'timeout', 'message' => 'AI provider response timed out. Try again.'];
+            }
+            return ['category' => 'network', 'message' => 'Cannot reach the AI provider. Check internet.'];
+        }
+        return ['category' => 'other', 'message' => 'AI provider returned an error. Check logs for details.'];
+    }
+
+    /**
+     * Compose the user-facing message when the LLM call fails. Layers, in
+     * order:
+     *   1. If tool calls already succeeded this turn, prefix that the data
+     *      WAS retrieved but the AI couldn't summarize it.
+     *   2. The categorized reason (rate limit / 5xx / timeout / network /
+     *      other) from chatbot_categorize_llm_error().
+     *   3. A "configure a fallback provider" tip when the active provider
+     *      chain has no fallback to fall through to.
+     */
+    function chatbot_format_llm_failure_reply(int $status, string $error, bool $toolsSucceeded, bool $hasFallback): string
+    {
+        $cat = chatbot_categorize_llm_error($status, $error);
+        $msg = $cat['message'];
+        if ($toolsSucceeded) {
+            $msg = 'I successfully retrieved your data but the AI provider failed to summarize it. ' . $msg
+                . ' You can try again in a minute.';
+        }
+        if (!$hasFallback) {
+            $msg .= ' Tip: Configure a fallback provider in AI Configuration to avoid this.';
+        }
+        return $msg;
+    }
+
+    /**
+     * Compact a tool-call response body for display in the chatbot UI.
+     * Pretty-prints arrays as JSON, returns strings as-is, then caps to
+     * $max chars. The raw response is what the LLM gets; this trimmed
+     * copy is purely for the collapsible tool-call card.
+     */
+    function chatbot_compact_response_for_ui($body, int $max = 1000): string
+    {
+        if (is_array($body) || is_object($body)) {
+            $s = (string)json_encode($body, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        } else {
+            $s = (string)$body;
+        }
+        if (strlen($s) > $max) $s = substr($s, 0, $max) . "\n…[truncated]";
+        return $s;
+    }
 }
