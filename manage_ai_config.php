@@ -3,9 +3,11 @@
  * AI Configuration admin page.
  *
  * Admins manage:
- *   - the active LLM provider (Groq or OpenAI)
- *   - per-provider API key + model (both providers can be configured in
- *     parallel; admin can prepare OpenAI before switching to it)
+ *   - the provider chain — an ordered list of providers (Groq, OpenAI,
+ *     Custom) each with enable/disable + priority. The chatbot tries them
+ *     in order on 429/5xx/network failures and surfaces which one served.
+ *   - per-provider API key + model (every provider can be configured in
+ *     parallel; misconfiguration of one does not block enabling another)
  *   - the system prompt and the chatbot-enabled toggle
  *
  * Values are persisted via includes/ai_settings.php (AES-256-CBC encrypted
@@ -55,7 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($action === 'save') {
-            $provider     = (string)($_POST['llm_provider']   ?? 'groq');
             $newGroqKey   = (string)($_POST['groq_api_key']   ?? '');
             $groqModel    = (string)($_POST['groq_model']     ?? '');
             $newOpenaiKey = (string)($_POST['openai_api_key'] ?? '');
@@ -81,9 +82,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $customTokenField  = (string)($_POST['custom_token_field']  ?? '');
             $newCustomKey      = (string)($_POST['custom_api_key']      ?? '');
 
-            if (!in_array($provider, [LLM_PROVIDER_GROQ, LLM_PROVIDER_OPENAI, LLM_PROVIDER_CUSTOM], true)) {
-                throw new RuntimeException('Invalid provider selection.');
+            // Chain: each provider has a priority (1-based int) and an
+            // enabled checkbox. Ordering submits priorities; renaming /
+            // dropping unknown providers is handled by llm_normalize_chain.
+            $chainPriorityIn = isset($_POST['chain_priority']) && is_array($_POST['chain_priority'])
+                ? $_POST['chain_priority'] : [];
+            $chainEnabledIn  = isset($_POST['chain_enabled'])  && is_array($_POST['chain_enabled'])
+                ? $_POST['chain_enabled']  : [];
+            $submittedChain = [];
+            foreach (LLM_PROVIDER_ALL as $prov) {
+                $submittedChain[] = [
+                    'provider' => $prov,
+                    'enabled'  => !empty($chainEnabledIn[$prov]),
+                    'priority' => (int)($chainPriorityIn[$prov] ?? 99),
+                ];
             }
+
             if ($groqModel !== '' && !in_array($groqModel, LLM_GROQ_ALLOWED_MODELS, true)) {
                 throw new RuntimeException('Invalid Groq model selection.');
             }
@@ -97,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Invalid token field selection.');
             }
 
-            // Persist per-provider key/model first so the switch validation
+            // Persist per-provider key/model first so the chain validation
             // below sees the freshly-set state.
             if ($newGroqKey !== '') {
                 ai_settings_set('groq_api_key', $newGroqKey, $userId);
@@ -125,28 +139,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($customTokenField  !== '') ai_settings_set('custom_token_field',  $customTokenField,  $userId);
             if ($newCustomKey      !== '') ai_settings_set('custom_api_key',      $newCustomKey,      $userId);
 
-            // Validate: can't switch to a provider whose key is not set, and
-            // for "custom" the selected preset's required fields must all
-            // be populated. We re-read the config so the freshly-saved
-            // values participate.
-            $providerCfg = llm_get_provider_config($provider);
-            if ($provider === LLM_PROVIDER_CUSTOM) {
-                if (!empty($providerCfg['config_errors'])) {
-                    $missing = $providerCfg['config_errors'];
-                    // Show a friendly message — refuse the switch but keep
-                    // the saved per-field values so the admin can finish
-                    // configuration and try again.
-                    throw new RuntimeException(
-                        'Cannot switch to Custom — ' . implode(', ', $missing) .
-                        ' is required. Configure the custom provider first, then switch.'
-                    );
-                }
+            // Chain validation: at least one provider must be enabled AND
+            // fully configured (key present, custom preset complete). Each
+            // provider is checked independently — Groq being incomplete
+            // does not block enabling OpenAI, which is the regression the
+            // previous "Cannot switch to X — Y required" logic introduced.
+            $normalized = llm_normalize_chain($submittedChain);
+            $hasAny = false;
+            foreach ($normalized as $entry) {
+                if (!$entry['enabled']) continue;
+                $cfg = llm_get_provider_config($entry['provider']);
+                if (($cfg['api_key'] ?? '') === '') continue;
+                if (($cfg['provider'] ?? '') === LLM_PROVIDER_CUSTOM && !empty($cfg['config_errors'])) continue;
+                $hasAny = true;
+                break;
             }
-            if ($providerCfg['api_key'] === '') {
-                $label = llm_provider_label($provider);
-                throw new RuntimeException("Cannot switch to $label — no API key configured. Set the key first.");
+            if (!$hasAny) {
+                throw new RuntimeException('At least one provider must be enabled and fully configured.');
             }
-            ai_settings_set('llm_provider', $provider, $userId);
+
+            llm_save_provider_chain($normalized, $userId);
+            // Drop the legacy single-provider key so it can't drift out of
+            // sync with the chain. Subsequent reads come exclusively from
+            // llm_provider_chain.
+            try { ai_settings_delete('llm_provider', $userId); } catch (Throwable $e) { /* idempotent */ }
 
             if ($prompt !== '') {
                 ai_settings_set('system_prompt', $prompt, $userId);
@@ -201,9 +217,41 @@ $promptMeta     = $envError ? null : ai_settings_get_meta('system_prompt');
 $enabledMeta    = $envError ? null : ai_settings_get_meta('chatbot_enabled');
 
 $activeProvider = $envError ? LLM_PROVIDER_GROQ : llm_get_active_provider();
-$groqCfg        = $envError ? ['model' => LLM_GROQ_DEFAULT_MODEL]   : llm_get_provider_config(LLM_PROVIDER_GROQ);
-$openaiCfg      = $envError ? ['model' => LLM_OPENAI_DEFAULT_MODEL] : llm_get_provider_config(LLM_PROVIDER_OPENAI);
-$customCfg      = $envError ? ['preset' => '', 'model' => '', 'preset_label' => '', 'config_errors' => []] : llm_get_provider_config(LLM_PROVIDER_CUSTOM);
+$groqCfg        = $envError ? ['model' => LLM_GROQ_DEFAULT_MODEL, 'api_key' => '']   : llm_get_provider_config(LLM_PROVIDER_GROQ);
+$openaiCfg      = $envError ? ['model' => LLM_OPENAI_DEFAULT_MODEL, 'api_key' => ''] : llm_get_provider_config(LLM_PROVIDER_OPENAI);
+$customCfg      = $envError ? ['preset' => '', 'model' => '', 'preset_label' => '', 'config_errors' => ['preset'], 'api_key' => ''] : llm_get_provider_config(LLM_PROVIDER_CUSTOM);
+
+// Provider chain (raw → ordered list of {provider, enabled, priority}).
+$providerChainRaw = $envError ? llm_chain_from_legacy() : llm_get_provider_chain_raw();
+$providerCfgByName = [
+    LLM_PROVIDER_GROQ   => $groqCfg,
+    LLM_PROVIDER_OPENAI => $openaiCfg,
+    LLM_PROVIDER_CUSTOM => $customCfg,
+];
+// "Configured" = key present and (for custom) no missing required fields.
+$providerConfiguredByName = [];
+foreach (LLM_PROVIDER_ALL as $prov) {
+    $cfg = $providerCfgByName[$prov];
+    $configured = (($cfg['api_key'] ?? '') !== '');
+    if ($prov === LLM_PROVIDER_CUSTOM && !empty($cfg['config_errors'])) {
+        $configured = false;
+    }
+    $providerConfiguredByName[$prov] = $configured;
+}
+// Compute primary + fallbacks for the banner: highest-priority entry that
+// is both enabled AND configured. Fallbacks = remaining enabled+configured
+// providers in priority order.
+$primaryProvider = null;
+$fallbackProviders = [];
+foreach ($providerChainRaw as $entry) {
+    if (!$entry['enabled']) continue;
+    if (!$providerConfiguredByName[$entry['provider']]) continue;
+    if ($primaryProvider === null) {
+        $primaryProvider = $entry['provider'];
+    } else {
+        $fallbackProviders[] = $entry['provider'];
+    }
+}
 $currentGroqModel   = $groqCfg['model'];
 $currentOpenaiModel = $openaiCfg['model'];
 
@@ -257,6 +305,13 @@ require 'header.php';
         .provider-section[open] > summary { border-bottom: 1px solid var(--bs-border-color, #dee2e6); }
         .provider-section .provider-body { padding: 16px; }
         .provider-section.active-provider > summary { background: var(--bs-success-bg-subtle, #d1e7dd); }
+        .chain-card { border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; background: var(--bs-body-bg, #fff); }
+        .chain-card-row { display: flex; align-items: center; gap: 12px; }
+        .chain-priority-label { width: 28px; height: 28px; border-radius: 50%; background: var(--bs-secondary-bg, #e9ecef); color: var(--bs-secondary-color, #495057); display: flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0; }
+        .chain-card-name { flex: 1; }
+        .chain-card-controls { display: flex; align-items: center; gap: 4px; }
+        .chain-card-controls .btn { padding: 2px 8px; font-size: 14px; line-height: 1; }
+        .test-result { font-size: 12px; }
     </style>
 </head>
 <body>
@@ -278,16 +333,24 @@ require 'header.php';
     <?php endif; ?>
 
     <?php
-        if ($activeProvider === LLM_PROVIDER_OPENAI) {
-            $activeCfg = $openaiCfg;
-        } elseif ($activeProvider === LLM_PROVIDER_CUSTOM) {
-            $activeCfg = $customCfg;
-        } else {
-            $activeCfg = $groqCfg;
-        }
+        $primaryCfg = $primaryProvider ? $providerCfgByName[$primaryProvider] : null;
     ?>
     <div class="provider-banner">
-        <strong><?= htmlspecialchars(llm_active_provider_banner($activeCfg)); ?></strong>
+        <?php if ($primaryProvider !== null && $primaryCfg !== null): ?>
+            <strong>Primary: <?= htmlspecialchars(llm_active_provider_banner($primaryCfg)); ?></strong>
+            <div class="mt-1 small">
+                <?php if (!empty($fallbackProviders)): ?>
+                    Fallback order:
+                    <?php $i = 2; foreach ($fallbackProviders as $fp): ?>
+                        <?= $i; ?>. <?= htmlspecialchars(llm_provider_label($fp)); ?><?= ($fp !== end($fallbackProviders)) ? ',' : ''; ?>
+                    <?php $i++; endforeach; ?>
+                <?php else: ?>
+                    No fallbacks configured.
+                <?php endif; ?>
+            </div>
+        <?php else: ?>
+            <span class="text-danger"><strong>⚠ No provider available — chatbot is disabled.</strong> Enable and fully configure at least one provider below.</span>
+        <?php endif; ?>
     </div>
 
     <form method="post" autocomplete="off" id="ai-config-form">
@@ -295,17 +358,53 @@ require 'header.php';
         <input type="hidden" name="action" value="save">
 
         <div class="api-key-card">
-            <h4>Provider</h4>
-            <select name="llm_provider" id="llm_provider" class="form-control" onchange="onProviderChange()">
-                <option value="groq"   <?= $activeProvider === LLM_PROVIDER_GROQ   ? 'selected' : ''; ?>>Groq</option>
-                <option value="openai" <?= $activeProvider === LLM_PROVIDER_OPENAI ? 'selected' : ''; ?>>OpenAI</option>
-                <option value="custom" <?= $activeProvider === LLM_PROVIDER_CUSTOM ? 'selected' : ''; ?>>Custom</option>
-            </select>
-            <small class="text-muted">Chatbot calls go to whichever provider is selected here. "Custom" lets you point at an institutional gateway (Azure APIM, OpenRouter, DeepSeek, etc.).</small>
+            <h4>Provider Chain</h4>
+            <p class="text-muted small mb-2">
+                The chatbot tries providers in priority order. If one fails on a transient error (HTTP 429, 5xx, network timeout) it falls through to the next enabled provider. Hard errors (400, 401, 403, 404) do <em>not</em> trigger fallback — those are deterministic and a different provider won't fix them. Use the arrows to reorder, and the toggle to skip a provider without losing its configuration.
+            </p>
+            <div id="provider-chain-cards">
+                <?php foreach ($providerChainRaw as $idx => $entry):
+                    $prov = $entry['provider'];
+                    $configured = $providerConfiguredByName[$prov];
+                    $enabled    = (bool)$entry['enabled'];
+                ?>
+                <div class="chain-card" data-provider="<?= htmlspecialchars($prov); ?>">
+                    <div class="chain-card-row">
+                        <div class="chain-priority-label">
+                            <span class="priority-num"><?= (int)$entry['priority']; ?></span>
+                        </div>
+                        <div class="chain-card-name">
+                            <strong><?= htmlspecialchars(llm_provider_label($prov)); ?></strong>
+                            <?php if ($configured): ?>
+                                <span class="badge bg-success ms-2">configured</span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary ms-2">not configured</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="chain-card-controls">
+                            <button type="button" class="btn btn-sm btn-outline-secondary chain-up"    title="Move up"   aria-label="Move up">▲</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary chain-down"  title="Move down" aria-label="Move down">▼</button>
+                            <div class="form-check form-switch d-inline-block ms-2">
+                                <input type="checkbox" class="form-check-input chain-enabled-cb" id="chain_enabled_<?= htmlspecialchars($prov); ?>" name="chain_enabled[<?= htmlspecialchars($prov); ?>]" value="1" <?= $enabled ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="chain_enabled_<?= htmlspecialchars($prov); ?>">Enabled</label>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" name="chain_priority[<?= htmlspecialchars($prov); ?>]" value="<?= (int)$entry['priority']; ?>" class="chain-priority-input">
+                </div>
+                <?php endforeach; ?>
+            </div>
         </div>
 
         <details class="provider-section <?= $activeProvider === LLM_PROVIDER_GROQ ? 'active-provider' : ''; ?>" id="groq-section" <?= $activeProvider === LLM_PROVIDER_GROQ ? 'open' : ''; ?>>
-            <summary>Groq Configuration <?= $activeProvider === LLM_PROVIDER_GROQ ? '<span class="badge bg-success ms-2">active</span>' : ''; ?></summary>
+            <summary>
+                Groq Configuration
+                <?= $activeProvider === LLM_PROVIDER_GROQ ? '<span class="badge bg-success ms-2">primary</span>' : ''; ?>
+                <button type="button" class="btn btn-sm btn-outline-secondary float-end test-provider-btn" data-provider="groq" onclick="event.stopPropagation(); event.preventDefault(); testConnection('groq');">
+                    <i class="fas fa-plug"></i> Test
+                </button>
+                <span class="test-result float-end me-2" data-for="groq"></span>
+            </summary>
             <div class="provider-body">
                 <div class="mb-3">
                     <h5>Groq API Key</h5>
@@ -345,7 +444,14 @@ require 'header.php';
         </details>
 
         <details class="provider-section <?= $activeProvider === LLM_PROVIDER_OPENAI ? 'active-provider' : ''; ?>" id="openai-section" <?= $activeProvider === LLM_PROVIDER_OPENAI ? 'open' : ''; ?>>
-            <summary>OpenAI Configuration <?= $activeProvider === LLM_PROVIDER_OPENAI ? '<span class="badge bg-success ms-2">active</span>' : ''; ?></summary>
+            <summary>
+                OpenAI Configuration
+                <?= $activeProvider === LLM_PROVIDER_OPENAI ? '<span class="badge bg-success ms-2">primary</span>' : ''; ?>
+                <button type="button" class="btn btn-sm btn-outline-secondary float-end test-provider-btn" data-provider="openai" onclick="event.stopPropagation(); event.preventDefault(); testConnection('openai');">
+                    <i class="fas fa-plug"></i> Test
+                </button>
+                <span class="test-result float-end me-2" data-for="openai"></span>
+            </summary>
             <div class="provider-body">
                 <div class="mb-3">
                     <h5>OpenAI API Key</h5>
@@ -390,7 +496,14 @@ require 'header.php';
             $azureModelIsPreset = in_array($customModel, LLM_CUSTOM_AZURE_ANTHROPIC_MODELS, true);
         ?>
         <details class="provider-section <?= $customActive ? 'active-provider' : ''; ?>" id="custom-section" <?= $customActive ? 'open' : ''; ?>>
-            <summary>Custom Provider Configuration <?= $customActive ? '<span class="badge bg-success ms-2">active</span>' : ''; ?></summary>
+            <summary>
+                Custom Provider Configuration
+                <?= $customActive ? '<span class="badge bg-success ms-2">primary</span>' : ''; ?>
+                <button type="button" class="btn btn-sm btn-outline-secondary float-end test-provider-btn" data-provider="custom" onclick="event.stopPropagation(); event.preventDefault(); testConnection('custom');">
+                    <i class="fas fa-plug"></i> Test
+                </button>
+                <span class="test-result float-end me-2" data-for="custom"></span>
+            </summary>
             <div class="provider-body">
                 <div class="mb-3">
                     <label class="form-label" for="custom_preset"><strong>Preset</strong></label>
@@ -549,13 +662,7 @@ require 'header.php';
         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Configuration</button>
     </form>
 
-    <hr>
-    <h4>Connection Test</h4>
-    <p class="text-muted">Calls the active provider's /models endpoint with the stored key. The key is never sent to your browser.</p>
-    <button type="button" class="btn btn-secondary" id="testBtn" onclick="testConnection()">
-        <i class="fas fa-plug"></i> <span id="testBtnLabel">Test <?= htmlspecialchars(llm_provider_label($activeProvider)); ?> Connection</span>
-    </button>
-    <span id="testResult" class="ms-3"></span>
+    <p class="text-muted small">Each provider section above has its own <strong>Test</strong> button. The API key is never sent to your browser.</p>
 
     <?php if ($groqKeyMeta || $openaiKeyMeta || $customKeyMeta): ?>
         <hr>
@@ -585,15 +692,43 @@ require 'header.php';
 </div>
 
 <script>
-function onProviderChange() {
-    var sel = document.getElementById('llm_provider');
-    var provider = sel.value;
-    var label = provider === 'openai' ? 'OpenAI' : (provider === 'custom' ? 'Custom' : 'Groq');
-    document.getElementById('testBtnLabel').textContent = 'Test ' + label + ' Connection';
-    // Auto-expand the matching section.
-    var openTarget = document.getElementById(provider + '-section');
-    if (openTarget) openTarget.open = true;
-}
+// Provider chain: up/down arrows reorder cards visually and rewrite
+// the chain_priority[<provider>] hidden inputs + visible priority badges.
+// Disabling a provider via the checkbox is independent of order — the
+// chain saved to the server respects both: each provider has a numeric
+// priority AND an enabled flag.
+(function () {
+    var container = document.getElementById('provider-chain-cards');
+    if (!container) return;
+    function renumber() {
+        var cards = container.querySelectorAll('.chain-card');
+        cards.forEach(function (card, idx) {
+            var priority = idx + 1;
+            var num   = card.querySelector('.priority-num');
+            var input = card.querySelector('.chain-priority-input');
+            if (num)   num.textContent = priority;
+            if (input) input.value     = String(priority);
+            var upBtn   = card.querySelector('.chain-up');
+            var downBtn = card.querySelector('.chain-down');
+            if (upBtn)   upBtn.disabled   = (idx === 0);
+            if (downBtn) downBtn.disabled = (idx === cards.length - 1);
+        });
+    }
+    container.addEventListener('click', function (e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        var card = btn.closest('.chain-card');
+        if (!card) return;
+        if (btn.classList.contains('chain-up') && card.previousElementSibling) {
+            container.insertBefore(card, card.previousElementSibling);
+            renumber();
+        } else if (btn.classList.contains('chain-down') && card.nextElementSibling) {
+            container.insertBefore(card.nextElementSibling, card);
+            renumber();
+        }
+    });
+    renumber();
+})();
 
 // Show/hide the preset-specific field groups inside the Custom section.
 // All field values stay in the DOM regardless of which group is visible, so
@@ -642,33 +777,33 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-function testConnection() {
-    var btn = document.getElementById('testBtn');
-    var out = document.getElementById('testResult');
-    var provider = document.getElementById('llm_provider').value;
-    btn.disabled = true;
-    out.innerHTML = '<span class="text-muted">Testing...</span>';
+function testConnection(provider) {
+    var btn = document.querySelector('.test-provider-btn[data-provider="' + provider + '"]');
+    var out = document.querySelector('.test-result[data-for="' + provider + '"]');
+    if (!out) return;
+    if (btn) btn.disabled = true;
+    out.innerHTML = '<span class="text-muted small">Testing…</span>';
     fetch('ai_test_connection.php?provider=' + encodeURIComponent(provider), {credentials: 'same-origin'})
         .then(function (r) { return r.json(); })
         .then(function (j) {
-            btn.disabled = false;
+            if (btn) btn.disabled = false;
             if (j.ok) {
-                out.innerHTML = '<span class="ai-status-ok"><i class="fas fa-check-circle"></i> ' +
-                    'Connection OK — ' + j.model_count + ' models available</span>';
+                var count = (j.model_count != null) ? (j.model_count + ' models') : 'reachable';
+                out.innerHTML = '<span class="ai-status-ok small"><i class="fas fa-check-circle"></i> ' + count + '</span>';
             } else {
                 var msg = j.message || 'Unknown error';
                 var d = document.createElement('span');
-                d.className = 'ai-status-bad';
-                d.textContent = '⚠ Connection failed: ' + msg;
+                d.className = 'ai-status-bad small';
+                d.textContent = '⚠ ' + msg;
                 out.innerHTML = '';
                 out.appendChild(d);
             }
         })
         .catch(function (e) {
-            btn.disabled = false;
+            if (btn) btn.disabled = false;
             var d = document.createElement('span');
-            d.className = 'ai-status-bad';
-            d.textContent = '⚠ Connection failed: ' + e;
+            d.className = 'ai-status-bad small';
+            d.textContent = '⚠ ' + e;
             out.innerHTML = '';
             out.appendChild(d);
         });

@@ -315,18 +315,109 @@ available, fast, open models), **OpenAI** (paid, most reliable tool
 calling), and **Custom** — a preset-driven third option that lets admins
 point the chatbot at an institutional gateway (Azure APIM, Azure OpenAI
 direct, OpenRouter, DeepSeek, vLLM, or anything else that speaks an
-OpenAI-compatible or Anthropic Messages shape). Switch between them in
-**Admin → AI Configuration**. All three are dispatched through a single
-function in `includes/llm_provider.php`; the chatbot itself does not know
-which one is active — translation between OpenAI and Anthropic shapes (for
-the Azure Anthropic preset) happens entirely inside `llm_chat_completions()`.
+OpenAI-compatible or Anthropic Messages shape).
+
+Rather than selecting one provider as "active," admins build a **provider
+chain** under **Admin → AI Configuration**: an ordered list of providers,
+each with its own enable / disable toggle. The chatbot tries the chain in
+priority order on every request and falls back to the next provider on
+transient errors. Configure as many or as few as you like — disabled
+providers can still be set up in advance (e.g. preconfigure a fallback
+OpenAI key without enabling it yet).
+
+### Provider chain
+
+The chain is stored in `ai_settings.llm_provider_chain` as a JSON array,
+shape:
+
+```json
+[
+  {"provider": "custom", "enabled": true,  "priority": 1},
+  {"provider": "openai", "enabled": true,  "priority": 2},
+  {"provider": "groq",   "enabled": false, "priority": 3}
+]
+```
+
+The admin UI renders each provider as a card with up/down arrows and an
+Enabled toggle. The order of the cards is the chain's priority order. The
+banner at the top of the page shows the **primary** provider — the
+highest-priority entry that is both enabled and fully configured — plus
+the rest of the fallback order. If nothing qualifies, the banner shows
+"No provider available — chatbot is disabled" in red and saves are
+blocked until at least one provider is enabled+configured.
+
+#### Failover trigger rules
+
+When the chatbot calls `llm_chat_completions_with_fallback()`, it tries
+the primary first. If the upstream returns one of the following, the
+chatbot logs a `Chatbot fallback:` line to the PHP error log and tries
+the next enabled provider in the chain:
+
+| Trigger | Why |
+|---------|-----|
+| HTTP `429` | Rate-limited — another provider may have headroom. |
+| HTTP `500`-`599` | Upstream is down or unhealthy. |
+| curl status=0 (network) | DNS resolution failure, connection refused, or timeout. |
+
+The following errors **do not** trigger failover — they're deterministic
+and retrying with a different provider won't fix them. The first
+attempted provider's error is returned verbatim:
+
+- `400` (bad request — almost always our payload, not the provider)
+- `401` (invalid API key — that provider needs a key fix, not a fallback)
+- `403` (permission denied — same)
+- `404` (endpoint missing — config error)
+
+If every enabled+configured provider returns a failover-worthy error, the
+chatbot returns the **last** provider's error with the full
+`chain_attempted` list so the admin can see what was tried.
+
+#### Reading the served-by indicator
+
+The chat widget's header subtitle ("powered by …") updates after every
+reply to reflect which provider in the chain actually served that reply.
+When the served provider isn't the primary — i.e. one or more providers
+failed and the chatbot fell through to a later entry — the subtitle
+appends a muted-gray `(fallback)` tag so the admin notices. Each turn's
+`ai_usage_log` row records the serving provider, so usage and cost still
+attribute correctly.
+
+#### Migration from legacy single-provider setups
+
+Existing installations that have the old `ai_settings.llm_provider`
+single-string key are auto-migrated on the next admin save: the legacy
+provider lands at **priority 1, enabled**, and the other two providers
+are appended at priority 2 and 3 with **enabled = false**. No action
+required from the admin beyond opening the page once — the values are
+preserved, just reorganized into the new shape.
+
+Until the admin first saves, reads still honor the legacy key
+transparently (the chain is derived in memory), so existing chatbot
+traffic doesn't break during the upgrade.
+
+#### Test Connection per provider
+
+Each provider card carries its own Test button (`ai_test_connection.php?
+provider=groq|openai|custom`). The probes are unchanged from before
+**except** that the Azure Anthropic preset and Azure GPT-5/o1/o3
+deployments now send `max_tokens=50` (or `max_completion_tokens=50`)
+instead of `1`. Claude returns the specific "Could not finish the
+message because max_tokens or model output limit was reached" error
+rather than HTTP 200 when the limit is below ~10 tokens, and reasoning
+models burn reasoning tokens against the same budget that caps output —
+so 1 left no room for any user-visible reply. 50 is plenty of room for
+the model to produce a minimal "ok" reply and stop naturally, and the
+incremental cost per probe is negligible since probes are admin-driven
+and rare. All other probes (Groq /models, OpenAI /models,
+openai_compatible /models or chat fallback, Azure OpenAI non-reasoning
+deployments) continue to use 1.
 
 Admins manage chatbot settings under **Admin → AI Configuration**
 (`manage_ai_config.php`). Values are stored in the `ai_settings` table:
 
-| `setting_key`     | Meaning |
-|-------------------|---------|
-| `llm_provider`    | `"groq"` (default), `"openai"`, or `"custom"` — which provider the chatbot uses. |
+| `setting_key`           | Meaning |
+|-------------------------|---------|
+| `llm_provider_chain`    | JSON array of `{provider, enabled, priority}` entries (see above). Replaces the legacy `llm_provider` single-string key. |
 | `groq_api_key`    | Groq Cloud API key (encrypted). |
 | `groq_model`      | One of `llama-3.3-70b-versatile` (default), `llama-3.1-8b-instant`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`. |
 | `openai_api_key`  | OpenAI API key (encrypted). |
@@ -345,9 +436,11 @@ Admins manage chatbot settings under **Admin → AI Configuration**
 | `ai_rate_limit_messages_per_day`    | Per-user daily cap, resets at midnight UTC. Default `200`, min `10`, max `5000`. |
 
 All three providers can be configured side by side — the admin can prepare
-OpenAI and Custom credentials in advance and switch over later. Switching
-to a provider whose key is empty (or, for Custom, whose preset has missing
-required fields) is rejected with an inline error.
+OpenAI and Custom credentials in advance and enable them whenever ready.
+Each provider's completeness is checked independently: Groq being
+unconfigured does **not** block enabling OpenAI. The only save-time rule is
+that **at least one** provider must be both enabled and fully configured;
+the page surfaces the error inline and refuses the save otherwise.
 
 ### Custom LLM Provider
 
@@ -438,31 +531,38 @@ The "Test Connection" button works for Custom too. Each preset uses a
 different probe so that the test succeeds even on gateways that don't
 expose `/models`:
 
-- **azure_openai** — minimal POST to the same chat completions URL with
-  `max_tokens: 1` and a one-word user message.
+- **azure_openai** (gpt-4o-mini etc.) — minimal POST to the same chat
+  completions URL with `max_tokens: 1` and a one-word user message.
+- **azure_openai** (gpt-5 / o1 / o3 reasoning models) — same shape but
+  `max_completion_tokens: 50` instead of 1, because these deployments
+  bill reasoning tokens against the same budget that caps user-visible
+  output, so 1 leaves no room for any reply.
 - **azure_anthropic** — minimal POST to `/anthropic/v1/messages` with
-  `max_tokens: 1` and a one-word user message. Success = HTTP 200 with a
-  content array.
+  `max_tokens: 50` (NOT 1 — Claude returns a "Could not finish the
+  message because max_tokens or model output limit was reached" error at
+  1 rather than HTTP 200) and a `"Reply with 'ok'."` user message.
+  Success = HTTP 200 with a content array.
 - **openai_compatible** — GET `{base_url}/models` first; if the endpoint
-  returns 404 or isn't supported, fall back to the minimal chat completions
-  probe.
+  returns 404 or isn't supported, fall back to the minimal chat
+  completions probe at `max_tokens: 1` (or `max_completion_tokens: 50`
+  if the admin overrode the token field for a reasoning model).
 
 Errors from the upstream provider are surfaced verbatim. The API key is
 never echoed back to the browser, the HTML, or any log line.
 
-#### Validation when switching to Custom
+#### Validation when enabling Custom
 
-Saving with `provider = custom` requires:
+A Custom-provider entry counts as "fully configured" — and therefore
+eligible to be enabled in the chain — when its selected preset has all
+required fields populated AND a Custom API key is set. The save handler
+applies that check per-provider: if Custom is incomplete, just don't
+enable it in the chain; the rest of the configuration saves fine.
 
-- a preset selected,
-- all of the selected preset's required fields populated,
-- a Custom API key configured.
-
-Any missing field blocks the Save with an inline error like
-`Cannot switch to Custom — Resource URL, API key is required. Configure
-the custom provider first, then switch.` Per-field values from other
-presets remain stored, so switching presets back and forth never loses
-configuration.
+This replaces the previous "Cannot switch to Custom — Resource URL, API
+key is required" hard block, which over-validated by tying the save of
+unrelated providers (Groq, OpenAI) to Custom's completeness. Per-field
+values from other presets remain stored across saves, so the admin can
+switch Custom's preset back and forth without losing configuration.
 
 #### Adding a fourth preset later
 

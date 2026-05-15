@@ -127,7 +127,7 @@ if (!$isDecisionTurn) {
 
 try {
     $chatbotEnabled = ai_settings_get('chatbot_enabled') === '1';
-    $llmConfig      = llm_get_active_config();
+    $providerChain  = llm_get_provider_chain();
     $systemPrompt   = ai_settings_get('system_prompt') ?: "You are MyVivarium's AI assistant.";
     // Compact override: aggressively short system prompt to fit the LLM
     // token cap. Admin-set system_prompt is still honored but kept compact.
@@ -141,13 +141,13 @@ try {
     echo json_encode(['ok' => false, 'error' => 'chatbot_unavailable']);
     exit;
 }
-if (!$chatbotEnabled || $llmConfig['api_key'] === '') {
+if (!$chatbotEnabled || empty($providerChain)) {
     http_response_code(503);
     echo json_encode(['ok' => false, 'error' => 'chatbot_disabled']);
     exit;
 }
-$activeProvider = $llmConfig['provider'];
-$activeModel    = $llmConfig['model'];
+$activeProvider = $providerChain[0]['provider'];
+$activeModel    = (string)($providerChain[0]['config']['model'] ?? '');
 
 // -----------------------------------------------------------------------------
 // Session API key (mint if needed)
@@ -613,14 +613,16 @@ if ($cancel_pending_op !== '') {
     $tools = [];
     $messages = chatbot_fit_to_budget($messages, $tools);
     $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
-    $llm = llm_chat_completions($messages, $tools);
+    $llm = llm_chat_completions_with_fallback($messages, $tools);
     if ($llm['ok']) {
         $reply = $llm['body']['choices'][0]['message']['content'] ?? 'Cancelled.';
         if (!is_string($reply) || $reply === '') $reply = 'Cancelled.';
         if (isset($llm['body']['usage'])) {
             $u = $llm['body']['usage'];
-            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$llm['provider']}, model={$llm['model']}, est=$estPrompt");
-            chatbot_usage_log($con, $user_id, $conversation_id, $llm['model'], $u, $estPrompt, $llm['provider']);
+            $servedBy = (string)($llm['served_by_provider'] ?? $llm['provider']);
+            $servedModel = (string)($llm['served_by_model'] ?? $llm['model']);
+            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$servedBy}, model={$servedModel}, est=$estPrompt");
+            chatbot_usage_log($con, $user_id, $conversation_id, $servedModel, $u, $estPrompt, $servedBy);
         }
     } else {
         $reply = 'Cancelled.';
@@ -638,6 +640,9 @@ if ($cancel_pending_op !== '') {
         'tool_calls' => [],
         'pending_confirmation' => null,
         'suggestions' => [],
+        'served_by_provider' => (string)($llm['served_by_provider'] ?? ''),
+        'served_by_model'    => (string)($llm['served_by_model']    ?? ''),
+        'fell_back_from'     => $llm['fell_back_from'] ?? [],
     ], JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -689,6 +694,12 @@ $toolCallsForResponse = [];
 $pendingConfirmation = null;
 $finalReply = '';
 $finalSuggestions = [];
+// Track which provider in the chain actually served the final reply, plus
+// any providers attempted-and-skipped before that. Set on the last
+// successful llm_chat_completions_with_fallback() call of the turn.
+$lastServedBy   = '';
+$lastServedModel = '';
+$lastFellBackFrom = [];
 // When the LLM yields a normal "no more tools" final message, we defer its
 // persistence to the end of the script so we can strip the SUGGESTIONS::
 // marker and store the parsed suggestions in the same row.
@@ -764,10 +775,11 @@ try {
         }
         $messages = chatbot_fit_to_budget($messages, $toolsForTurn);
         $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($toolsForTurn);
-        $llm = llm_chat_completions($messages, $toolsForTurn);
+        $llm = llm_chat_completions_with_fallback($messages, $toolsForTurn);
 
         if (!$llm['ok']) {
-            error_log('chatbot llm error provider=' . $llm['provider'] . ' status=' . $llm['status'] . ' err=' . ($llm['error'] ?? '') . ' raw=' . ($llm['raw'] ?? ''));
+            $attempted = is_array($llm['chain_attempted'] ?? null) ? implode(',', $llm['chain_attempted']) : '';
+            error_log('chatbot llm error attempted=[' . $attempted . '] status=' . $llm['status'] . ' err=' . ($llm['error'] ?? '') . ' raw=' . ($llm['raw'] ?? ''));
             if ($llm['status'] === 429) {
                 $finalReply = 'I am getting too many requests right now, try again in a minute.';
             } else {
@@ -777,10 +789,16 @@ try {
             break;
         }
 
+        // Track served-by for the response envelope (last successful turn wins).
+        $lastServedBy     = (string)($llm['served_by_provider'] ?? $llm['provider']);
+        $lastServedModel  = (string)($llm['served_by_model']    ?? $llm['model']);
+        $lastFellBackFrom = is_array($llm['fell_back_from'] ?? null) ? $llm['fell_back_from'] : [];
+
         if (isset($llm['body']['usage'])) {
             $u = $llm['body']['usage'];
-            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$llm['provider']}, model={$llm['model']}, est=$estPrompt");
-            chatbot_usage_log($con, $user_id, $conversation_id, $llm['model'], $u, $estPrompt, $llm['provider']);
+            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$lastServedBy}, model={$lastServedModel}, est=$estPrompt"
+                . (!empty($lastFellBackFrom) ? ', fell_back_from=[' . implode(',', $lastFellBackFrom) . ']' : ''));
+            chatbot_usage_log($con, $user_id, $conversation_id, $lastServedModel, $u, $estPrompt, $lastServedBy);
         }
 
         $choice = $llm['body']['choices'][0]['message'] ?? null;
@@ -960,4 +978,7 @@ echo json_encode([
     'tool_calls'          => $toolCallsForResponse,
     'pending_confirmation'=> $pendingConfirmation,
     'suggestions'         => $finalSuggestions,
+    'served_by_provider'  => $lastServedBy,
+    'served_by_model'     => $lastServedModel,
+    'fell_back_from'      => array_values($lastFellBackFrom),
 ], JSON_UNESCAPED_SLASHES);
