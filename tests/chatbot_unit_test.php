@@ -203,5 +203,146 @@ check('FOLLOW-UP SUGGESTIONS marker example verbatim',
 check('FOLLOW-UP SUGGESTIONS empty marker documented',
     strpos($sug, 'SUGGESTIONS::[]') !== false);
 
+// ---------------------------------------------------------------------------
+// Provider-independence: ai_chat.php reads $llm['body']['choices'][0]['message']
+// regardless of which provider is configured. The translation adapter is
+// supposed to make a Custom-Anthropic provider indistinguishable from
+// Groq/OpenAI as far as the chatbot's view is concerned. Verify that
+// here by stubbing the HTTP hook and confirming each provider returns the
+// same OpenAI-shape `choices[0].message` for an equivalent semantic
+// response.
+// ---------------------------------------------------------------------------
+
+// Lazy-load llm_provider.php with an in-memory ai_settings_get() stub.
+if (!class_exists('AiSettingsException')) {
+    class AiSettingsException extends RuntimeException {}
+}
+$GLOBALS['__cb_llm_store'] = [];
+if (!function_exists('ai_settings_get')) {
+    function ai_settings_get(string $key): ?string
+    {
+        $s = $GLOBALS['__cb_llm_store'] ?? [];
+        return array_key_exists($key, $s) ? $s[$key] : null;
+    }
+}
+require_once __DIR__ . '/../includes/llm_provider.php';
+
+$messages = [
+    ['role' => 'system', 'content' => 'You are MyVivarium.'],
+    ['role' => 'user',   'content' => 'list cages'],
+];
+
+// Groq: stub returns the canonical OpenAI-shape response.
+$GLOBALS['__cb_llm_store'] = [
+    'llm_provider' => 'groq',
+    'groq_api_key' => 'gsk_x',
+    'groq_model'   => 'llama-3.3-70b-versatile',
+];
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function () {
+    return [200, json_encode([
+        'id'      => 'chatcmpl-1',
+        'choices' => [['message' => ['role' => 'assistant', 'content' => 'I will list cages.']]],
+        'usage'   => ['prompt_tokens' => 10, 'completion_tokens' => 5],
+    ]), ''];
+};
+$groqRes = llm_chat_completions($messages, []);
+
+// Custom Anthropic via APIM: stub returns an Anthropic-shape response with
+// the same semantic content. The translation layer must rewrite it to be
+// indistinguishable from the Groq response above.
+$GLOBALS['__cb_llm_store'] = [
+    'llm_provider'    => 'custom',
+    'custom_preset'   => 'azure_anthropic',
+    'custom_base_url' => 'https://apim.example.com',
+    'custom_model'    => 'claude-haiku-4-5',
+    'custom_api_key'  => 'anth-x',
+];
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function () {
+    return [200, json_encode([
+        'id'      => 'msg_1',
+        'model'   => 'claude-haiku-4-5',
+        'content' => [['type' => 'text', 'text' => 'I will list cages.']],
+        'stop_reason' => 'end_turn',
+        'usage'   => ['input_tokens' => 10, 'output_tokens' => 5],
+    ]), ''];
+};
+$customRes = llm_chat_completions($messages, []);
+
+check('provider-independence: both return ok=true',
+    $groqRes['ok'] === true && $customRes['ok'] === true);
+check('provider-independence: both have a single choice with assistant message',
+    isset($groqRes['body']['choices'][0]['message'])
+    && isset($customRes['body']['choices'][0]['message'])
+    && $groqRes['body']['choices'][0]['message']['role']   === 'assistant'
+    && $customRes['body']['choices'][0]['message']['role'] === 'assistant');
+check('provider-independence: identical content surfaces to chatbot',
+    $groqRes['body']['choices'][0]['message']['content']
+    === $customRes['body']['choices'][0]['message']['content']);
+check('provider-independence: usage shape matches (prompt/completion_tokens)',
+    isset($groqRes['body']['usage']['prompt_tokens'])
+    && isset($customRes['body']['usage']['prompt_tokens'])
+    && $groqRes['body']['usage']['prompt_tokens']     === $customRes['body']['usage']['prompt_tokens']
+    && $groqRes['body']['usage']['completion_tokens'] === $customRes['body']['usage']['completion_tokens']);
+
+// Verify the chatbot's actual usage pattern works on both responses. ai_chat.php
+// reads $llm['body']['choices'][0]['message'] with optional ['tool_calls'].
+foreach (['groq' => $groqRes, 'custom_anthropic' => $customRes] as $label => $r) {
+    $choice = $r['body']['choices'][0]['message'] ?? null;
+    $hasContent = is_array($choice) && is_string($choice['content'] ?? null);
+    check("provider-independence ($label): ai_chat.php access pattern returns a string content", $hasContent);
+    // tool_calls may be absent for a non-tool response — both providers
+    // must omit it identically when there is none.
+    $tc = $choice['tool_calls'] ?? null;
+    check("provider-independence ($label): no tool_calls present when none invoked", $tc === null);
+}
+
+// Tool-use round trip: both providers should yield a tool_calls array of
+// equivalent shape that ai_chat.php can iterate over.
+$GLOBALS['__cb_llm_store'] = [
+    'llm_provider' => 'groq',
+    'groq_api_key' => 'gsk_x',
+    'groq_model'   => 'llama-3.3-70b-versatile',
+];
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function () {
+    return [200, json_encode([
+        'choices' => [['message' => [
+            'role' => 'assistant',
+            'content' => '',
+            'tool_calls' => [[
+                'id' => 'call_1', 'type' => 'function',
+                'function' => ['name' => 'listHoldingCages', 'arguments' => '{"limit":3}'],
+            ]],
+        ]]],
+        'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1],
+    ]), ''];
+};
+$gTool = llm_chat_completions($messages, []);
+
+$GLOBALS['__cb_llm_store'] = [
+    'llm_provider'    => 'custom',
+    'custom_preset'   => 'azure_anthropic',
+    'custom_base_url' => 'https://apim.example.com',
+    'custom_model'    => 'claude-haiku-4-5',
+    'custom_api_key'  => 'k',
+];
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function () {
+    return [200, json_encode([
+        'content' => [['type' => 'tool_use', 'id' => 'tu_1', 'name' => 'listHoldingCages', 'input' => ['limit' => 3]]],
+        'stop_reason' => 'tool_use',
+        'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+    ]), ''];
+};
+$cTool = llm_chat_completions($messages, []);
+
+check('provider-independence: tool call name identical across providers',
+    $gTool['body']['choices'][0]['message']['tool_calls'][0]['function']['name']
+    === $cTool['body']['choices'][0]['message']['tool_calls'][0]['function']['name']);
+$gArgs = json_decode($gTool['body']['choices'][0]['message']['tool_calls'][0]['function']['arguments'], true);
+$cArgs = json_decode($cTool['body']['choices'][0]['message']['tool_calls'][0]['function']['arguments'], true);
+check('provider-independence: tool call arguments identical across providers',
+    $gArgs === $cArgs);
+
+unset($GLOBALS['LLM_HTTP_POST_HOOK']);
+
 echo "\n$pass passed, $fail failed\n";
 exit($fail === 0 ? 0 : 1);

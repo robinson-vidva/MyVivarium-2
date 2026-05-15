@@ -310,31 +310,179 @@ header. The counter is stored per key in `rate_limit`.
 
 ## AI Configuration
 
-MyVivarium supports two LLM providers: **Groq** (free tier available, fast,
-open models) and **OpenAI** (paid, most reliable tool calling). Switch in
-**Admin → AI Configuration**. Both providers speak the same OpenAI-style
-`/v1/chat/completions` shape and are dispatched through a single function
-in `includes/llm_provider.php`; the chatbot itself does not know which one
-is active.
+MyVivarium supports three LLM provider options: **Groq** (free tier
+available, fast, open models), **OpenAI** (paid, most reliable tool
+calling), and **Custom** — a preset-driven third option that lets admins
+point the chatbot at an institutional gateway (Azure APIM, Azure OpenAI
+direct, OpenRouter, DeepSeek, vLLM, or anything else that speaks an
+OpenAI-compatible or Anthropic Messages shape). Switch between them in
+**Admin → AI Configuration**. All three are dispatched through a single
+function in `includes/llm_provider.php`; the chatbot itself does not know
+which one is active — translation between OpenAI and Anthropic shapes (for
+the Azure Anthropic preset) happens entirely inside `llm_chat_completions()`.
 
 Admins manage chatbot settings under **Admin → AI Configuration**
 (`manage_ai_config.php`). Values are stored in the `ai_settings` table:
 
 | `setting_key`     | Meaning |
 |-------------------|---------|
-| `llm_provider`    | `"groq"` (default) or `"openai"` — which provider the chatbot uses. |
+| `llm_provider`    | `"groq"` (default), `"openai"`, or `"custom"` — which provider the chatbot uses. |
 | `groq_api_key`    | Groq Cloud API key (encrypted). |
 | `groq_model`      | One of `llama-3.3-70b-versatile` (default), `llama-3.1-8b-instant`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`. |
 | `openai_api_key`  | OpenAI API key (encrypted). |
 | `openai_model`    | One of `gpt-5.4-mini` (default), `gpt-5.4-nano`, `gpt-5.4`, `gpt-4.1-nano`, `gpt-4.1-mini`. |
+| `custom_preset`        | One of `"azure_openai"`, `"azure_anthropic"`, `"openai_compatible"`. Selects which preset to use under the Custom provider. |
+| `custom_api_key`       | API key for the configured custom provider (encrypted). |
+| `custom_resource_url`  | (azure_openai) Azure OpenAI resource endpoint or APIM gateway URL, e.g. `https://my-resource.openai.azure.com`. |
+| `custom_deployment`    | (azure_openai) The Azure deployment name, e.g. `gpt-4o-mini`. |
+| `custom_api_version`   | (azure_openai) Azure API version string. Defaults to `2024-10-21`. |
+| `custom_base_url`      | (azure_anthropic / openai_compatible) Provider base URL. Chat completions URL is appended internally. |
+| `custom_model`         | (azure_anthropic / openai_compatible) Exact model id the provider expects. |
+| `custom_token_field`   | (openai_compatible) `"max_tokens"` (default) or `"max_completion_tokens"` for newer reasoning models. |
 | `system_prompt`   | System prompt prepended to every chatbot turn. A hardcoded security block, a hardcoded response-formatting block, and a hardcoded follow-up-suggestion block are also prepended, ahead of this value, and cannot be edited away by admins. See [`docs/chatbot.md`](../docs/chatbot.md) for formatting + suggestion details. |
 | `chatbot_enabled` | `"1"` or `"0"`. |
 | `ai_rate_limit_messages_per_minute` | Per-user message cap, fixed 60-second window. Default `10`, min `1`, max `60`. Counts user-typed messages only — tool calls and LLM round-trips do not count. |
 | `ai_rate_limit_messages_per_day`    | Per-user daily cap, resets at midnight UTC. Default `200`, min `10`, max `5000`. |
 
-Both providers can be configured side by side — the admin can prepare an
-OpenAI key in advance and switch over later. Switching to a provider whose
-key is empty is rejected with an inline error.
+All three providers can be configured side by side — the admin can prepare
+OpenAI and Custom credentials in advance and switch over later. Switching
+to a provider whose key is empty (or, for Custom, whose preset has missing
+required fields) is rejected with an inline error.
+
+### Custom LLM Provider
+
+The Custom option exists so that admins can wire MyVivarium up to whatever
+their institution provisions — Azure OpenAI behind APIM, an Anthropic
+deployment routed through APIM, a self-hosted vLLM, OpenRouter, DeepSeek,
+Cerebras, Together, or anything else that speaks an OpenAI-compatible or
+Anthropic Messages API. The admin UI is preset-driven: pick the preset
+and the form asks for the few fields that preset needs and nothing else.
+
+Three presets ship today:
+
+**Azure OpenAI (GPT models)** — `custom_preset = "azure_openai"`. For
+Azure OpenAI service or an Azure APIM gateway routing to a GPT-family
+deployment.
+
+Required fields: Resource URL, Deployment name, API version (default
+`2024-10-21`), API key.
+
+Internal behavior: the request URL is built as
+`{resource_url}/openai/deployments/{deployment}/chat/completions?api-version={version}`.
+The auth header is `api-key:` with NO `Bearer ` prefix. The model name is
+NOT included in the request body (the deployment URL identifies the
+model). The token field is `max_tokens` for most deployments, or
+`max_completion_tokens` when the deployment name starts with `gpt-5`,
+`o1`, or `o3` (newer reasoning models reject the legacy field).
+
+**Azure Anthropic / Claude via APIM** — `custom_preset = "azure_anthropic"`.
+For Anthropic Messages format routed through Azure APIM or a similar gateway.
+
+Required fields: Base URL, Model (a dropdown of `claude-opus-4-5`,
+`claude-sonnet-4-6`, `claude-haiku-4-5`, plus a Custom… escape hatch),
+API key.
+
+Internal behavior: the request URL is built as
+`{base_url}/anthropic/v1/messages`. The auth header is `x-api-key:` with no
+prefix, plus an `anthropic-version: 2023-06-01` extra header. The request
+body is in Anthropic Messages format — the `system` prompt is hoisted to a
+top-level field, the messages array uses `{type:'text'}` / `{type:'tool_use'}`
+content blocks, and tool definitions become a top-level `tools` array with
+`input_schema`. The Anthropic response is translated BACK to OpenAI shape
+inside `llm_chat_completions()`, so `ai_chat.php` sees the same
+`choices[0].message` shape it always sees. Token field is `max_tokens`,
+which Anthropic requires (default of 1024 when not otherwise set).
+
+**OpenAI-compatible (generic)** — `custom_preset = "openai_compatible"`.
+For any provider whose API matches OpenAI chat completions: OpenRouter,
+DeepSeek, Cerebras, Together, vLLM, LM Studio, custom proxies, etc.
+
+Required fields: Base URL, Model, API key. Optional: token field override
+(`max_tokens` vs `max_completion_tokens`).
+
+Internal behavior: the request URL is built as `{base_url}/chat/completions`,
+the auth header is `Authorization: Bearer <key>`, the body is standard
+OpenAI chat completions with the model name in the body.
+
+#### Example configuration
+
+A representative Azure OpenAI deployment pattern (generic — substitute
+your own values, do not paste real credentials into the README):
+
+```
+Provider           = Custom
+Preset             = Azure OpenAI (GPT models)
+Resource URL       = https://apim-my-org.azure-api.net
+Deployment name    = gpt-4o-mini
+API version        = 2024-10-21
+API key            = <subscription key issued by APIM>
+```
+
+When saved, the chatbot will POST to
+`https://apim-my-org.azure-api.net/openai/deployments/gpt-4o-mini/chat/completions?api-version=2024-10-21`
+with `api-key: <key>` and the standard OpenAI message/tool body.
+
+#### Test Connection per preset
+
+The "Test Connection" button works for Custom too. Each preset uses a
+different probe so that the test succeeds even on gateways that don't
+expose `/models`:
+
+- **azure_openai** — minimal POST to the same chat completions URL with
+  `max_tokens: 1` and a one-word user message.
+- **azure_anthropic** — minimal POST to `/anthropic/v1/messages` with
+  `max_tokens: 1` and a one-word user message. Success = HTTP 200 with a
+  content array.
+- **openai_compatible** — GET `{base_url}/models` first; if the endpoint
+  returns 404 or isn't supported, fall back to the minimal chat completions
+  probe.
+
+Errors from the upstream provider are surfaced verbatim. The API key is
+never echoed back to the browser, the HTML, or any log line.
+
+#### Validation when switching to Custom
+
+Saving with `provider = custom` requires:
+
+- a preset selected,
+- all of the selected preset's required fields populated,
+- a Custom API key configured.
+
+Any missing field blocks the Save with an inline error like
+`Cannot switch to Custom — Resource URL, API key is required. Configure
+the custom provider first, then switch.` Per-field values from other
+presets remain stored, so switching presets back and forth never loses
+configuration.
+
+#### Adding a fourth preset later
+
+The preset system is intentionally narrow — add a new preset by:
+
+1. Adding a new constant + entry to the preset switch in
+   `llm_get_custom_config()` in `includes/llm_provider.php`. Build the
+   `request_url`, `auth_header`, `auth_prefix`, `body_format`, and
+   `token_field` for the new provider. If the body shape isn't OpenAI or
+   Anthropic, add a translation pair (input → provider, response → OpenAI).
+2. Adding the corresponding `custom-preset-group` block to
+   `manage_ai_config.php` with the fields the preset needs.
+3. Adding a unit test in `tests/llm_provider_custom_test.php`.
+
+Test connection and chatbot dispatch will pick up the new preset
+automatically as long as `llm_get_custom_config()` returns the same shape
+as the existing presets.
+
+#### Note on rate limits
+
+Custom providers often have lower rate limits than the big commercial
+providers — Azure APIM gateways in particular are commonly capped to a few
+hundred or a few thousand tokens per minute. For example, the **FlyerGPT
+gateway at FlyerLab** runs on a 1000 TPM (tokens-per-minute) quota.
+MyVivarium's existing per-user message rate limit and conversation
+trimming in `ai_chat.php` work identically regardless of provider, but
+admins running against a low-budget gateway should expect "rate limit
+exceeded" errors more often than they would on Groq or OpenAI directly.
+No code change is needed to support such gateways — the constraint is
+documented here purely so deployers know what to expect.
 
 ### Encryption model
 
@@ -366,13 +514,12 @@ been provisioned.
 ### Test Connection
 
 The admin page exposes a "Test Connection" button that calls
-`ai_test_connection.php?provider=<groq|openai>` (admin-only, returns JSON).
-The endpoint hits the active provider's `/v1/models` endpoint
-(`api.groq.com/openai/v1/models` or `api.openai.com/v1/models`) with a
-10-second cURL timeout using the decrypted key as `Authorization: Bearer …`.
-The API key value is **never echoed back** to the browser, the rendered
-HTML, or any log
-line.
+`ai_test_connection.php?provider=<groq|openai|custom>` (admin-only,
+returns JSON). For Groq and OpenAI it hits the provider's `/v1/models`
+endpoint with the stored Bearer key. For Custom it dispatches based on the
+configured preset — see [Custom LLM Provider → Test Connection per preset]
+(#test-connection-per-preset). The API key value is **never echoed back**
+to the browser, the rendered HTML, or any log line.
 
 ### Activity logging
 
