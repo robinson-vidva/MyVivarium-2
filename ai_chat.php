@@ -179,23 +179,44 @@ function chatbot_conversation_create(mysqli $con, int $user_id): string
     return $id;
 }
 
-function chatbot_message_persist(mysqli $con, string $cid, string $role, ?string $content, ?array $tool_call = null, ?array $tool_result = null, ?string $pending_op_id = null, ?array $suggestions = null): int
+function chatbot_message_persist(mysqli $con, string $cid, string $role, ?string $content, ?array $tool_call = null, ?array $tool_result = null, ?string $pending_op_id = null, ?array $suggestions = null, ?array $tokens = null): int
 {
     $callJson        = $tool_call   ? json_encode($tool_call,   JSON_UNESCAPED_SLASHES) : null;
     $resultJson      = $tool_result ? json_encode($tool_result, JSON_UNESCAPED_SLASHES) : null;
     $suggestionsJson = is_array($suggestions) ? json_encode(array_values($suggestions), JSON_UNESCAPED_SLASHES) : null;
+    // tokens_json holds the summed-per-turn {prompt, completion, total} that
+    // the chat widget renders below this assistant bubble. Only persisted
+    // when caller passes a non-empty totals object; older messages (and
+    // non-assistant rows) get NULL so the widget gracefully skips them.
+    $tokensJson      = null;
+    if (is_array($tokens) && (int)($tokens['total'] ?? 0) > 0) {
+        $tokensJson = json_encode([
+            'prompt'     => (int)($tokens['prompt']     ?? 0),
+            'completion' => (int)($tokens['completion'] ?? 0),
+            'total'      => (int)($tokens['total']      ?? 0),
+        ], JSON_UNESCAPED_SLASHES);
+    }
 
-    // suggestions_json was added in a later migration; if the column is
-    // absent (older DB), fall back to the legacy 6-column INSERT so the
+    // suggestions_json and tokens_json were added in later migrations; if
+    // a column is absent (older DB), fall back to the smaller INSERT so the
     // chatbot keeps working until the operator runs database/api_setup.php.
     static $hasSuggCol = null;
+    static $hasTokCol  = null;
     if ($hasSuggCol === null) {
         $r = @$con->query("SHOW COLUMNS FROM ai_messages LIKE 'suggestions_json'");
         $hasSuggCol = ($r && $r->num_rows > 0);
         if ($r) $r->close();
     }
+    if ($hasTokCol === null) {
+        $r = @$con->query("SHOW COLUMNS FROM ai_messages LIKE 'tokens_json'");
+        $hasTokCol = ($r && $r->num_rows > 0);
+        if ($r) $r->close();
+    }
 
-    if ($hasSuggCol) {
+    if ($hasSuggCol && $hasTokCol) {
+        $stmt = $con->prepare("INSERT INTO ai_messages (conversation_id, role, content, tool_call_json, tool_result_json, pending_op_id, suggestions_json, tokens_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param('ssssssss', $cid, $role, $content, $callJson, $resultJson, $pending_op_id, $suggestionsJson, $tokensJson);
+    } elseif ($hasSuggCol) {
         $stmt = $con->prepare("INSERT INTO ai_messages (conversation_id, role, content, tool_call_json, tool_result_json, pending_op_id, suggestions_json) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->bind_param('sssssss', $cid, $role, $content, $callJson, $resultJson, $pending_op_id, $suggestionsJson);
     } else {
@@ -614,6 +635,10 @@ if ($cancel_pending_op !== '') {
     $messages = chatbot_fit_to_budget($messages, $tools);
     $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
     $llm = llm_chat_completions_with_fallback($messages, $tools);
+    // Cancellation reply is a single LLM round-trip, so the turn total IS
+    // the round-trip total (still keep the same {prompt,completion,total}
+    // shape so the front-end branch is identical to the main loop).
+    $cancelTokens = ['prompt' => 0, 'completion' => 0, 'total' => 0];
     if ($llm['ok']) {
         $reply = $llm['body']['choices'][0]['message']['content'] ?? 'Cancelled.';
         if (!is_string($reply) || $reply === '') $reply = 'Cancelled.';
@@ -621,7 +646,10 @@ if ($cancel_pending_op !== '') {
             $u = $llm['body']['usage'];
             $servedBy = (string)($llm['served_by_provider'] ?? $llm['provider']);
             $servedModel = (string)($llm['served_by_model'] ?? $llm['model']);
-            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$servedBy}, model={$servedModel}, est=$estPrompt");
+            $cancelTokens['prompt']     = (int)($u['prompt_tokens']     ?? 0);
+            $cancelTokens['completion'] = (int)($u['completion_tokens'] ?? 0);
+            $cancelTokens['total']      = $cancelTokens['prompt'] + $cancelTokens['completion'];
+            error_log("Chatbot call: prompt=" . $cancelTokens['prompt'] . ", completion=" . $cancelTokens['completion'] . ", provider={$servedBy}, model={$servedModel}, est=$estPrompt");
             chatbot_usage_log($con, $user_id, $conversation_id, $servedModel, $u, $estPrompt, $servedBy);
         }
     } else {
@@ -631,7 +659,7 @@ if ($cancel_pending_op !== '') {
     // conversation is in a transitional state.
     $parsed = chatbot_parse_suggestions($reply);
     $reply  = $parsed['content'] !== '' ? $parsed['content'] : 'Cancelled.';
-    chatbot_message_persist($con, $conversation_id, 'assistant', $reply, null, null, null, []);
+    chatbot_message_persist($con, $conversation_id, 'assistant', $reply, null, null, null, [], $cancelTokens);
     log_activity($con, 'ai_chat_message', 'ai_conversation', $conversation_id, 'cancel');
     echo json_encode([
         'ok' => true,
@@ -643,6 +671,8 @@ if ($cancel_pending_op !== '') {
         'served_by_provider' => (string)($llm['served_by_provider'] ?? ''),
         'served_by_model'    => (string)($llm['served_by_model']    ?? ''),
         'fell_back_from'     => $llm['fell_back_from'] ?? [],
+        // {prompt, completion, total} for the single round-trip this turn used.
+        'tokens'             => $cancelTokens,
     ], JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -694,6 +724,15 @@ $toolCallsForResponse = [];
 $pendingConfirmation = null;
 $finalReply = '';
 $finalSuggestions = [];
+// Per-turn token totals. A single user message can fan out into multiple
+// LLM round-trips (initial reply + tool-result follow-up + possibly more,
+// up to $MAX_ITERATIONS). The chat widget displays ONE token line per
+// user message, so we sum prompt + completion across every round-trip in
+// this turn here, then surface the total in the JSON response and persist
+// it on the final assistant message row. Each addend comes from the same
+// usage object that ai_usage_log records, so the displayed numbers match
+// the logged numbers exactly.
+$turnTokens = ['prompt' => 0, 'completion' => 0, 'total' => 0];
 // Track which provider in the chain actually served the final reply, plus
 // any providers attempted-and-skipped before that. Set on the last
 // successful llm_chat_completions_with_fallback() call of the turn.
@@ -799,6 +838,12 @@ try {
             error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$lastServedBy}, model={$lastServedModel}, est=$estPrompt"
                 . (!empty($lastFellBackFrom) ? ', fell_back_from=[' . implode(',', $lastFellBackFrom) . ']' : ''));
             chatbot_usage_log($con, $user_id, $conversation_id, $lastServedModel, $u, $estPrompt, $lastServedBy);
+            // Sum tokens across every LLM round-trip in this user-message
+            // turn. The widget shows one line per user message, not per
+            // internal round-trip; these are the addends being summed.
+            $turnTokens['prompt']     += (int)($u['prompt_tokens']     ?? 0);
+            $turnTokens['completion'] += (int)($u['completion_tokens'] ?? 0);
+            $turnTokens['total']       = $turnTokens['prompt'] + $turnTokens['completion'];
         }
 
         $choice = $llm['body']['choices'][0]['message'] ?? null;
@@ -963,7 +1008,7 @@ if ($finalReplyDeferred && $pendingConfirmation === null) {
     if (empty($finalSuggestions)) {
         $finalSuggestions = chatbot_fallback_suggestions($toolCallsForResponse, $finalReply);
     }
-    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply, null, null, null, $finalSuggestions);
+    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply, null, null, null, $finalSuggestions, $turnTokens);
 }
 
 // Auto-title once we have a few turns under our belt.
@@ -981,4 +1026,8 @@ echo json_encode([
     'served_by_provider'  => $lastServedBy,
     'served_by_model'     => $lastServedModel,
     'fell_back_from'      => array_values($lastFellBackFrom),
+    // Summed prompt + completion + total across every LLM round-trip in
+    // this turn. Front-end renders one token line per user message under
+    // the assistant bubble; zeros mean no LLM call produced usage data.
+    'tokens'              => $turnTokens,
 ], JSON_UNESCAPED_SLASHES);

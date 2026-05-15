@@ -135,6 +135,46 @@ assistant content. Tool results are never run through
 
 ---
 
+## Per-response token usage display — testing phase
+
+Below every assistant message bubble the widget renders a small muted
+subtitle of the form:
+
+```
+245 prompt + 87 completion = 332 tokens
+```
+
+Numbers come from the LLM provider's `response.usage` field — the same
+source that `ai_usage_log` rows are populated from, so the displayed
+numbers exactly match what is logged.
+
+A single user message can fan out into multiple LLM round-trips (initial
+reply, tool-result follow-up, possibly several iterations up to
+`MAX_ITERATIONS`). The token line shows **one total per user message,
+not per internal round-trip** — `ai_chat.php` sums prompt and completion
+across every round-trip in the turn and stores the result on the final
+assistant message row (`ai_messages.tokens_json`).
+
+The line is intentionally suppressed in three cases:
+
+- **User messages** and **system events** (cancellations, errors) — no
+  AI inference produced them, so there's no usage to show.
+- **`pending_confirmation`** previews — the turn isn't final yet; the
+  count is incomplete until the user confirms or cancels.
+- **Missing or zero usage** — older messages (from before this feature)
+  or any LLM response that omitted `usage` gracefully render no line at
+  all, rather than `0 tokens` clutter.
+
+Token data persists on the assistant message row, so reloading the
+conversation via `ai_chat_history.php` brings the same line back.
+
+This is a **testing-phase feature** designed to give us per-query cost
+visibility while we tune providers and prompts. It can be hidden later
+by gating `formatTokenLine()` in `includes/chatbot_widget.php` on a
+user preference (e.g. a new `ai_settings` toggle).
+
+---
+
 ## Token budget — testing phase
 
 The combined hardcoded system prompt now contains three blocks (security

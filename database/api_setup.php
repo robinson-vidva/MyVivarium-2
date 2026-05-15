@@ -188,6 +188,8 @@ $chatbotTables = [
         `tool_call_json` text,
         `tool_result_json` text,
         `pending_op_id` varchar(36) DEFAULT NULL,
+        `suggestions_json` text DEFAULT NULL,
+        `tokens_json` text DEFAULT NULL,
         `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`),
         KEY `idx_ai_msg_conv_created` (`conversation_id`, `created_at`),
@@ -248,6 +250,16 @@ if (table_exists($con, 'ai_messages') && !column_exists($con, 'ai_messages', 'su
         exit(1);
     }
     echo "[ok]    ai_messages.suggestions_json added\n";
+}
+
+// Migration: add tokens_json to ai_messages so the per-response token
+// usage display persists across page reloads. Idempotent.
+if (table_exists($con, 'ai_messages') && !column_exists($con, 'ai_messages', 'tokens_json')) {
+    if ($con->query("ALTER TABLE `ai_messages` ADD COLUMN `tokens_json` text DEFAULT NULL AFTER `suggestions_json`") === false) {
+        fwrite(STDERR, "[error] ai_messages.tokens_json: " . $con->error . "\n");
+        exit(1);
+    }
+    echo "[ok]    ai_messages.tokens_json added\n";
 }
 
 // AI settings storage for the admin chatbot configuration.
