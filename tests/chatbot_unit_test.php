@@ -183,6 +183,22 @@ check('chatbot_build_messages includes RESPONSE FORMATTING RULES block',
 check('chatbot_build_messages includes FOLLOW-UP SUGGESTIONS block',
     strpos($aiChat, 'chatbot_follow_up_suggestions_block()') !== false);
 
+// --- per-response token usage display (testing-phase feature) ---
+// Response envelope must carry a tokens field so the widget can render
+// the "X prompt + Y completion = Z tokens" line below assistant bubbles.
+check('ai_chat.php emits tokens field in JSON response',
+    strpos($aiChat, "'tokens'") !== false
+    && strpos($aiChat, '$turnTokens') !== false);
+check('ai_chat.php sums tokens across every LLM round-trip in the turn',
+    strpos($aiChat, "\$turnTokens['prompt']") !== false
+    && strpos($aiChat, "\$turnTokens['completion']") !== false
+    && strpos($aiChat, "\$turnTokens['total']") !== false);
+check('ai_chat.php persists tokens on the final assistant message row',
+    preg_match("/chatbot_message_persist\\([^;]*\\\$turnTokens\\)/", $aiChat) === 1);
+// Cancellation acknowledgement is one round-trip; still emits tokens.
+check('ai_chat.php cancellation path emits tokens too',
+    strpos($aiChat, '$cancelTokens') !== false);
+
 $fmt = chatbot_response_formatting_rules_block();
 check('RESPONSE FORMATTING RULES header verbatim',
     strpos($fmt, 'RESPONSE FORMATTING RULES:') === 0);

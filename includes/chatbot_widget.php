@@ -136,6 +136,16 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
   .mv-confirm-card button.mv-btn-confirm { background: #198754; color: #fff; }
   .mv-confirm-card button.mv-btn-cancel  { background: #6c757d; color: #fff; }
   .mv-confirm-card.done { opacity: 0.6; pointer-events: none; }
+  /* Per-response token usage line. Rendered as a sibling immediately
+     below each assistant bubble, muted-gray subtitle in the same shade
+     as the tool-call card text so it visually belongs to the bubble
+     above. Hidden when the backend didn't return usage data. */
+  .mv-msg-tokens {
+    align-self: flex-start; display: inline-block;
+    color: #6c757d; font-size: 11px; line-height: 1.3;
+    margin-top: 2px; margin-bottom: 8px; max-width: 95%;
+    word-break: break-word;
+  }
   .mv-suggestions {
     align-self: flex-start; display: flex; flex-wrap: wrap; gap: 6px;
     max-width: 85%; margin-top: 2px; transition: opacity 0.15s ease;
@@ -388,7 +398,37 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
     return out.join('');
   }
 
-  function addMessage(role, content) {
+  // Format a token-usage line for an assistant bubble. Returns null when
+  // the message has no usable token data (older messages from before
+  // this feature, system events, user messages, or LLM responses that
+  // did not include a usage block) so the caller can gracefully skip.
+  function formatTokenLine(tokens) {
+    if (!tokens || typeof tokens !== 'object') return null;
+    const p = Number(tokens.prompt)     || 0;
+    const c = Number(tokens.completion) || 0;
+    const t = Number(tokens.total) || (p + c);
+    if (t <= 0) return null;
+    const fmt = n => n.toLocaleString('en-US');
+    // Spec format: "245 prompt + 87 completion = 332 tokens". Keep short
+    // for mobile — provider/model attribution lives in the header
+    // subtitle, not on every bubble.
+    return fmt(p) + ' prompt + ' + fmt(c) + ' completion = ' + fmt(t) + ' tokens';
+  }
+  function appendTokenLine(tokens) {
+    const line = formatTokenLine(tokens);
+    if (!line) return null;
+    const el = document.createElement('div');
+    el.className = 'mv-msg-tokens';
+    el.textContent = line;
+    msgs.appendChild(el);
+    return el;
+  }
+
+  // role: 'user' | 'assistant' | 'system_event'
+  // tokens (optional): { prompt, completion, total } — only honored for
+  //   assistant bubbles. User messages and system events never display
+  //   tokens regardless of what's passed in.
+  function addMessage(role, content, tokens) {
     const div = document.createElement('div');
     const isAssistant = role !== 'user' && role !== 'system_event';
     div.className = 'mv-msg mv-msg-' + (role === 'user' ? 'user' : role === 'system_event' ? 'event' : 'assistant');
@@ -399,6 +439,10 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
       div.textContent = content;
     }
     msgs.appendChild(div);
+    // Token line is appended in the same DOM operation as the bubble so
+    // the rendering doesn't visibly lag — no async loading, the data is
+    // already in the response payload.
+    if (isAssistant) appendTokenLine(tokens);
     scrollBottom();
   }
 
@@ -523,9 +567,12 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
         updateSubtitle(body.served_by_provider, body.served_by_model, body.fell_back_from);
         (body.tool_calls || []).forEach(addToolCard);
         if (body.pending_confirmation) {
+          // Pending-confirmation cards represent a not-yet-final turn —
+          // intentionally no token line here per spec, even though the
+          // backend has already burned tokens to produce the diff.
           addConfirmCard(body.pending_confirmation);
         } else if (body.reply) {
-          addMessage('assistant', body.reply);
+          addMessage('assistant', body.reply, body.tokens);
         }
         if (Array.isArray(body.suggestions) && body.suggestions.length > 0
             && !body.pending_confirmation) {
@@ -611,7 +658,9 @@ $GLOBALS['__chatbot_widget_rendered'] = true;
         const list = j.messages || [];
         list.forEach(m => {
           if (m.role === 'user' || m.role === 'assistant') {
-            if (m.content) addMessage(m.role, m.content);
+            // History payload carries m.tokens for assistant rows when
+            // they were stored at the time (older rows return null).
+            if (m.content) addMessage(m.role, m.content, m.role === 'assistant' ? m.tokens : null);
             if (m.tool_call_json && m.tool_call_json.tool_calls) {
               m.tool_call_json.tool_calls.forEach(tc => addToolCard({ name: (tc.function && tc.function.name) || 'tool' }));
             }

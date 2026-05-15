@@ -45,15 +45,23 @@ if (!$conv) {
     exit;
 }
 
-// suggestions_json column may not exist on older deployments; degrade gracefully.
+// suggestions_json and tokens_json columns may not exist on older
+// deployments; degrade gracefully by only SELECTing what exists.
 $hasSuggestions = false;
 $probe = @$con->query("SHOW COLUMNS FROM ai_messages LIKE 'suggestions_json'");
 if ($probe) {
     $hasSuggestions = $probe->num_rows > 0;
     $probe->close();
 }
+$hasTokens = false;
+$probe = @$con->query("SHOW COLUMNS FROM ai_messages LIKE 'tokens_json'");
+if ($probe) {
+    $hasTokens = $probe->num_rows > 0;
+    $probe->close();
+}
 $columns = "id, role, content, tool_call_json, tool_result_json, pending_op_id, created_at"
-    . ($hasSuggestions ? ", suggestions_json" : "");
+    . ($hasSuggestions ? ", suggestions_json" : "")
+    . ($hasTokens      ? ", tokens_json"      : "");
 $stmt = $con->prepare("SELECT $columns FROM ai_messages WHERE conversation_id = ? ORDER BY id ASC");
 $stmt->bind_param('s', $id);
 $stmt->execute();
@@ -72,6 +80,25 @@ foreach ($msgs as &$m) {
         $m['suggestions'] = [];
     }
     unset($m['suggestions_json']);
+    // Tokens: hydrate the stored {prompt, completion, total} so the widget
+    // can render the same token-usage line that appeared when the message
+    // first arrived. Older messages without the column or with NULL value
+    // get null, and the widget gracefully skips them.
+    if (isset($m['tokens_json']) && $m['tokens_json'] !== null && $m['tokens_json'] !== '') {
+        $decoded = json_decode($m['tokens_json'], true);
+        if (is_array($decoded) && (int)($decoded['total'] ?? 0) > 0) {
+            $m['tokens'] = [
+                'prompt'     => (int)($decoded['prompt']     ?? 0),
+                'completion' => (int)($decoded['completion'] ?? 0),
+                'total'      => (int)($decoded['total']      ?? 0),
+            ];
+        } else {
+            $m['tokens'] = null;
+        }
+    } else {
+        $m['tokens'] = null;
+    }
+    unset($m['tokens_json']);
 }
 unset($m);
 
