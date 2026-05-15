@@ -327,7 +327,7 @@ Admins manage chatbot settings under **Admin → AI Configuration**
 | `groq_model`      | One of `llama-3.3-70b-versatile` (default), `llama-3.1-8b-instant`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`. |
 | `openai_api_key`  | OpenAI API key (encrypted). |
 | `openai_model`    | One of `gpt-5.4-mini` (default), `gpt-5.4-nano`, `gpt-5.4`, `gpt-4.1-nano`, `gpt-4.1-mini`. |
-| `system_prompt`   | System prompt prepended to every chatbot turn. A hardcoded security block (see below) is also prepended, ahead of this value, and cannot be edited away by admins. |
+| `system_prompt`   | System prompt prepended to every chatbot turn. A hardcoded security block, a hardcoded response-formatting block, and a hardcoded follow-up-suggestion block are also prepended, ahead of this value, and cannot be edited away by admins. See [`docs/chatbot.md`](../docs/chatbot.md) for formatting + suggestion details. |
 | `chatbot_enabled` | `"1"` or `"0"`. |
 | `ai_rate_limit_messages_per_minute` | Per-user message cap, fixed 60-second window. Default `10`, min `1`, max `60`. Counts user-typed messages only — tool calls and LLM round-trips do not count. |
 | `ai_rate_limit_messages_per_day`    | Per-user daily cap, resets at midnight UTC. Default `200`, min `10`, max `5000`. |

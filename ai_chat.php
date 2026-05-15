@@ -179,12 +179,29 @@ function chatbot_conversation_create(mysqli $con, int $user_id): string
     return $id;
 }
 
-function chatbot_message_persist(mysqli $con, string $cid, string $role, ?string $content, ?array $tool_call = null, ?array $tool_result = null, ?string $pending_op_id = null): int
+function chatbot_message_persist(mysqli $con, string $cid, string $role, ?string $content, ?array $tool_call = null, ?array $tool_result = null, ?string $pending_op_id = null, ?array $suggestions = null): int
 {
-    $callJson   = $tool_call   ? json_encode($tool_call,   JSON_UNESCAPED_SLASHES) : null;
-    $resultJson = $tool_result ? json_encode($tool_result, JSON_UNESCAPED_SLASHES) : null;
-    $stmt = $con->prepare("INSERT INTO ai_messages (conversation_id, role, content, tool_call_json, tool_result_json, pending_op_id) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param('ssssss', $cid, $role, $content, $callJson, $resultJson, $pending_op_id);
+    $callJson        = $tool_call   ? json_encode($tool_call,   JSON_UNESCAPED_SLASHES) : null;
+    $resultJson      = $tool_result ? json_encode($tool_result, JSON_UNESCAPED_SLASHES) : null;
+    $suggestionsJson = is_array($suggestions) ? json_encode(array_values($suggestions), JSON_UNESCAPED_SLASHES) : null;
+
+    // suggestions_json was added in a later migration; if the column is
+    // absent (older DB), fall back to the legacy 6-column INSERT so the
+    // chatbot keeps working until the operator runs database/api_setup.php.
+    static $hasSuggCol = null;
+    if ($hasSuggCol === null) {
+        $r = @$con->query("SHOW COLUMNS FROM ai_messages LIKE 'suggestions_json'");
+        $hasSuggCol = ($r && $r->num_rows > 0);
+        if ($r) $r->close();
+    }
+
+    if ($hasSuggCol) {
+        $stmt = $con->prepare("INSERT INTO ai_messages (conversation_id, role, content, tool_call_json, tool_result_json, pending_op_id, suggestions_json) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param('sssssss', $cid, $role, $content, $callJson, $resultJson, $pending_op_id, $suggestionsJson);
+    } else {
+        $stmt = $con->prepare("INSERT INTO ai_messages (conversation_id, role, content, tool_call_json, tool_result_json, pending_op_id) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param('ssssss', $cid, $role, $content, $callJson, $resultJson, $pending_op_id);
+    }
     $stmt->execute();
     $id = (int)$stmt->insert_id;
     $stmt->close();
@@ -466,15 +483,17 @@ function chatbot_api_health(): array
 
 function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, string $username, int $user_id): array
 {
-    // Hardcoded security block. NOT admin-editable: prepended to the
+    // Hardcoded blocks. NOT admin-editable: prepended to the
     // admin-configured system prompt so an admin can't accidentally remove
-    // the safety rules.
-    $hardcoded = chatbot_security_rules_block();
+    // the safety rules, formatting rules, or follow-up suggestion contract.
+    $hardcoded   = chatbot_security_rules_block();
+    $formatting  = chatbot_response_formatting_rules_block();
+    $suggestions = chatbot_follow_up_suggestions_block();
 
     // Compact admin-configurable system prompt — role / capabilities /
     // runtime — under ~300 tokens. Verbose phrasing was the single largest
     // per-call payload contributor.
-    $augmented = $hardcoded . "\n\n" . $systemPrompt
+    $augmented = $hardcoded . "\n\n" . $formatting . "\n\n" . $suggestions . "\n\n" . $systemPrompt
         . " Tool definitions are loaded from MyVivarium's OpenAPI specification."
         . " If the user asks for something you do not have a tool for, tell them honestly and list 3-5 example things you CAN do based on the available tools (call listCapabilities)."
         . " Do not invent tools or substitute a different tool for what the user asked."
@@ -606,7 +625,11 @@ if ($cancel_pending_op !== '') {
     } else {
         $reply = 'Cancelled.';
     }
-    chatbot_message_persist($con, $conversation_id, 'assistant', $reply);
+    // No follow-up suggestions on cancellation acknowledgements — the
+    // conversation is in a transitional state.
+    $parsed = chatbot_parse_suggestions($reply);
+    $reply  = $parsed['content'] !== '' ? $parsed['content'] : 'Cancelled.';
+    chatbot_message_persist($con, $conversation_id, 'assistant', $reply, null, null, null, []);
     log_activity($con, 'ai_chat_message', 'ai_conversation', $conversation_id, 'cancel');
     echo json_encode([
         'ok' => true,
@@ -614,6 +637,7 @@ if ($cancel_pending_op !== '') {
         'reply' => $reply,
         'tool_calls' => [],
         'pending_confirmation' => null,
+        'suggestions' => [],
     ], JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -664,6 +688,11 @@ $MAX_ITERATIONS = 6;
 $toolCallsForResponse = [];
 $pendingConfirmation = null;
 $finalReply = '';
+$finalSuggestions = [];
+// When the LLM yields a normal "no more tools" final message, we defer its
+// persistence to the end of the script so we can strip the SUGGESTIONS::
+// marker and store the parsed suggestions in the same row.
+$finalReplyDeferred = false;
 $toolsForTurn = chatbot_select_tools($incomingMessage);
 
 // Health pre-check: if /api/v1 is unreachable or returning HTML, abort
@@ -672,13 +701,14 @@ $health = chatbot_api_health();
 if (!$health['ok']) {
     error_log("Chatbot health check failed for user $user_id: " . ($health['reason'] ?? 'unknown'));
     $finalReply = 'The API is not responding correctly. Check that /api/v1 is reachable and the session key is valid.';
-    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
+    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply, null, null, null, []);
     echo json_encode([
         'ok'                  => true,
         'reply'               => $finalReply,
         'conversation_id'     => $conversation_id,
         'tool_calls'          => [],
         'pending_confirmation'=> null,
+        'suggestions'         => [],
     ], JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -761,10 +791,13 @@ try {
         }
         $toolCalls = $choice['tool_calls'] ?? [];
 
-        // No more tools to call → final assistant message.
+        // No more tools to call → final assistant message. Defer persistence
+        // until after we've stripped the SUGGESTIONS:: marker out so the
+        // stored content matches what the user sees, and so the parsed
+        // suggestions land in the same DB row.
         if (empty($toolCalls)) {
             $finalReply = (string)($choice['content'] ?? '');
-            chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
+            $finalReplyDeferred = true;
             break;
         }
 
@@ -829,13 +862,14 @@ try {
                         ['id' => $tc['id'] ?? null, 'function' => ['name' => $name]],
                         ['status' => $apiRes['status'], 'body' => $apiRes['body']]
                     );
-                    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
+                    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply, null, null, null, []);
                     echo json_encode([
                         'ok'                  => true,
                         'reply'               => $finalReply,
                         'conversation_id'     => $conversation_id,
                         'tool_calls'          => $toolCallsForResponse,
                         'pending_confirmation'=> null,
+                        'suggestions'         => [],
                     ], JSON_UNESCAPED_SLASHES);
                     exit;
                 }
@@ -893,11 +927,25 @@ try {
 
     if ($iter >= $MAX_ITERATIONS && $finalReply === '') {
         $finalReply = 'I hit the tool-call limit for this turn; please rephrase.';
-        chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply);
+        chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply, null, null, null, []);
     }
 } catch (Throwable $e) {
     error_log('ai_chat fatal: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
     $finalReply = 'AI assistant is temporarily unavailable.';
+}
+
+// Suggestion parsing + fallback. Only applies when the LLM produced a real
+// final assistant reply (deferred persistence path). Pending-confirmation
+// turns get no suggestions because the confirm/cancel buttons drive the
+// next step. Error and abort turns kept empty suggestions inline.
+if ($finalReplyDeferred && $pendingConfirmation === null) {
+    $parsed     = chatbot_parse_suggestions($finalReply);
+    $finalReply = $parsed['content'];
+    $finalSuggestions = $parsed['suggestions'];
+    if (empty($finalSuggestions)) {
+        $finalSuggestions = chatbot_fallback_suggestions($toolCallsForResponse, $finalReply);
+    }
+    chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply, null, null, null, $finalSuggestions);
 }
 
 // Auto-title once we have a few turns under our belt.
@@ -911,4 +959,5 @@ echo json_encode([
     'conversation_id'     => $conversation_id,
     'tool_calls'          => $toolCallsForResponse,
     'pending_confirmation'=> $pendingConfirmation,
+    'suggestions'         => $finalSuggestions,
 ], JSON_UNESCAPED_SLASHES);
