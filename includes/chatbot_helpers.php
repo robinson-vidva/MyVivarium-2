@@ -435,7 +435,9 @@ if (!function_exists('chatbot_resolve_tool')) {
     /**
      * Keyword router: pick the smallest tool subset that covers the user's
      * intent. If nothing matches, return the full tool set so the model can
-     * still discover what's available.
+     * still discover what's available — during the testing phase we err
+     * toward including more tools (small token cost) over refusing valid
+     * requests because a group wasn't pre-selected.
      */
     function chatbot_select_tools(string $userMessage): array
     {
@@ -445,55 +447,108 @@ if (!function_exists('chatbot_resolve_tool')) {
         $groups = chatbot_tool_groups();
         $msg    = strtolower($userMessage);
         $keep   = [];
-        $hit    = false;
+        $matched = [];
 
-        // Mice-related → mice + maintenance + identity (so AI can use
-        // listCapabilities / getMe in the same turn).
-        if (preg_match('/\b(mouse|mice|pup|litter|sire|dam)\b/', $msg)) {
-            $hit = true;
-            $keep = array_merge($keep,
-                $groups['Mice'] ?? [],
-                $groups['Holding Cages'] ?? [],
-                $groups['Breeding Cages'] ?? []);
-        }
-        if (preg_match('/\b(cage|cages|holding|breeding|room)\b/', $msg)) {
-            $hit = true;
-            $keep = array_merge($keep,
-                $groups['Holding Cages'] ?? [],
-                $groups['Breeding Cages'] ?? [],
-                $groups['Maintenance Notes'] ?? [],
-                $groups['Mice'] ?? []);
-        }
-        if (preg_match('/\b(note|notes|maintenance|water|bedding|food)\b/', $msg)) {
-            $hit = true;
-            $keep = array_merge($keep,
-                $groups['Maintenance Notes'] ?? [],
-                $groups['Holding Cages'] ?? [],
-                $groups['Breeding Cages'] ?? []);
-        }
-        if (preg_match('/\b(log|logs|history|activity|audit|who|when)\b/', $msg)) {
-            $hit = true;
-            $keep = array_merge($keep, $groups['Activity Log'] ?? []);
-        }
-        if (preg_match('/\b(me|my|profile|account|user)\b/', $msg)) {
-            $hit = true;
-            $keep = array_merge($keep, $groups['Users'] ?? []);
-        }
+        $route = function (string $pattern, array $groupNames, ?string $label = null) use (&$keep, &$matched, $msg, $groups) {
+            if (preg_match($pattern, $msg)) {
+                $matched[] = $label ?? $groupNames[0];
+                foreach ($groupNames as $g) {
+                    $keep = array_merge($keep, $groups[$g] ?? []);
+                }
+            }
+        };
+
+        // Mice-related → mice + cages (so AI can answer "which cage is this
+        // mouse in", lineage, etc.).
+        $route('/\b(mouse|mice|pup|litter|sire|dam|offspring|pups|lineage|parent)\b/',
+            ['Mice', 'Holding Cages', 'Breeding Cages'], 'Mice');
+
+        // Cages.
+        $route('/\b(cage|cages|holding|breeding|room)\b/',
+            ['Holding Cages', 'Breeding Cages', 'Maintenance Notes', 'Mice'], 'Cages');
+
+        // Maintenance notes.
+        $route('/\b(note|notes|maintenance|water|bedding|food)\b/',
+            ['Maintenance Notes', 'Holding Cages', 'Breeding Cages'], 'Notes');
+
+        // Activity log / history. "history" / "moved" also routes to Mice
+        // (cage-history endpoint lives under Mice).
+        $route('/\b(log|logs|activity|audit|who|when)\b/',
+            ['Activity Log'], 'ActivityLog');
+        $route('/\b(history|moved)\b/',
+            ['Mice', 'Activity Log'], 'History');
+
+        // Account / profile / user identity.
+        $route('/\b(profile|account|user|users)\b/',
+            ['Users', 'Account'], 'Account');
+        $route('/(my profile|my account|who am i|my info)/',
+            ['Account', 'Users'], 'MyAccount');
+
+        // Tasks — the bug that motivated this routing pass. "task" or
+        // "todo" must always pull the Tasks tools, plus the adjacent
+        // Reminders/Calendar groups since users mix the terms.
+        $route('/\b(task|tasks|todo|pending|open task)\b/',
+            ['Tasks', 'Reminders', 'Calendar'], 'Tasks');
+        $route('/(to-do|to do)/',
+            ['Tasks', 'Reminders', 'Calendar'], 'Tasks');
+
+        // Reminders.
+        $route('/\b(reminder|reminders)\b/',
+            ['Reminders', 'Tasks'], 'Reminders');
+
+        // Calendar / scheduling.
+        $route('/\b(calendar|schedule|upcoming|due|deadline)\b/',
+            ['Calendar', 'Tasks', 'Reminders'], 'Calendar');
+
+        // Notifications.
+        $route('/\b(notification|notifications|alert|alerts)\b/',
+            ['Notifications'], 'Notifications');
+
+        // Strains.
+        $route('/\b(strain|strains)\b/',
+            ['Strains'], 'Strains');
+
+        // IACUC / protocols.
+        $route('/\b(iacuc|protocol|protocols)\b/',
+            ['IACUC', 'Holding Cages', 'Breeding Cages'], 'IACUC');
+
+        // Dashboard / overview.
+        $route('/\b(dashboard|summary|overview)\b/',
+            ['Dashboard', 'Mice', 'Holding Cages', 'Breeding Cages'], 'Dashboard');
+
+        // Capabilities.
         if (preg_match('/\b(what|capabilities|help|can you|able)\b/', $msg)) {
-            $hit = true;
+            $matched[] = 'Capabilities';
             $keep[] = 'listCapabilities';
         }
 
-        if (!$hit) return $all;
+        // "my" alone is ambiguous (could be "my mice", "my tasks", "my
+        // notifications" — already covered above). If "my" matched but no
+        // domain keyword did, fall through to "send all" rather than
+        // restrict to Users only. That regression is the BUG C class of
+        // failures.
+        if (empty($matched) && preg_match('/\b(me|my)\b/', $msg)) {
+            // No domain — let the LLM see the full toolset.
+        }
 
-        // listCapabilities is always useful; include it so the model can
-        // tell the user what tools it does have when the routed subset
-        // doesn't cover their ask.
+        if (empty($matched)) {
+            error_log("Chatbot tool selection: no keyword match, sending all " . count($all) . " tools");
+            return $all;
+        }
+
+        // listCapabilities is always useful so the model can tell the user
+        // what's available when the routed subset doesn't cover their ask.
         $keep[] = 'listCapabilities';
-        $keep = array_unique($keep);
+        $keep = array_values(array_unique($keep));
 
-        return array_values(array_filter($all,
+        $filtered = array_values(array_filter($all,
             fn($t) => in_array($t['function']['name'] ?? '', $keep, true)));
+
+        if (count($filtered) < count($all)) {
+            error_log("Chatbot tool selection: matched groups [" . implode(', ', array_unique($matched)) . "], tools sent: " . count($filtered) . " of " . count($all));
+        }
+
+        return $filtered;
     }
 
     /**
