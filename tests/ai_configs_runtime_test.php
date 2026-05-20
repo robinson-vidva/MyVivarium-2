@@ -90,5 +90,28 @@ ok($cfg === null, 'secondary returns null when not set');
 $cfg = ai_configs_to_runtime(row(['provider' => 'unknown', 'api_key_primary' => ai_settings_encrypt('x')]), 'primary');
 ok(in_array('provider', $cfg['config_errors'], true), 'unknown provider flagged');
 
+// test-connection chat probe must merge custom_settings the same way the
+// runtime chat call does — otherwise admins see false negatives on configs
+// whose auth lives in a custom header (e.g. Azure APIM).
+$captured = null;
+$GLOBALS['LLM_HTTP_POST_HOOK'] = function ($url, $headers, $body) use (&$captured) {
+    $captured = ['url' => $url, 'headers' => $headers, 'body' => $body];
+    return [200, '{"choices":[{"message":{"content":"ok"}}]}', ''];
+};
+$probeCfg = ai_configs_to_runtime(row([
+    'provider' => 'custom', 'preset' => 'azure_openai',
+    'base_url' => 'https://apim.example.net', 'model' => 'gpt-4o-mini',
+    'custom_settings' => [
+        ['key' => 'header.Ocp-Apim-Subscription-Key', 'value' => 'apim-secret'],
+        ['key' => 'top_p',                            'value' => '0.7'],
+    ],
+]), 'primary');
+$res = ai_configs_run_test_chat_probe($probeCfg);
+ok($res['ok'] === true, 'test probe returns ok on 200');
+ok(in_array('Ocp-Apim-Subscription-Key: apim-secret', $captured['headers'], true), 'test probe sends custom header');
+$bodyArr = json_decode($captured['body'], true);
+ok(isset($bodyArr['top_p']) && $bodyArr['top_p'] === 0.7, 'test probe merges custom body extras');
+unset($GLOBALS['LLM_HTTP_POST_HOOK']);
+
 echo "\n$pass passed, $fail failed\n";
 exit($fail === 0 ? 0 : 1);
