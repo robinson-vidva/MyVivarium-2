@@ -244,6 +244,14 @@ require 'header.php';
             .config-actions { width: 100%; justify-content: flex-end; }
             .config-meta    { flex: 1 1 100%; }
         }
+        #configModal .modal-dialog-scrollable .modal-content { max-height: calc(100vh - 3.5rem); overflow: hidden; }
+        #configModal #configModalForm { display: flex; flex-direction: column; max-height: 100%; overflow: hidden; flex: 1 1 auto; min-height: 0; }
+        #configModal #configModalForm .modal-header,
+        #configModal #configModalForm .modal-footer { flex-shrink: 0; }
+        #configModal #configModalForm .modal-body { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+        #configModal .modal-footer { position: sticky; bottom: 0; background-color: inherit; z-index: 2; }
+        #globalSettingsForm { margin-bottom: 2.5rem; }
+        #globalSettingsForm .global-settings-actions { padding-top: 0.5rem; padding-bottom: 0.5rem; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
@@ -387,7 +395,9 @@ require 'header.php';
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Global Settings</button>
+        <div class="global-settings-actions">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Global Settings</button>
+        </div>
     </form>
 </div>
 
