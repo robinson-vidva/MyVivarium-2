@@ -132,14 +132,22 @@ $dbHasConfig = email_settings_any_configured($con);
 if ($dbHasConfig) {
     $view = email_settings_get_view($con);
     $values    = $view['values'];
-    $secretSet = $view['secret_set'];
+    $secretSet = $view['secret_set'];        // true iff a DB row holds the secret
+    $secretInDb = $view['secret_set'];
 } else {
     $values    = email_settings_env_defaults();
-    $secretSet = [
-        'smtp_password' => defined('SMTP_PASSWORD') && SMTP_PASSWORD !== '',
-        'brevo_api_key' => false,
-    ];
+    $secretSet = ['smtp_password' => false, 'brevo_api_key' => false];
+    $secretInDb = ['smtp_password' => false, 'brevo_api_key' => false];
 }
+
+// "Effectively set" reflects what email_settings_resolve_active() would
+// actually use at send time: a DB value OR (for smtp_password only) the
+// .env fallback. We drive the on-page hint + status indicator from this
+// so the UI never says "no password stored" while .env is silently in use.
+$envSmtpPasswordSet = defined('SMTP_PASSWORD') && SMTP_PASSWORD !== '';
+$secretSet['smtp_password'] = $secretInDb['smtp_password'] || $envSmtpPasswordSet;
+// Brevo has no .env fallback, so DB-only.
+$secretSet['brevo_api_key'] = $secretInDb['brevo_api_key'];
 if (!in_array(($values['transport'] ?? ''), ['smtp', 'brevo'], true)) {
     $values['transport'] = 'smtp';
 }
@@ -254,15 +262,24 @@ require 'header.php';
                 <div class="col-12">
                     <label class="form-label" for="smtp_password">Password</label>
                     <input type="password" class="form-control" id="smtp_password" name="smtp_password"
-                           placeholder="<?= !empty($secretSet['smtp_password']) ? 'leave blank to keep stored value' : 'enter SMTP password'; ?>"
+                           placeholder="<?= !empty($secretSet['smtp_password']) ? 'leave blank to keep the current value' : 'enter SMTP password'; ?>"
                            autocomplete="new-password">
-                    <div class="secret-status <?= !empty($secretSet['smtp_password']) ? 'is-set' : 'is-unset'; ?>" id="smtpPasswordStatus">
-                        <?= !empty($secretSet['smtp_password']) ? 'Password is set.' : 'No password stored.'; ?>
-                    </div>
                     <?php if (!empty($secretSet['smtp_password'])): ?>
+                        <div class="form-text">Leave blank to keep the current value. Type a new password to replace it.</div>
+                    <?php endif; ?>
+                    <div class="secret-status <?= !empty($secretSet['smtp_password']) ? 'is-set' : 'is-unset'; ?>" id="smtpPasswordStatus">
+                        <?php if (!empty($secretInDb['smtp_password'])): ?>
+                            Password is set (encrypted in database).
+                        <?php elseif (!empty($secretSet['smtp_password'])): ?>
+                            Password is set (using .env fallback).
+                        <?php else: ?>
+                            No password stored.
+                        <?php endif; ?>
+                    </div>
+                    <?php if (!empty($secretInDb['smtp_password'])): ?>
                         <div class="form-check mt-1">
                             <input class="form-check-input" type="checkbox" id="clear_smtp_password" name="clear_smtp_password" value="1">
-                            <label class="form-check-label" for="clear_smtp_password">Clear stored SMTP password</label>
+                            <label class="form-check-label" for="clear_smtp_password">Clear stored SMTP password (revert to .env fallback if present)</label>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -275,12 +292,15 @@ require 'header.php';
                 <div class="col-12">
                     <label class="form-label" for="brevo_api_key">API key</label>
                     <input type="password" class="form-control" id="brevo_api_key" name="brevo_api_key"
-                           placeholder="<?= !empty($secretSet['brevo_api_key']) ? 'leave blank to keep stored value' : 'paste Brevo API key'; ?>"
+                           placeholder="<?= !empty($secretSet['brevo_api_key']) ? 'leave blank to keep the current value' : 'paste Brevo API key'; ?>"
                            autocomplete="new-password">
-                    <div class="secret-status <?= !empty($secretSet['brevo_api_key']) ? 'is-set' : 'is-unset'; ?>" id="brevoApiKeyStatus">
-                        <?= !empty($secretSet['brevo_api_key']) ? 'API key is set.' : 'No API key stored.'; ?>
-                    </div>
                     <?php if (!empty($secretSet['brevo_api_key'])): ?>
+                        <div class="form-text">Leave blank to keep the current value. Type a new key to replace it.</div>
+                    <?php endif; ?>
+                    <div class="secret-status <?= !empty($secretSet['brevo_api_key']) ? 'is-set' : 'is-unset'; ?>" id="brevoApiKeyStatus">
+                        <?= !empty($secretSet['brevo_api_key']) ? 'API key is set (encrypted in database).' : 'No API key stored.'; ?>
+                    </div>
+                    <?php if (!empty($secretInDb['brevo_api_key'])): ?>
                         <div class="form-check mt-1">
                             <input class="form-check-input" type="checkbox" id="clear_brevo_api_key" name="clear_brevo_api_key" value="1">
                             <label class="form-check-label" for="clear_brevo_api_key">Clear stored Brevo API key</label>
