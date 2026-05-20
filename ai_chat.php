@@ -27,6 +27,7 @@ require 'dbcon.php';
 require_once __DIR__ . '/log_activity.php';
 require_once __DIR__ . '/includes/ai_settings.php';
 require_once __DIR__ . '/includes/llm_provider.php';
+require_once __DIR__ . '/includes/ai_configs.php';
 require_once __DIR__ . '/includes/chatbot_session.php';
 require_once __DIR__ . '/includes/chatbot_helpers.php';
 require_once __DIR__ . '/includes/ai_rate_limit.php';
@@ -141,13 +142,35 @@ try {
     echo json_encode(['ok' => false, 'error' => 'chatbot_unavailable']);
     exit;
 }
-if (!$chatbotEnabled || empty($providerChain)) {
+// Prefer the new multi-config table when any rows exist. Otherwise fall back
+// to the legacy provider-chain so existing single-slot installs keep working.
+// TODO(retire-legacy-chain): drop the $useConfigChain branch and read
+// ai_configs unconditionally once the bridge has shipped one full release.
+$useConfigChain = (ai_configs_count($con) > 0);
+$configChainAvailable = $useConfigChain ? !empty(ai_configs_enabled_chain($con)) : false;
+
+if (!$chatbotEnabled || (!$useConfigChain && empty($providerChain)) || ($useConfigChain && !$configChainAvailable)) {
     http_response_code(503);
     echo json_encode(['ok' => false, 'error' => 'chatbot_disabled']);
     exit;
 }
-$activeProvider = $providerChain[0]['provider'];
-$activeModel    = (string)($providerChain[0]['config']['model'] ?? '');
+
+if ($useConfigChain) {
+    $first = ai_configs_enabled_chain($con)[0];
+    $activeProvider = (string)$first['provider'];
+    $activeModel    = (string)$first['model'];
+} else {
+    $activeProvider = $providerChain[0]['provider'];
+    $activeModel    = (string)($providerChain[0]['config']['model'] ?? '');
+}
+
+function ai_chat_dispatch_completion(mysqli $con, bool $useConfigChain, array $messages, array $tools): array
+{
+    if ($useConfigChain) {
+        return llm_chat_completions_via_configs($con, $messages, $tools);
+    }
+    return llm_chat_completions_with_fallback($messages, $tools);
+}
 
 // -----------------------------------------------------------------------------
 // Session API key (mint if needed)
@@ -258,14 +281,13 @@ function chatbot_context_message_limit(): int
     return $n;
 }
 
-function chatbot_usage_log(mysqli $con, int $user_id, string $cid, string $model, array $usage, int $estPrompt = 0, string $provider = ''): void
+function chatbot_usage_log(mysqli $con, int $user_id, string $cid, string $model, array $usage, int $estPrompt = 0, string $provider = '', ?int $configId = null): void
 {
     $pt = (int)($usage['prompt_tokens']     ?? 0);
     $ct = (int)($usage['completion_tokens'] ?? 0);
-    // ai_usage_log may or may not have estimated_prompt_tokens / provider
-    // columns (added in subsequent schema revisions). Detect & fall back.
     static $hasEstCol = null;
     static $hasProvCol = null;
+    static $hasConfigCol = null;
     if ($hasEstCol === null) {
         $r = @$con->query("SHOW COLUMNS FROM ai_usage_log LIKE 'estimated_prompt_tokens'");
         $hasEstCol = ($r && $r->num_rows > 0);
@@ -276,7 +298,15 @@ function chatbot_usage_log(mysqli $con, int $user_id, string $cid, string $model
         $hasProvCol = ($r && $r->num_rows > 0);
         if ($r) $r->close();
     }
-    if ($hasEstCol && $hasProvCol) {
+    if ($hasConfigCol === null) {
+        $r = @$con->query("SHOW COLUMNS FROM ai_usage_log LIKE 'config_id'");
+        $hasConfigCol = ($r && $r->num_rows > 0);
+        if ($r) $r->close();
+    }
+    if ($hasEstCol && $hasProvCol && $hasConfigCol) {
+        $stmt = $con->prepare("INSERT INTO ai_usage_log (user_id, conversation_id, prompt_tokens, completion_tokens, model, estimated_prompt_tokens, provider, config_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param('isiisisi', $user_id, $cid, $pt, $ct, $model, $estPrompt, $provider, $configId);
+    } elseif ($hasEstCol && $hasProvCol) {
         $stmt = $con->prepare("INSERT INTO ai_usage_log (user_id, conversation_id, prompt_tokens, completion_tokens, model, estimated_prompt_tokens, provider) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->bind_param('isiisis', $user_id, $cid, $pt, $ct, $model, $estPrompt, $provider);
     } elseif ($hasEstCol) {
@@ -636,7 +666,7 @@ if ($cancel_pending_op !== '') {
     $tools = [];
     $messages = chatbot_fit_to_budget($messages, $tools);
     $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($tools);
-    $llm = llm_chat_completions_with_fallback($messages, $tools);
+    $llm = ai_chat_dispatch_completion($con, $useConfigChain, $messages, $tools);
     // Cancellation reply is a single LLM round-trip, so the turn total IS
     // the round-trip total (still keep the same {prompt,completion,total}
     // shape so the front-end branch is identical to the main loop).
@@ -651,8 +681,10 @@ if ($cancel_pending_op !== '') {
             $cancelTokens['prompt']     = (int)($u['prompt_tokens']     ?? 0);
             $cancelTokens['completion'] = (int)($u['completion_tokens'] ?? 0);
             $cancelTokens['total']      = $cancelTokens['prompt'] + $cancelTokens['completion'];
+            $servedConfigId = isset($llm['served_by_config_id']) ? (int)$llm['served_by_config_id'] : null;
+            if ($servedConfigId === 0) $servedConfigId = null;
             error_log("Chatbot call: prompt=" . $cancelTokens['prompt'] . ", completion=" . $cancelTokens['completion'] . ", provider={$servedBy}, model={$servedModel}, est=$estPrompt");
-            chatbot_usage_log($con, $user_id, $conversation_id, $servedModel, $u, $estPrompt, $servedBy);
+            chatbot_usage_log($con, $user_id, $conversation_id, $servedModel, $u, $estPrompt, $servedBy, $servedConfigId);
         }
     } else {
         $reply = 'Cancelled.';
@@ -830,12 +862,20 @@ try {
         }
         $messages = chatbot_fit_to_budget($messages, $toolsForTurn);
         $estPrompt = chatbot_estimate_tokens($messages) + chatbot_estimate_tokens($toolsForTurn);
-        $llm = llm_chat_completions_with_fallback($messages, $toolsForTurn);
+        $llm = ai_chat_dispatch_completion($con, $useConfigChain, $messages, $toolsForTurn);
 
         if (!$llm['ok']) {
             // Log the verbatim provider error so admins can diagnose. The
             // user gets a categorized, friendlier reply via the helper.
-            $attempted = is_array($llm['chain_attempted'] ?? null) ? implode(',', $llm['chain_attempted']) : '';
+            $attemptedParts = [];
+            foreach ((array)($llm['chain_attempted'] ?? []) as $a) {
+                if (is_array($a)) {
+                    $attemptedParts[] = ($a['nickname'] ?? '?') . '(' . ($a['key'] ?? '?') . ')';
+                } else {
+                    $attemptedParts[] = (string)$a;
+                }
+            }
+            $attempted = implode(',', $attemptedParts);
             error_log('chatbot llm error attempted=[' . $attempted . '] status=' . (int)($llm['status'] ?? 0)
                 . ' err=' . ($llm['error'] ?? '') . ' raw=' . ($llm['raw'] ?? ''));
 
@@ -844,7 +884,9 @@ try {
                 $s = (int)($tc['status'] ?? 0);
                 if ($s >= 200 && $s < 300) { $toolsSucceeded = true; break; }
             }
-            $hasFallback = count($providerChain) > 1;
+            $hasFallback = $useConfigChain
+                ? (count(ai_configs_enabled_chain($con)) > 1)
+                : (count($providerChain) > 1);
             $finalReply = chatbot_format_llm_failure_reply(
                 (int)($llm['status'] ?? 0),
                 (string)($llm['error']  ?? ''),
@@ -862,9 +904,19 @@ try {
 
         if (isset($llm['body']['usage'])) {
             $u = $llm['body']['usage'];
-            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$lastServedBy}, model={$lastServedModel}, est=$estPrompt"
-                . (!empty($lastFellBackFrom) ? ', fell_back_from=[' . implode(',', $lastFellBackFrom) . ']' : ''));
-            chatbot_usage_log($con, $user_id, $conversation_id, $lastServedModel, $u, $estPrompt, $lastServedBy);
+            $lastServedConfigId = isset($llm['served_by_config_id']) ? (int)$llm['served_by_config_id'] : null;
+            if ($lastServedConfigId === 0) $lastServedConfigId = null;
+            $fellBackSummary = '';
+            if (!empty($lastFellBackFrom)) {
+                $parts = [];
+                foreach ($lastFellBackFrom as $fb) {
+                    if (is_array($fb)) $parts[] = ($fb['nickname'] ?? '?') . '(' . ($fb['key'] ?? '?') . ')';
+                    else $parts[] = (string)$fb;
+                }
+                $fellBackSummary = ', fell_back_from=[' . implode(',', $parts) . ']';
+            }
+            error_log("Chatbot call: prompt=" . (int)($u['prompt_tokens'] ?? 0) . ", completion=" . (int)($u['completion_tokens'] ?? 0) . ", provider={$lastServedBy}, model={$lastServedModel}, est=$estPrompt" . $fellBackSummary);
+            chatbot_usage_log($con, $user_id, $conversation_id, $lastServedModel, $u, $estPrompt, $lastServedBy, $lastServedConfigId);
             // Sum tokens across every LLM round-trip in this user-message
             // turn. The widget shows one line per user message, not per
             // internal round-trip; these are the addends being summed.

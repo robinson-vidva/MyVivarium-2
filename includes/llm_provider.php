@@ -1,4 +1,14 @@
 <?php
+// TODO(retire-legacy-chain): This file's provider-chain functions
+// (llm_get_provider_chain, llm_get_provider_chain_raw, llm_normalize_chain,
+// llm_chain_from_legacy, llm_save_provider_chain, llm_chat_completions_with_fallback,
+// llm_get_active_provider, llm_get_active_config) plus the single-slot
+// ai_settings keys they read (groq_api_key, openai_api_key, custom_*,
+// llm_provider, llm_provider_chain) are kept ONLY as a fallback while the
+// new ai_configs table proves itself in production. Once we have one full
+// release cycle without rollbacks, delete these and update ai_chat.php's
+// "else branch" + ai_test_connection.php + chatbot_widget.php to read
+// ai_configs directly. Track the rollout in includes/ai_configs.php.
 /**
  * LLM provider abstraction.
  *

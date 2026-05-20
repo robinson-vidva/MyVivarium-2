@@ -138,3 +138,60 @@ CREATE TABLE IF NOT EXISTS `ai_settings` (
   KEY `idx_ai_settings_updated_by` (`updated_by`),
   CONSTRAINT `fk_ai_settings_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 );
+
+-- Multi-configuration AI provider table. Each row is a named provider profile
+-- (nickname) with its own model, API keys, base URL, system prompt override,
+-- temperature, max tokens, enable flag, sort order, and default flag. The
+-- chatbot iterates enabled rows by sort_order ascending and falls back on
+-- transient failures (429/5xx/network); within each config it tries the
+-- primary key first then the secondary key. api_key_primary / api_key_secondary
+-- are encrypted with the same AES-256-CBC scheme as ai_settings.
+CREATE TABLE IF NOT EXISTS `ai_configs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `nickname` varchar(100) NOT NULL,
+  `provider` varchar(32) NOT NULL,
+  `model` varchar(255) DEFAULT NULL,
+  `preset` varchar(64) DEFAULT NULL,
+  `api_key_primary` mediumtext,
+  `api_key_secondary` mediumtext,
+  `base_url` varchar(512) DEFAULT NULL,
+  `system_prompt` text,
+  `temperature` decimal(3,2) DEFAULT NULL,
+  `max_tokens` int DEFAULT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `sort_order` int NOT NULL DEFAULT 0,
+  `is_default` tinyint(1) NOT NULL DEFAULT 0,
+  `created_by` int DEFAULT NULL,
+  `updated_by` int DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_ai_configs_nickname` (`nickname`),
+  KEY `idx_ai_configs_order` (`sort_order`),
+  KEY `idx_ai_configs_enabled_order` (`enabled`, `sort_order`),
+  CONSTRAINT `fk_ai_configs_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_ai_configs_updater` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+);
+
+-- Free-form key/value rows attached to a config. Used for provider-specific
+-- request parameters (top_p, presence_penalty, response_format, seed, …).
+-- A row whose key begins with 'header.' is sent as an HTTP request header
+-- (with the 'header.' prefix stripped); all other rows are merged into the
+-- JSON request body. Values are encrypted at rest because they may contain
+-- secondary tokens (APIM subscription keys, org ids).
+CREATE TABLE IF NOT EXISTS `ai_config_settings` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `config_id` int NOT NULL,
+  `setting_key` varchar(128) NOT NULL,
+  `setting_value` mediumtext,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_ai_config_settings_key` (`config_id`, `setting_key`),
+  KEY `idx_ai_config_settings_config` (`config_id`),
+  CONSTRAINT `fk_ai_config_settings_config` FOREIGN KEY (`config_id`) REFERENCES `ai_configs` (`id`) ON DELETE CASCADE
+);
+
+-- Per-config attribution on the usage log so the admin token-usage popup
+-- can break tokens down by nickname. Nullable because legacy rows predate
+-- the configs table.
+ALTER TABLE `ai_usage_log` ADD COLUMN `config_id` int DEFAULT NULL,
+  ADD KEY `idx_ai_usage_config_created` (`config_id`, `created_at`);
