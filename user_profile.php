@@ -14,12 +14,7 @@ require 'session_config.php';
 require 'dbcon.php'; // Database connection
 require 'config.php'; // Configuration file for email settings
 require 'header.php'; // Include the header file
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-}
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+require_once __DIR__ . '/includes/mailer.php';
 
 // Check if the user is logged in
 if (!isset($_SESSION['username'])) {
@@ -196,26 +191,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
         $subject = 'Password Reset';
         $message = "To reset your password, click the following link:\n$resetLink";
 
-        $mail = new PHPMailer(true);
-        try {
-            $mail->isSMTP();
-            $mail->Host = SMTP_HOST;
-            $mail->Port = SMTP_PORT;
-            $mail->SMTPAuth = true;
-            $mail->Username = SMTP_USERNAME;
-            $mail->Password = SMTP_PASSWORD;
-            $mail->SMTPSecure = SMTP_ENCRYPTION;
-
-            $mail->setFrom(SENDER_EMAIL, SENDER_NAME);
-            $mail->addAddress($to);
-            $mail->isHTML(false);
-            $mail->Subject = $subject;
-            $mail->Body = $message;
-
-            $mail->send();
+        [$mailOk, $mailErr] = mv_send_mail($to, $subject, $message, ['is_html' => false]);
+        if ($mailOk) {
             $resultMessage = "Password reset instructions have been sent to your email address.";
-        } catch (Exception $e) {
-            $resultMessage = "Email could not be sent. Error: " . $mail->ErrorInfo;
+        } else {
+            $resultMessage = "Email could not be sent. Error: " . $mailErr;
         }
     } else {
         $resultMessage = "Email address not found in our records. Please try again.";

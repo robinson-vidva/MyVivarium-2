@@ -320,6 +320,22 @@ CREATE TABLE `settings` (
   PRIMARY KEY (`name`)
 );
 
+-- Email transport configuration managed through the admin Email Settings page.
+-- Rows with is_encrypted = 1 store AES-256-CBC ciphertext (base64(iv) ":" base64(ct))
+-- using the same key (AI_SETTINGS_ENCRYPTION_KEY) as the ai_settings table.
+CREATE TABLE `email_settings` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(64) NOT NULL,
+  `setting_value` mediumtext NOT NULL,
+  `is_encrypted` tinyint(1) NOT NULL DEFAULT 0,
+  `updated_by` int DEFAULT NULL,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_email_settings_key` (`setting_key`),
+  KEY `idx_email_settings_updated_by` (`updated_by`),
+  CONSTRAINT `fk_email_settings_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+);
+
 -- Insert initial data into the users table
 INSERT INTO `users` (`name`, `username`, `position`, `role`, `password`, `status`, `reset_token`, `reset_token_expiration`, `login_attempts`, `account_locked`, `email_verified`, `email_token`, `initials`)
 VALUES ('Temporary Admin', 'admin@myvivarium.online', 'Principal Investigator', 'admin', '$2y$10$roVlhpjZsRFXY.m9JtRB/OAaN2dp50O7D2J5idI2MsUotxMyrHRZ6', 'approved', NULL, NULL, 0, NULL, 1, NULL, 'TAN');

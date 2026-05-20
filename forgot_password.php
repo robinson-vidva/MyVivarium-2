@@ -9,14 +9,9 @@
  * The script also fetches lab information to customize the page.
  */
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
 require 'dbcon.php';  // Include database connection file
 require 'config.php';  // Include configuration file
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-}
+require_once __DIR__ . '/includes/mailer.php';
 
 // Query to fetch the lab name, URL, and Turnstile keys from the settings table
 $labQuery = "SELECT name, value FROM settings WHERE name IN ('lab_name', 'url', 'cf-turnstile-sitekey', 'cf-turnstile-secretKey')";
@@ -114,28 +109,17 @@ function handlePasswordReset($con, $email, $resetBaseUrl, $genericSuccess) {
         // Build the reset link from the server's own hostname.
         $resetLink = rtrim($resetBaseUrl, '/') . "/reset_password.php?token=" . urlencode($resetToken);
 
-        $mail = new PHPMailer(true);
-        try {
-            $mail->isSMTP();
-            $mail->Host = SMTP_HOST;
-            $mail->Port = SMTP_PORT;
-            $mail->SMTPAuth = true;
-            $mail->Username = SMTP_USERNAME;
-            $mail->Password = SMTP_PASSWORD;
-            $mail->SMTPSecure = SMTP_ENCRYPTION;
-
-            $mail->setFrom(SENDER_EMAIL, SENDER_NAME);
-            $mail->addAddress($email);
-            $mail->isHTML(false);
-            $mail->Subject = 'Password Reset';
-            $mail->Body = "To reset your password, click the following link:\n" . $resetLink;
-
-            $mail->send();
-        } catch (Exception $e) {
-            // Log the underlying SMTP error for operators, but show the user a
-            // generic message — ErrorInfo can echo back user-supplied data and
-            // leak SMTP server details.
-            error_log('forgot_password mailer error: ' . $mail->ErrorInfo);
+        [$mailOk, $mailErr] = mv_send_mail(
+            $email,
+            'Password Reset',
+            "To reset your password, click the following link:\n" . $resetLink,
+            ['is_html' => false]
+        );
+        if (!$mailOk) {
+            // Log the underlying mailer error for operators, but show the user
+            // a generic message — error strings can echo back user-supplied
+            // data and leak transport details.
+            error_log('forgot_password mailer error: ' . $mailErr);
         }
     }
 
