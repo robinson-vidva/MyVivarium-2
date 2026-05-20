@@ -796,24 +796,29 @@ function ai_configs_usage_summary(mysqli $con): array
 
     $perConfig = [];
     if ($hasConfigCol) {
-        $sql = "SELECT u.config_id, COALESCE(c.nickname, u.provider, '(unknown)') AS label,
+        // provider/nickname live on ai_configs; ai_usage_log only stores the
+        // config_id link. Rows with NULL config_id or a config_id whose
+        // ai_configs row has been deleted fall through the LEFT JOIN and
+        // collapse into one "(unknown)" bucket via GROUP BY c.id.
+        $sql = "SELECT c.id AS config_id,
+                       COALESCE(c.nickname, c.provider, '(unknown)') AS label,
                        COALESCE(SUM(u.prompt_tokens),0) AS pt,
                        COALESCE(SUM(u.completion_tokens),0) AS ct,
                        COUNT(*) AS n
                   FROM ai_usage_log u
                   LEFT JOIN ai_configs c ON c.id = u.config_id
                  WHERE u.created_at >= DATE_SUB(UTC_DATE(), INTERVAL 30 DAY)
-                 GROUP BY u.config_id, label
+                 GROUP BY c.id, label
                  ORDER BY (SUM(u.prompt_tokens) + SUM(u.completion_tokens)) DESC";
     } else {
-        $sql = "SELECT NULL AS config_id, COALESCE(provider, '(unknown)') AS label,
+        // Pre-migration schema (no config_id column) — no way to attribute
+        // per-config, so return a single aggregate row.
+        $sql = "SELECT NULL AS config_id, '(all)' AS label,
                        COALESCE(SUM(prompt_tokens),0) AS pt,
                        COALESCE(SUM(completion_tokens),0) AS ct,
                        COUNT(*) AS n
                   FROM ai_usage_log
-                 WHERE created_at >= DATE_SUB(UTC_DATE(), INTERVAL 30 DAY)
-                 GROUP BY label
-                 ORDER BY (SUM(prompt_tokens) + SUM(completion_tokens)) DESC";
+                 WHERE created_at >= DATE_SUB(UTC_DATE(), INTERVAL 30 DAY)";
     }
     $r = @$con->query($sql);
     if ($r) {
