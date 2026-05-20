@@ -87,7 +87,12 @@ require 'header.php';
 </head>
 <body>
 <div class="container mt-4 content">
-    <h1>API Keys</h1>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+        <h1 class="mb-0">API Keys</h1>
+        <a href="api/docs/" class="btn btn-outline-primary">
+            <i class="fas fa-book"></i> View API Documentation
+        </a>
+    </div>
     <p class="text-muted">REST API access tokens. The raw key value is shown once at creation; only the hash is stored. Revoking a key stops it from working immediately.</p>
     <?php include 'message.php'; ?>
 

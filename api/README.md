@@ -10,7 +10,7 @@ The OpenAPI 3.1 spec at [`api/openapi.yaml`](openapi.yaml) is the single
 source of truth for the API surface. Three audiences read from it:
 
 - **Humans** — interactive Swagger UI at `/api/docs/` (admin only). Linked
-  from the admin menu next to "API Keys" and "AI Configuration".
+  from the API Keys admin page.
 - **Developers** — the spec itself is served at `/api/v1/openapi.yaml` and
   `/api/v1/openapi.json` (no auth required; the spec describes the surface
   and contains no secrets).
