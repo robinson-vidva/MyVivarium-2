@@ -19,14 +19,7 @@ require 'session_config.php';
 // Include the database connection file
 require 'dbcon.php';
 require 'config.php'; // Include configuration file for SMTP details
-// Composer is optional. PHPMailer is only needed for email side-effects on
-// this page; if vendor/ is missing the page still renders.
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-}
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+require_once __DIR__ . '/includes/mailer.php';
 
 // Query to fetch the lab name, URL, and Turnstile keys from the settings table
 $labQuery = "SELECT name, value FROM settings WHERE name IN ('lab_name', 'url', 'cf-turnstile-secretKey', 'cf-turnstile-sitekey')";
@@ -58,29 +51,9 @@ function sendConfirmationEmail($to, $token)
     $subject = 'Email Confirmation';
     $message = "Please click the link below to confirm your email address:\n$confirmLink";
 
-    $mail = new PHPMailer(true);
-    try {
-        //Server settings
-        $mail->isSMTP();
-        $mail->Host = SMTP_HOST;
-        $mail->Port = SMTP_PORT;
-        $mail->SMTPAuth = true;
-        $mail->Username = SMTP_USERNAME;
-        $mail->Password = SMTP_PASSWORD;
-        $mail->SMTPSecure = SMTP_ENCRYPTION;
-
-        //Recipients
-        $mail->setFrom(SENDER_EMAIL, SENDER_NAME);
-        $mail->addAddress($to);
-
-        // Content
-        $mail->isHTML(false);
-        $mail->Subject = $subject;
-        $mail->Body = $message;
-
-        $mail->send();
-    } catch (Exception $e) {
-        error_log("Message could not be sent. Mailer Error: {$mail->ErrorInfo}");
+    [$ok, $err] = mv_send_mail($to, $subject, $message, ['is_html' => false]);
+    if (!$ok) {
+        error_log('sendConfirmationEmail error: ' . $err);
     }
 }
 
