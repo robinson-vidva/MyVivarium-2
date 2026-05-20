@@ -683,6 +683,39 @@ function llm_chat_completions_via_configs(mysqli $con, array $messages, array $t
 }
 
 /**
+ * Mirror of llm_test_chat_probe() that also merges custom_settings (header.*
+ * and body extras) into the probe request. Test must match the real chat
+ * path or admins see false negatives on configs whose auth lives in a
+ * custom header (e.g. Azure APIM's Ocp-Apim-Subscription-Key).
+ */
+function ai_configs_run_test_chat_probe(array $cfg): array
+{
+    $maxTokens = llm_probe_max_tokens($cfg);
+    $userText  = ($maxTokens > 1) ? "Reply with 'ok'." : 'hi';
+    $messages  = [['role' => 'user', 'content' => $userText]];
+    $req       = llm_build_chat_request($cfg, $messages, [], $maxTokens);
+
+    $bodyArr = $req['body_arr'];
+    $headers = $req['headers'];
+    $split   = ai_configs_split_custom_settings($cfg['custom_settings'] ?? []);
+    foreach ($split['body_extras'] as $k => $v) $bodyArr[$k] = $v;
+    foreach ($split['headers']     as $h)       $headers[]   = $h;
+    $bodyStr = json_encode($bodyArr, JSON_UNESCAPED_SLASHES);
+
+    [$code, $body, $err] = llm_http_post($req['url'], $headers, $bodyStr);
+    if ($code === 0) {
+        return ['ok' => false, 'model_count' => null,
+                'error' => 'Network error: ' . ($err ?: 'unknown'),
+                'http_status' => 0];
+    }
+    if ($code >= 200 && $code < 300) {
+        return ['ok' => true, 'model_count' => null, 'error' => null, 'http_status' => $code];
+    }
+    $msg = llm_extract_error_message($body, $code, (string)($cfg['provider'] ?? ''));
+    return ['ok' => false, 'model_count' => null, 'error' => $msg, 'http_status' => $code];
+}
+
+/**
  * Per-config test connection. Tries primary first, then secondary on a
  * transient failure. Returns ['ok', 'http_status', 'error', 'used_key'].
  */
@@ -724,7 +757,7 @@ function ai_configs_test_connection(mysqli $con, int $configId): array
                 return $res;
             }
         }
-        $probe = llm_test_chat_probe($cfg, (string)$cfg['provider']);
+        $probe = ai_configs_run_test_chat_probe($cfg);
         $probe['used_key'] = $whichKey;
         if (!$probe['ok'] && llm_is_failover_status((int)$probe['http_status']) && $whichKey === 'primary' && !empty($row['api_key_secondary'])) {
             continue;
@@ -839,7 +872,20 @@ function ai_configs_usage_summary(mysqli $con): array
 function ai_configs_migrate_from_legacy(mysqli $con, int $userId): int
 {
     ai_configs_ensure_tables($con);
-    if (ai_configs_count($con) > 0) return 0;
+
+    // One-time migration. The flag is set after the first attempt (regardless
+    // of whether it found legacy keys) so deleting every config later does
+    // not cause this helper to resurrect the legacy entries from ai_settings
+    // on the next page load.
+    try {
+        if (ai_settings_get('ai_configs_migrated_from_legacy') === '1') return 0;
+    } catch (Throwable $e) {
+        return 0;
+    }
+    if (ai_configs_count($con) > 0) {
+        try { ai_settings_set('ai_configs_migrated_from_legacy', '1', $userId); } catch (Throwable $e) {}
+        return 0;
+    }
 
     $chain = llm_get_provider_chain_raw();
     $created = 0;
@@ -885,5 +931,6 @@ function ai_configs_migrate_from_legacy(mysqli $con, int $userId): int
     if ($created > 0) {
         log_activity($con, 'ai_config_migrate_legacy', 'ai_config', null, "created=$created");
     }
+    try { ai_settings_set('ai_configs_migrated_from_legacy', '1', $userId); } catch (Throwable $e) {}
     return $created;
 }
