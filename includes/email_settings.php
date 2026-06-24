@@ -29,36 +29,6 @@ function email_settings_is_secret(string $key): bool
     return in_array($key, EMAIL_SECRET_KEYS, true);
 }
 
-// Ensure the email_settings table exists. Mirrors
-// database/migrations/2026_05_20_email_settings.sql so the feature works on
-// databases provisioned before that migration shipped, without a manual
-// migration step — the same auto-provision posture as ai_settings_ensure_key().
-// Idempotent (CREATE TABLE IF NOT EXISTS). Throws EmailSettingsException with
-// an admin-facing message if the table is absent and cannot be created.
-function email_settings_ensure_table(mysqli $con): void
-{
-    $sql = "CREATE TABLE IF NOT EXISTS `email_settings` (
-              `id` int NOT NULL AUTO_INCREMENT,
-              `setting_key` varchar(64) NOT NULL,
-              `setting_value` mediumtext NOT NULL,
-              `is_encrypted` tinyint(1) NOT NULL DEFAULT 0,
-              `updated_by` int DEFAULT NULL,
-              `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-              PRIMARY KEY (`id`),
-              UNIQUE KEY `uniq_email_settings_key` (`setting_key`),
-              KEY `idx_email_settings_updated_by` (`updated_by`),
-              CONSTRAINT `fk_email_settings_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
-            )";
-    try {
-        $con->query($sql);
-    } catch (mysqli_sql_exception $e) {
-        throw new EmailSettingsException(
-            'The email_settings table is missing and could not be created automatically (' .
-            $e->getMessage() . '). Run database/migrations/2026_05_20_email_settings.sql against the database.'
-        );
-    }
-}
-
 function email_settings_get_raw_row(mysqli $con, string $key): ?array
 {
     $stmt = $con->prepare("SELECT setting_key, setting_value, is_encrypted, updated_by, updated_at
