@@ -288,7 +288,7 @@ mysqli_close($con);
                                 <td data-label="Name"><?php echo htmlspecialchars($row['name']); ?></td>
                                 <td data-label="Username"><?php echo htmlspecialchars($row['username']); ?></td>
                                 <td data-label="Status"><?php echo htmlspecialchars($row['status']); ?></td>
-                                <td data-label="Role"><?php echo htmlspecialchars($row['role']); ?></td>
+                                <td data-label="Role"><?php echo htmlspecialchars(role_label($row['role'])); ?></td>
                                 <td data-label="Actions">
                                     <form action="manage_users.php" method="post" class="action-buttons" onsubmit="return confirmAdminAction('<?php echo htmlspecialchars($row['username']); ?>')">
                                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
