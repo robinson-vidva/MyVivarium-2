@@ -12,6 +12,9 @@ require 'session_config.php';
 // Include the database connection file
 require 'dbcon.php';
 
+// Include the role capability matrix
+require_once 'services/roles.php';
+
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -21,6 +24,14 @@ if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
     exit; // Exit to ensure no further code is executed
+}
+
+// Role gate: view-only IACUC members may not log maintenance notes. (Vivarium
+// managers and veterinarians still can.)
+if (!role_can_add_note($_SESSION['role'] ?? null)) {
+    $_SESSION['message'] = 'Your role does not have permission to add maintenance records.';
+    header("Location: hc_dash.php");
+    exit;
 }
 
 // Generate a CSRF token if it doesn't exist

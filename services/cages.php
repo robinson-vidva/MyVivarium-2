@@ -385,6 +385,7 @@ function cage_card_data(mysqli $con, int $user_id, string $cage_id, string $kind
 
 function holding_create(mysqli $con, int $user_id, array $body): array
 {
+    perm_require_add_cage($con, $user_id);
     $cage_id = svc_required_str($body, 'cage_id');
     $pi      = svc_int($body, 'pi_name');
     $room    = svc_str($body, 'room');
@@ -447,6 +448,7 @@ function holding_update(mysqli $con, int $user_id, string $cage_id, array $body)
 
 function breeding_create(mysqli $con, int $user_id, array $body): array
 {
+    perm_require_add_cage($con, $user_id);
     $cage_id   = svc_required_str($body, 'cage_id');
     $cross     = svc_str($body, 'cross');
     $male_id   = svc_str($body, 'male_id');

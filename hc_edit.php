@@ -17,6 +17,7 @@
 require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
+require_once 'services/roles.php';
 
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -62,9 +63,15 @@ $cu->execute();
 $selectedUsers = array_column($cu->get_result()->fetch_all(MYSQLI_ASSOC), 'user_id');
 $cu->close();
 
-// Authz: admin OR assigned user
+// Authz: a write-capable role (admin/user/veterinarian) AND admin-or-assigned.
+// View-only roles (vivarium_manager, iacuc_member) are rejected outright.
 $currentUserId = $_SESSION['user_id'] ?? 0;
 $userRole      = $_SESSION['role'] ?? '';
+if (!role_can_write($userRole)) {
+    $_SESSION['message'] = 'Access denied. Your role has view-only access and cannot edit cages.';
+    header("Location: hc_dash.php?" . getCurrentUrlParams());
+    exit;
+}
 if ($userRole !== 'admin' && !in_array($currentUserId, $selectedUsers)) {
     $_SESSION['message'] = 'Access denied. Only admins or assigned users can edit this cage.';
     header("Location: hc_dash.php?" . getCurrentUrlParams());

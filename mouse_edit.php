@@ -15,10 +15,18 @@
 require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
+require_once 'services/roles.php';
 
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
+    exit;
+}
+
+// Role gate: view-only roles (vivarium_manager, iacuc_member) cannot edit mice.
+if (!role_can_write($_SESSION['role'] ?? null)) {
+    $_SESSION['message'] = 'Your role has view-only access and cannot edit mice.';
+    header("Location: home.php");
     exit;
 }
 

@@ -17,6 +17,9 @@ require 'dbcon.php';
 // Include the activity log helper
 require_once 'log_activity.php';
 
+// Include the role capability matrix
+require_once 'services/roles.php';
+
 // Disable error display in production (errors logged to server logs)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -114,6 +117,13 @@ if (isset($_GET['id'])) {
         $currentUserId = $_SESSION['user_id']; // User ID from session
         $userRole = $_SESSION['role']; // User role from session
         $cageUsers = $selectedUsers; // Array of user IDs associated with the cage
+
+        // View-only roles (vivarium_manager, iacuc_member) cannot edit cages.
+        if (!role_can_write($userRole)) {
+            $_SESSION['message'] = 'Access denied. Your role has view-only access and cannot edit cages.';
+            header("Location: bc_dash.php?" . getCurrentUrlParams());
+            exit();
+        }
 
         // Check if the user is either an admin or one of the users associated with the cage
         if ($userRole !== 'admin' && !in_array($currentUserId, $cageUsers)) {

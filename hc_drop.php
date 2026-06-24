@@ -19,6 +19,9 @@ require 'dbcon.php';
 // Include the activity log helper
 require_once 'log_activity.php';
 
+// Include the role capability matrix
+require_once 'services/roles.php';
+
 // Check if the user is not logged in, redirect them to index.php
 if (!isset($_SESSION['username'])) {
     header("Location: index.php");
@@ -89,6 +92,15 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
             }
         }
         mysqli_stmt_close($usersStmt);
+    }
+
+    // Role gate: veterinarians and the view-only roles may never delete or
+    // archive a cage, even when assigned to it.
+    if (!role_can_delete($userRole)) {
+        mysqli_rollback($con);
+        $_SESSION['message'] = 'Access denied. Your role cannot delete or archive cages.';
+        header("Location: hc_dash.php");
+        exit();
     }
 
     // Check if the user is either an admin or assigned to the cage

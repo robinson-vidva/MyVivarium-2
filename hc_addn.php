@@ -16,10 +16,19 @@
 require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
+require_once 'services/roles.php';
 
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
+    exit;
+}
+
+// Role gate: only roles that may create cages (admin, user, veterinarian) get
+// past here. View-only roles (vivarium_manager, iacuc_member) are turned away.
+if (!role_can_add_cage($_SESSION['role'] ?? null)) {
+    $_SESSION['message'] = 'Your role does not have permission to add cages.';
+    header("Location: hc_dash.php");
     exit;
 }
 

@@ -19,11 +19,22 @@ require 'dbcon.php';
 // Include the activity log helper
 require_once 'log_activity.php';
 
+// Include the role capability matrix
+require_once 'services/roles.php';
+
 // Check if the user is not logged in, redirect them to index.php with the current URL for redirection after login
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
     header("Location: index.php?redirect=$currentUrl");
     exit; // Exit to ensure no further code is executed
+}
+
+// Role gate: only roles that may create cages (admin, user, veterinarian) get
+// past here. View-only roles (vivarium_manager, iacuc_member) are turned away.
+if (!role_can_add_cage($_SESSION['role'] ?? null)) {
+    $_SESSION['message'] = 'Your role does not have permission to add cages.';
+    header("Location: bc_dash.php");
+    exit;
 }
 
 // Generate CSRF token if not already set
