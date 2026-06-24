@@ -45,6 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die('CSRF token validation failed');
     }
 
+    // View-only roles (vivarium_manager, iacuc_member) may read reminders but
+    // not create, edit, archive, restore or delete them. $uiCanWrite is set in
+    // header.php.
+    if (!$uiCanWrite) {
+        redirectToPage('Your role has view-only access and cannot modify reminders.');
+    }
+
     // Determine the action to perform
     if (isset($_POST['add']) || isset($_POST['edit'])) {
         // Only read form fields for add/edit actions
@@ -453,7 +460,7 @@ ob_end_flush(); // Flush the output buffer
 
         <!-- Button row: Add New + Archive Toggle -->
         <div class="add-button">
-            <?php if (!$showArchived): ?>
+            <?php if (!$showArchived && $uiCanWrite): ?>
                 <button id="addNewReminderButton" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Reminder</button>
             <?php endif; ?>
             <a href="manage_reminder.php<?= $showArchived ? '' : '?show_archived=1'; ?>"
@@ -623,6 +630,7 @@ ob_end_flush(); // Flush the output buffer
                                         <i class="fas fa-eye"></i>
                                     </button>
 
+                                    <?php if ($uiCanWrite): ?>
                                     <?php if ($showArchived): ?>
                                         <!-- Archived view: Restore + Delete Forever -->
                                         <form action="manage_reminder.php" method="post" style="display:inline-block;">
@@ -655,6 +663,7 @@ ob_end_flush(); // Flush the output buffer
                                             </button>
                                         </form>
                                     <?php endif; ?>
+                                    <?php endif; // $uiCanWrite ?>
                                 </div>
                             </td>
                         </tr>

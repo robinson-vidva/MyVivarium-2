@@ -144,14 +144,33 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 // Build query with optional search
 if (!empty($search)) {
     $search_pattern = '%' . $search . '%';
-    $count_stmt = $con->prepare("SELECT COUNT(*) as total FROM users WHERE name LIKE ? OR username LIKE ? OR role LIKE ? OR status LIKE ?");
-    $count_stmt->bind_param("ssss", $search_pattern, $search_pattern, $search_pattern, $search_pattern);
+
+    // Also match the friendly role label so that searching the displayed text
+    // (e.g. "IACUC Member") finds rows stored under the slug "iacuc_member".
+    $roleSlugMatches = [];
+    foreach (roles_all() as $slug) {
+        if (stripos(role_label($slug), $search) !== false) {
+            $roleSlugMatches[] = $slug;
+        }
+    }
+    $roleInClause = $roleSlugMatches
+        ? ' OR role IN (' . implode(',', array_fill(0, count($roleSlugMatches), '?')) . ')'
+        : '';
+    $whereSql   = "name LIKE ? OR username LIKE ? OR role LIKE ? OR status LIKE ?" . $roleInClause;
+    $baseTypes  = 'ssss' . str_repeat('s', count($roleSlugMatches));
+    $baseParams = array_merge(
+        [$search_pattern, $search_pattern, $search_pattern, $search_pattern],
+        $roleSlugMatches
+    );
+
+    $count_stmt = $con->prepare("SELECT COUNT(*) as total FROM users WHERE $whereSql");
+    $count_stmt->bind_param($baseTypes, ...$baseParams);
     $count_stmt->execute();
     $total_records = $count_stmt->get_result()->fetch_assoc()['total'];
     $count_stmt->close();
 
-    $user_stmt = $con->prepare("SELECT * FROM users WHERE name LIKE ? OR username LIKE ? OR role LIKE ? OR status LIKE ? ORDER BY name ASC LIMIT ? OFFSET ?");
-    $user_stmt->bind_param("ssssii", $search_pattern, $search_pattern, $search_pattern, $search_pattern, $records_per_page, $offset);
+    $user_stmt = $con->prepare("SELECT * FROM users WHERE $whereSql ORDER BY name ASC LIMIT ? OFFSET ?");
+    $user_stmt->bind_param($baseTypes . 'ii', ...array_merge($baseParams, [$records_per_page, $offset]));
     $user_stmt->execute();
     $userresult = $user_stmt->get_result();
     $user_stmt->close();

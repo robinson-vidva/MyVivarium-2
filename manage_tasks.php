@@ -87,6 +87,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die('CSRF token validation failed');
     }
 
+    // View-only roles (vivarium_manager, iacuc_member) may read tasks but not
+    // create, edit or delete them. $uiCanWrite is set in header.php.
+    if (!$uiCanWrite) {
+        redirectToPage('Your role has view-only access and cannot modify tasks.');
+    }
+
     $taskAction = '';
     $task_id = null; // Initialize task_id variable
 
@@ -554,9 +560,11 @@ ob_end_flush(); // Flush the output buffer
 
         <!-- Buttons to add a new task and show all tasks -->
         <div class="add-button">
+            <?php if ($uiCanWrite) : ?>
             <button id="addNewTaskButton" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add New Task
             </button>
+            <?php endif; ?>
             <?php if (isset($_GET['id']) && !empty($_GET['id'])) : ?>
                 <a href="manage_tasks.php" class="btn btn-secondary ml-2">Show All Tasks</a>
             <?php endif; ?>
@@ -703,10 +711,12 @@ ob_end_flush(); // Flush the output buffer
                             <td data-label="Status"><?= htmlspecialchars($row['status']); ?></td>
                             <td data-label="Actions" class="table-actions">
                                 <div class="action-buttons">
+                                    <?php if ($uiCanWrite) : ?>
                                     <button class="btn btn-warning btn-sm editButton" data-id="<?= $row['id']; ?>"><i class="fas fa-edit"></i></button>
+                                    <?php endif; ?>
                                     <button class="btn btn-info btn-sm viewButton" data-id="<?= $row['id']; ?>"><i class="fas fa-eye"></i></button>
 
-                                    <?php if ($row['assigned_by'] == $_SESSION['user_id'] || $_SESSION['role'] == 'admin') : ?>
+                                    <?php if ($uiCanWrite && ($row['assigned_by'] == $_SESSION['user_id'] || $_SESSION['role'] == 'admin')) : ?>
                                         <form action="manage_tasks.php" method="post" style="display:inline-block;">
                                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                                             <input type="hidden" name="id" value="<?= $row['id']; ?>">
