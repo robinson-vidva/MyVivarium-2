@@ -33,12 +33,24 @@ try {
     $envError = $e->getMessage();
 }
 
+// Auto-create the email_settings table if a prior migration step was skipped
+// (e.g. an existing database upgraded before this feature shipped). Without
+// this, every Save fails with "Table 'email_settings' doesn't exist".
+$setupError = null;
+try {
+    email_settings_ensure_table($con);
+} catch (EmailSettingsException $e) {
+    $setupError = $e->getMessage();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!isset($_POST['csrf_token']) || !hash_equals((string)$_SESSION['csrf_token'], (string)$_POST['csrf_token'])) {
         die('CSRF token validation failed');
     }
     if ($envError !== null) {
         $saveError = 'Cannot save: ' . $envError;
+    } elseif ($setupError !== null) {
+        $saveError = 'Cannot save: ' . $setupError;
     } else {
         $transport = strtolower(trim((string)($_POST['transport'] ?? 'smtp')));
         if (!in_array($transport, ['smtp', 'brevo'], true)) $transport = 'smtp';
@@ -195,6 +207,9 @@ require 'header.php';
 
     <?php if ($envError !== null): ?>
         <div class="alert alert-danger"><strong>Encryption key error:</strong> <?= htmlspecialchars($envError); ?></div>
+    <?php endif; ?>
+    <?php if ($setupError !== null): ?>
+        <div class="alert alert-danger"><strong>Database setup error:</strong> <?= htmlspecialchars($setupError); ?></div>
     <?php endif; ?>
     <?php if ($saveError !== null): ?>
         <div class="alert alert-danger"><?= htmlspecialchars($saveError); ?></div>
