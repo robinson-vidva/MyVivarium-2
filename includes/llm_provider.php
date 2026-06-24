@@ -777,11 +777,9 @@ function llm_http_post(string $url, array $headers, string $body): array
     $raw = curl_exec($ch);
     if ($raw === false) {
         $err = curl_error($ch);
-        curl_close($ch);
         return [0, '', $err];
     }
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
     return [$status, (string)$raw, ''];
 }
 
@@ -800,11 +798,9 @@ function llm_http_get(string $url, array $headers): array
     $raw = curl_exec($ch);
     if ($raw === false) {
         $err = curl_error($ch);
-        curl_close($ch);
         return [0, '', $err];
     }
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
     return [$status, (string)$raw, ''];
 }
 

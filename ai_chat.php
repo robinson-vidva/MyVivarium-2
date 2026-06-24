@@ -425,7 +425,6 @@ function chatbot_api_call(string $sessionKey, string $method, string $path, arra
     $raw = curl_exec($ch);
     if ($raw === false) {
         $err = curl_error($ch);
-        curl_close($ch);
         return [
             'status' => 0,
             'body'   => ['ok' => false, 'error' => ['code' => 'network', 'message' => $err]],
@@ -435,7 +434,6 @@ function chatbot_api_call(string $sessionKey, string $method, string $path, arra
     }
     $status      = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $contentType = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-    curl_close($ch);
 
     $isJsonCT = stripos($contentType, 'application/json') !== false;
     $decoded  = $isJsonCT ? json_decode($raw, true) : null;
@@ -504,12 +502,10 @@ function chatbot_api_health(): array
     $raw = curl_exec($ch);
     if ($raw === false) {
         $err = curl_error($ch);
-        curl_close($ch);
         return ['ok' => false, 'status' => 0, 'reason' => 'network: ' . $err];
     }
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $ct     = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-    curl_close($ch);
     if ($status < 200 || $status >= 300) {
         return ['ok' => false, 'status' => $status, 'reason' => "status $status"];
     }

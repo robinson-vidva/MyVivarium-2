@@ -98,7 +98,6 @@ if (isset($_POST['login'])) {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         $response = curl_exec($ch);
-        curl_close($ch);
         $result = json_decode($response, true);
 
         // Check Turnstile response success
