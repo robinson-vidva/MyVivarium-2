@@ -138,6 +138,18 @@ function perm_require_add_cage(mysqli $con, int $user_id): void
     }
 }
 
+/**
+ * Can the user log a maintenance note? Role-gated only (admin, vivarium_manager,
+ * veterinarian, user) with no per-cage assignment — matching the web
+ * maintenance form, where any maintenance-capable role may log against any cage.
+ */
+function perm_require_add_note(mysqli $con, int $user_id): void
+{
+    if (!role_can_add_note(perm_user_role($con, $user_id))) {
+        throw new ApiException('forbidden', "Your role cannot add maintenance notes", 403);
+    }
+}
+
 function perm_require_delete_cage(mysqli $con, int $user_id, string $cage_id): void
 {
     if (!perm_can_delete_cage($con, $user_id, $cage_id)) {

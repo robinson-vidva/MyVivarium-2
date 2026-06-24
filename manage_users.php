@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Log role changes
             if ($isRoleChange) {
-                log_activity($con, 'role_change', 'user', $username, "Changed role to $action");
+                log_activity($con, 'role_change', 'user', $username, "Changed role to " . role_label($action));
             }
         } else {
             // Log error and handle it gracefully

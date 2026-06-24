@@ -79,13 +79,3 @@ function role_can_add_note(?string $role): bool
 {
     return in_array($role, [ROLE_ADMIN, ROLE_VIVARIUM_MANAGER, ROLE_VETERINARIAN, ROLE_USER], true);
 }
-
-/**
- * View-only roles never write cages/mice. (vivarium_manager is view-only here
- * but may still log notes — see role_can_add_note.) Unknown/empty roles are
- * treated as view-only, which fails safe.
- */
-function role_is_view_only(?string $role): bool
-{
-    return !role_can_write($role);
-}

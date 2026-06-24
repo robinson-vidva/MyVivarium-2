@@ -109,7 +109,10 @@ function maint_create(mysqli $con, int $user_id, array $body): array
     }
     $chk->close();
 
-    perm_require_write_cage($con, $user_id, $cage_id);
+    // Maintenance logging is role-gated (not assignment-gated), consistent with
+    // the web maintenance form: any maintenance-capable role (admin, vivarium
+    // manager, veterinarian, user) may log against any cage. iacuc_member cannot.
+    perm_require_add_note($con, $user_id);
 
     $ins = $con->prepare("INSERT INTO maintenance (cage_id, user_id, comments, note_type) VALUES (?, ?, ?, ?)");
     $ins->bind_param('siss', $cage_id, $user_id, $note_text, $note_type);
