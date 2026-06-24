@@ -331,6 +331,7 @@ if (isset($settings['r2_pres'])) {
                         }
                         ?>
                         <li><a class="dropdown-item" href="cage_lineage.php">Cage Lineage</a></li>
+                        <li><a class="dropdown-item" href="room_maintenance.php"><i class="fas fa-clipboard-list me-1"></i> Recent Maintenance</a></li>
                     </ul>
                 </div>
 
