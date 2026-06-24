@@ -145,12 +145,14 @@ function mv_send_mail_brevo(array $to, string $subject, string $body, bool $isHt
     $resp = curl_exec($ch);
     if ($resp === false) {
         $err = curl_error($ch) ?: 'Unknown cURL error';
-        curl_close($ch);
+        // No curl_close(): cURL handles are freed automatically when $ch goes
+        // out of scope, and curl_close() is a deprecated no-op since PHP 8.0
+        // (it emits a Deprecated notice on 8.5 that would corrupt the JSON
+        // response from the test-email endpoint).
         error_log('mv_send_mail Brevo cURL error: ' . $err);
         return [false, $err];
     }
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     if ($status >= 200 && $status < 300) {
         return [true, ''];

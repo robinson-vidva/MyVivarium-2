@@ -125,7 +125,16 @@ function email_settings_get_view(mysqli $con): array
 // pre-fill the form from .env on first load.
 function email_settings_any_configured(mysqli $con): bool
 {
-    $res = $con->query("SELECT 1 FROM email_settings LIMIT 1");
+    // Tolerate a missing email_settings table (migration not yet run). Under
+    // mysqli's default exception mode (PHP 8.1+) a missing table throws
+    // rather than returning false, so catch it and report "nothing
+    // configured" — callers then render from / fall back to .env instead of
+    // surfacing an uncaught fatal on the admin page.
+    try {
+        $res = $con->query("SELECT 1 FROM email_settings LIMIT 1");
+    } catch (mysqli_sql_exception $e) {
+        return false;
+    }
     if (!$res) return false;
     $has = (bool)$res->fetch_row();
     $res->free();
