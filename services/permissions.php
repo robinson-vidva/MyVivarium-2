@@ -14,6 +14,7 @@
  */
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/roles.php';
 
 function perm_user_role(mysqli $con, int $user_id): ?string
 {
@@ -34,17 +35,51 @@ function perm_is_admin(mysqli $con, int $user_id): bool
 }
 
 /**
- * Can the user modify this cage? (admin OR assigned in cage_users)
+ * Is the user listed in cage_users for this cage?
  */
-function perm_can_write_cage(mysqli $con, int $user_id, string $cage_id): bool
+function perm_user_assigned_cage(mysqli $con, int $user_id, string $cage_id): bool
 {
-    if (perm_is_admin($con, $user_id)) return true;
     $stmt = $con->prepare("SELECT 1 FROM cage_users WHERE cage_id = ? AND user_id = ? LIMIT 1");
     $stmt->bind_param('si', $cage_id, $user_id);
     $stmt->execute();
     $ok = $stmt->get_result()->num_rows > 0;
     $stmt->close();
     return $ok;
+}
+
+/**
+ * Can the user modify this cage? admin OR (a write-capable role AND assigned
+ * in cage_users). View-only roles (iacuc_member, vivarium_manager) are
+ * rejected even if somehow assigned.
+ */
+function perm_can_write_cage(mysqli $con, int $user_id, string $cage_id): bool
+{
+    $role = perm_user_role($con, $user_id);
+    if ($role === ROLE_ADMIN) return true;
+    if (!role_can_write($role)) return false;
+    return perm_user_assigned_cage($con, $user_id, $cage_id);
+}
+
+/**
+ * Can the user create a new cage? Role-gated only (no per-cage assignment,
+ * since the cage does not exist yet). admin/user/veterinarian may; the
+ * view-only roles may not.
+ */
+function perm_can_add_cage(mysqli $con, int $user_id): bool
+{
+    return role_can_add_cage(perm_user_role($con, $user_id));
+}
+
+/**
+ * Can the user delete/archive this cage? admin OR (a delete-capable role AND
+ * assigned). Veterinarians are blocked here even when assigned.
+ */
+function perm_can_delete_cage(mysqli $con, int $user_id, string $cage_id): bool
+{
+    $role = perm_user_role($con, $user_id);
+    if ($role === ROLE_ADMIN) return true;
+    if (!role_can_delete($role)) return false;
+    return perm_user_assigned_cage($con, $user_id, $cage_id);
 }
 
 /**
@@ -93,5 +128,19 @@ function perm_require_write_mouse(mysqli $con, int $user_id, string $mouse_id): 
 {
     if (!perm_can_write_mouse($con, $user_id, $mouse_id)) {
         throw new ApiException('forbidden', "You don't have write access to mouse $mouse_id", 403);
+    }
+}
+
+function perm_require_add_cage(mysqli $con, int $user_id): void
+{
+    if (!perm_can_add_cage($con, $user_id)) {
+        throw new ApiException('forbidden', "Your role cannot create cages", 403);
+    }
+}
+
+function perm_require_delete_cage(mysqli $con, int $user_id, string $cage_id): void
+{
+    if (!perm_can_delete_cage($con, $user_id, $cage_id)) {
+        throw new ApiException('forbidden', "You don't have delete access to cage $cage_id", 403);
     }
 }

@@ -14,6 +14,9 @@ require 'session_config.php';
 // Include the database connection file
 require 'dbcon.php';
 
+// Include the role capability matrix (valid roles + labels)
+require_once 'services/roles.php';
+
 // Include the activity log helper
 require_once 'log_activity.php';
 
@@ -38,10 +41,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $action = trim($_POST['action'] ?? '');
 
+    // Every role change other than "promote to admin" is a downgrade away from
+    // admin. Built from the role matrix so new roles are covered automatically.
+    $downgradeActions = array_merge(
+        ['delete', 'pending'],
+        array_values(array_diff(roles_all(), [ROLE_ADMIN]))
+    );
+
     // Block actions that an admin should never be able to run against themselves.
     // (Deleting yourself or downgrading yourself can lock the system out.)
-    $selfDestructive = ['delete', 'pending', 'vivarium_manager', 'user'];
-    if ($username === ($_SESSION['username'] ?? '') && in_array($action, $selfDestructive, true)) {
+    if ($username === ($_SESSION['username'] ?? '') && in_array($action, $downgradeActions, true)) {
         $_SESSION['message'] = 'You cannot perform that action on your own account.';
         header('Location: manage_users.php');
         exit;
@@ -49,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Last-admin protection: refuse any change that would remove the final
     // active admin (delete, pending, or role downgrade away from admin).
-    $wouldRemoveAdmin = in_array($action, ['delete', 'pending', 'vivarium_manager', 'user'], true);
+    $wouldRemoveAdmin = in_array($action, $downgradeActions, true);
     if ($wouldRemoveAdmin) {
         $roleStmt = $con->prepare("SELECT role, status FROM users WHERE username = ?");
         $roleStmt->bind_param('s', $username);
@@ -70,10 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Initialize query variables
+    // Initialize query variables. A role change is any action that names a
+    // valid role (admin, vivarium_manager, veterinarian, iacuc_member, user).
     $query = "";
+    $isRoleChange = role_is_valid($action);
 
-    // Determine the action to take: approve, set to pending, delete user, set role to admin, vivarium_manager, or user
+    // Determine the action to take: approve, set to pending, delete user, or
+    // change role.
     switch ($action) {
         case 'approve':
             $query = "UPDATE users SET status='approved' WHERE username=?";
@@ -84,29 +96,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'delete':
             $query = "DELETE FROM users WHERE username=?";
             break;
-        case 'admin':
-            $query = "UPDATE users SET role='admin' WHERE username=?";
-            break;
-        case 'vivarium_manager':
-            $query = "UPDATE users SET role='vivarium_manager' WHERE username=?";
-            break;
-        case 'user':
-            $query = "UPDATE users SET role='user' WHERE username=?";
-            break;
         default:
-            die('Invalid action');
+            if ($isRoleChange) {
+                $query = "UPDATE users SET role=? WHERE username=?";
+            } else {
+                die('Invalid action');
+            }
     }
 
     // Execute the prepared statement if a valid action is set
     if (!empty($query)) {
         $statement = mysqli_prepare($con, $query);
         if ($statement) {
-            mysqli_stmt_bind_param($statement, "s", $username);
+            // Role changes bind (role, username); everything else binds username.
+            if ($isRoleChange) {
+                mysqli_stmt_bind_param($statement, "ss", $action, $username);
+            } else {
+                mysqli_stmt_bind_param($statement, "s", $username);
+            }
             mysqli_stmt_execute($statement);
             mysqli_stmt_close($statement);
 
             // Log role changes
-            if (in_array($action, ['admin', 'vivarium_manager', 'user'])) {
+            if ($isRoleChange) {
                 log_activity($con, 'role_change', 'user', $username, "Changed role to $action");
             }
         } else {
@@ -163,6 +175,16 @@ function buildUserQueryString($overrides = []) {
     $params = array_merge($params, $overrides);
     return http_build_query($params);
 }
+
+// Icon + colour for each role's "Make <role>" action button. Keyed by role so
+// the row below can simply render a button for every role except the current one.
+$roleButtonMeta = [
+    ROLE_ADMIN            => ['icon' => 'fa-user-shield',     'btn' => 'btn-warning'],
+    ROLE_VIVARIUM_MANAGER => ['icon' => 'fa-flask',           'btn' => 'btn-info'],
+    ROLE_VETERINARIAN     => ['icon' => 'fa-user-md',         'btn' => 'btn-info'],
+    ROLE_IACUC_MEMBER     => ['icon' => 'fa-clipboard-check', 'btn' => 'btn-info'],
+    ROLE_USER             => ['icon' => 'fa-user',            'btn' => 'btn-secondary'],
+];
 
 // Include the header file
 require 'header.php';
@@ -279,16 +301,10 @@ mysqli_close($con);
                                             <button type="submit" class="btn btn-secondary btn-sm" name="action" value="pending" title="Deactivate User"><i class="fas fa-ban"></i></button>
                                         <?php } ?>
 
-                                        <?php if ($row['role'] === 'user') { ?>
-                                            <button type="submit" class="btn btn-warning btn-sm" name="action" value="admin" title="Make Admin"><i class="fas fa-user-shield"></i></button>
-                                            <button type="submit" class="btn btn-info btn-sm" name="action" value="vivarium_manager" title="Make Vivarium Manager"><i class="fas fa-flask"></i></button>
-                                        <?php } elseif ($row['role'] == 'admin') { ?>
-                                            <button type="submit" class="btn btn-info btn-sm" name="action" value="user" title="Make User"><i class="fas fa-user"></i></button>
-                                            <button type="submit" class="btn btn-info btn-sm" name="action" value="vivarium_manager" title="Make Vivarium Manager"><i class="fas fa-flask"></i></button>
-                                        <?php } elseif ($row['role'] == 'vivarium_manager') { ?>
-                                            <button type="submit" class="btn btn-warning btn-sm" name="action" value="admin" title="Make Admin"><i class="fas fa-user-shield"></i></button>
-                                            <button type="submit" class="btn btn-secondary btn-sm" name="action" value="user" title="Make User"><i class="fas fa-user"></i></button>
-                                        <?php } ?>
+                                        <?php foreach ($roleButtonMeta as $roleKey => $roleMeta):
+                                            if ($row['role'] === $roleKey) continue; ?>
+                                            <button type="submit" class="btn <?= $roleMeta['btn']; ?> btn-sm" name="action" value="<?= htmlspecialchars($roleKey); ?>" title="Make <?= htmlspecialchars(role_label($roleKey)); ?>"><i class="fas <?= $roleMeta['icon']; ?>"></i></button>
+                                        <?php endforeach; ?>
 
                                         <button type="submit" class="btn btn-danger btn-sm" name="action" value="delete" title="Delete User"><i class="fas fa-trash"></i></button>
                                     </form>
