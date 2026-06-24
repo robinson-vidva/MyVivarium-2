@@ -131,6 +131,9 @@ require 'header.php';
                 <h2 class="mb-1">Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h2>
                 <span class="text-body-secondary" style="font-size: 0.9rem; opacity: 0.85;">
                     <?php echo htmlspecialchars($_SESSION['position']); ?>
+                    <?php if (!empty($_SESSION['role'])): ?>
+                        <span class="badge bg-secondary ms-1" title="Your access level"><?php echo htmlspecialchars(role_label($_SESSION['role'])); ?></span>
+                    <?php endif; ?>
                 </span>
             </div>
 
