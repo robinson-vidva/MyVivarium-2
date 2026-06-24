@@ -15,8 +15,10 @@
 require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
+require_once 'services/roles.php';
 
 if (!isset($_SESSION['username'])) { header('Location: index.php'); exit; }
+if (!role_can_write($_SESSION['role'] ?? null)) { $_SESSION['message'] = 'Your role has view-only access and cannot move mice.'; header('Location: mouse_dash.php'); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: mouse_dash.php'); exit; }
 if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) { die('CSRF token validation failed'); }
 

@@ -12,6 +12,7 @@
 
 require 'session_config.php';
 require 'dbcon.php';
+require_once 'services/roles.php';
 
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
@@ -88,7 +89,10 @@ if (!empty($mouse['dob'])) {
 }
 
 $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
-$canModify = !in_array($mouse['status'], ['sacrificed', 'archived'], true);
+// Edit/Move/Sacrifice require a write-capable role (admin/user/veterinarian)
+// AND a mouse that is still alive. View-only roles never see these.
+$canModify = role_can_write($_SESSION['role'] ?? null)
+          && !in_array($mouse['status'], ['sacrificed', 'archived'], true);
 
 $statusBadge = [
     'alive'           => 'bg-success',

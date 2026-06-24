@@ -17,6 +17,7 @@
 require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
+require_once 'services/roles.php';
 
 header('Content-Type: application/json');
 
@@ -25,6 +26,9 @@ if (!isset($_SESSION['username'])) {
     echo json_encode(['ok' => false, 'error' => 'unauthorized']);
     exit;
 }
+
+// View-only roles (vivarium_manager, iacuc_member) don't get the Edit button.
+$roleCanWrite = role_can_write($_SESSION['role'] ?? null);
 
 $mode = $_REQUEST['mode'] ?? 'list';
 
@@ -211,9 +215,11 @@ while ($m = $res->fetch_assoc()) {
     $rows .= '<td data-label="Cage">' . $cageCell . '</td>';
     $rows .= '<td data-label="Status"><span class="badge ' . $statusBadge . '">' . htmlspecialchars($m['status']) . '</span></td>';
     $rows .= '<td data-label="Actions" class="text-end">'
-          .  '<a href="mouse_view.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a> '
-          .  '<a href="mouse_edit.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>'
-          .  '</td>';
+          .  '<a href="mouse_view.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a> ';
+    if ($roleCanWrite) {
+        $rows .= '<a href="mouse_edit.php?id=' . urlencode($m['mouse_id']) . '" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>';
+    }
+    $rows .= '</td>';
     $rows .= '</tr>';
 }
 $stmt->close();

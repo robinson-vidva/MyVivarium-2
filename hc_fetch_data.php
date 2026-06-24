@@ -13,6 +13,7 @@ require 'session_config.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 require 'dbcon.php';
+require_once 'services/roles.php';
 ob_start();
 
 if (!isset($_SESSION['username'])) {
@@ -22,6 +23,10 @@ if (!isset($_SESSION['username'])) {
 
 $userRole = $_SESSION['role'] ?? '';
 $currentUserId = $_SESSION['user_id'] ?? 0;
+
+// Role capabilities (constant per request) for gating per-row action buttons.
+$roleCanWrite  = role_can_write($userRole);   // edit  (admin/user/veterinarian)
+$roleCanDelete = role_can_delete($userRole);  // archive/restore/delete (admin/user)
 
 $allowedLimits = [10, 20, 30, 50];
 $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
@@ -139,11 +144,19 @@ while ($row = $result->fetch_assoc()) {
 
     if ($userRole === 'admin' || $isAssigned) {
         if ($showArchived) {
-            $tableRows .= '<a href="#" onclick="confirmRestore(\'' . htmlspecialchars($cageID, ENT_QUOTES) . '\')" class="btn btn-success btn-sm" data-bs-toggle="tooltip" title="Restore"><i class="fas fa-undo"></i></a>'
-                        . '<a href="#" onclick="confirmPermanentDelete(\'' . htmlspecialchars($cageID, ENT_QUOTES) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" title="Delete Forever"><i class="fas fa-trash"></i></a>';
+            // Restore + permanent delete are delete-class actions.
+            if ($roleCanDelete) {
+                $tableRows .= '<a href="#" onclick="confirmRestore(\'' . htmlspecialchars($cageID, ENT_QUOTES) . '\')" class="btn btn-success btn-sm" data-bs-toggle="tooltip" title="Restore"><i class="fas fa-undo"></i></a>'
+                            . '<a href="#" onclick="confirmPermanentDelete(\'' . htmlspecialchars($cageID, ENT_QUOTES) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" title="Delete Forever"><i class="fas fa-trash"></i></a>';
+            }
         } else {
-            $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($cageID) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" title="Edit"><i class="fas fa-edit"></i></a>'
-                        . '<a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($cageID, ENT_QUOTES) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" title="Archive"><i class="fas fa-archive"></i></a>';
+            // Veterinarians may edit but not archive; view-only roles get neither.
+            if ($roleCanWrite) {
+                $tableRows .= '<a href="hc_edit.php?id=' . rawurlencode($cageID) . '" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" title="Edit"><i class="fas fa-edit"></i></a>';
+            }
+            if ($roleCanDelete) {
+                $tableRows .= '<a href="#" onclick="confirmDeletion(\'' . htmlspecialchars($cageID, ENT_QUOTES) . '\')" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" title="Archive"><i class="fas fa-archive"></i></a>';
+            }
         }
     }
     $tableRows .= '</td></tr>';

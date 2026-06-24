@@ -320,18 +320,22 @@ require 'header.php';
                     <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-center">
                         <h1 class="mb-0">Breeding Cage Dashboard</h1>
                         <div class="action-icons mt-3 mt-md-0">
+                            <?php if ($uiCanAddCage): ?>
                             <!-- Add new cage button with tooltip -->
                             <a href="bc_addn.php" class="btn btn-primary btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Add New Cage">
                                 <i class="fas fa-plus"></i>
                             </a>
+                            <?php endif; ?>
                             <!-- Print cage card button with tooltip -->
                             <a href="slct_crd.php" class="btn btn-success btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Print Cage Card">
                                 <i class="fas fa-print"></i>
                             </a>
+                            <?php if ($uiCanAddNote): ?>
                             <!-- Maintenance button with tooltip -->
                             <a href="maintenance.php?from=bc_dash" class="btn btn-warning btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Cage Maintenance">
                                 <i class="fas fa-wrench"></i>
                             </a>
+                            <?php endif; ?>
                         </div>
                     </div>
 

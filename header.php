@@ -18,6 +18,17 @@ header("Permissions-Policy: geolocation=(), microphone=(), camera=()"); // Restr
 // Include the database connection file
 require 'dbcon.php';
 
+// Role capability flags for showing/hiding action buttons on the shared
+// dashboards and views. These control UI visibility ONLY — every write
+// endpoint enforces the same rules server-side (see services/roles.php), so a
+// hidden button is not the access control, just a cleaner UX.
+require_once __DIR__ . '/services/roles.php';
+$uiRole       = $_SESSION['role'] ?? null;
+$uiCanAddCage = role_can_add_cage($uiRole);   // add cage  (admin/user/vet)
+$uiCanWrite   = role_can_write($uiRole);       // edit cage/mouse (admin/user/vet)
+$uiCanDelete  = role_can_delete($uiRole);      // delete/archive (admin/user)
+$uiCanAddNote = role_can_add_note($uiRole);    // log maintenance (all but iacuc)
+
 // Query to fetch settings from the database
 $query = "SELECT * FROM settings";
 $result = mysqli_query($con, $query);

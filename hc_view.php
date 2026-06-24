@@ -491,12 +491,16 @@ require 'header.php';
                     <a href="javascript:void(0);" onclick="goBack()" class="btn btn-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Go Back">
                         <i class="fas fa-arrow-circle-left"></i>
                     </a>
+                    <?php if ($uiCanWrite): ?>
                     <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
+                    <?php endif; ?>
+                    <?php if ($uiCanAddCage): ?>
                     <a href="hc_addn.php?clone=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-success btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Duplicate Cage">
                         <i class="fas fa-clone"></i>
                     </a>
+                    <?php endif; ?>
                     <a href="manage_tasks.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-info btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Manage Tasks">
                         <i class="fas fa-tasks"></i>
                     </a>
@@ -588,9 +592,11 @@ require 'header.php';
                 <i class="fas fa-paw"></i>
                 <h5>Mice (<?= count($mice); ?>)</h5>
                 <div class="action-buttons">
+                    <?php if ($uiCanWrite): ?>
                     <a href="mouse_addn.php?cage_id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-primary btn-sm" title="Register Mouse in this Cage">
                         <i class="fas fa-plus"></i>
                     </a>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php if (!empty($mice)) : ?>
@@ -624,9 +630,11 @@ require 'header.php';
                                     <td data-label="Actions">
                                         <div class="action-buttons">
                                             <a href="mouse_view.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
+                                            <?php if ($uiCanWrite): ?>
                                             <a href="mouse_edit.php?id=<?= rawurlencode($mouse['mouse_id']); ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
-                                            <?php if ($mouse['status'] === 'alive'): ?>
+                                                <?php if ($mouse['status'] === 'alive'): ?>
                                                 <button type="button" class="btn btn-sm btn-secondary" onclick="openTransferModal(<?= htmlspecialchars(json_encode($mouse['mouse_id'])); ?>)" title="Transfer to another cage"><i class="fas fa-exchange-alt"></i></button>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
                                     </td>
@@ -681,12 +689,16 @@ require 'header.php';
                 <i class="fas fa-clipboard-list"></i>
                 <h5>Maintenance Log</h5>
                 <div class="action-buttons">
+                    <?php if ($uiCanAddNote): ?>
                     <a href="maintenance.php?from=hc_dash" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Add Maintenance Record">
                         <i class="fas fa-wrench"></i>
                     </a>
+                    <?php endif; ?>
+                    <?php if ($uiCanWrite): ?>
                     <a href="hc_edit.php?id=<?= rawurlencode($holdingcage['cage_id']); ?>" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Cage">
                         <i class="fas fa-edit"></i>
                     </a>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php if ($maintenanceLogs->num_rows > 0) : ?>

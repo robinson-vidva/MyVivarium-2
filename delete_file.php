@@ -15,6 +15,9 @@ require 'session_config.php';
 // Include the database connection file
 require 'dbcon.php';
 
+// Include the role capability matrix
+require_once 'services/roles.php';
+
 // Check if the user is not logged in, redirect them to index.php with the current URL for redirection after login
 if (!isset($_SESSION['username'])) {
     header("Location: index.php");
@@ -53,6 +56,14 @@ if (isset($_GET['id'])) {
         $cageUsersResult = $stmtCageUsers->get_result();
         $cageUsers = array_column($cageUsersResult->fetch_all(MYSQLI_ASSOC), 'user_id');
         $stmtCageUsers->close();
+
+        // View-only roles (vivarium_manager, iacuc_member) cannot delete files,
+        // even when assigned to the cage.
+        if (!role_can_write($userRole)) {
+            $_SESSION['message'] = 'Access denied. Your role has view-only access and cannot delete files.';
+            header("Location: index.php");
+            exit();
+        }
 
         // Check if user is authorized (admin or assigned to cage)
         if ($userRole !== 'admin' && !in_array($currentUserId, $cageUsers)) {

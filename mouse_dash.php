@@ -148,9 +148,11 @@ require 'header.php';
                     <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-center">
                         <h1 class="mb-0">Mice</h1>
                         <div class="action-icons mt-3 mt-md-0">
+                            <?php if ($uiCanWrite): ?>
                             <a href="mouse_addn.php" class="btn btn-primary btn-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Register New Mouse">
                                 <i class="fas fa-plus"></i>
                             </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="card-body">
