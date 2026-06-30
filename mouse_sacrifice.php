@@ -12,6 +12,7 @@ require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
 require_once 'services/roles.php';
+require_once 'includes/cage_access.php';
 
 if (!isset($_SESSION['username'])) { header('Location: index.php'); exit; }
 if (!role_can_write($_SESSION['role'] ?? null)) { $_SESSION['message'] = 'Your role has view-only access and cannot sacrifice mice.'; header('Location: mouse_dash.php'); exit; }
@@ -28,7 +29,7 @@ if ($mouse_id === '' || $sacrificed_at === '') {
     header('Location: mouse_dash.php'); exit;
 }
 
-$stmt = $con->prepare("SELECT status FROM mice WHERE mouse_id = ?");
+$stmt = $con->prepare("SELECT status, current_cage_id FROM mice WHERE mouse_id = ?");
 $stmt->bind_param("s", $mouse_id);
 $stmt->execute();
 $res = $stmt->get_result();
@@ -38,6 +39,13 @@ if ($res->num_rows !== 1) {
 }
 $row = $res->fetch_assoc();
 $stmt->close();
+
+// Per-cage authorization: a non-admin may only act on a mouse in a cage they
+// are assigned to (matches the cage pages and the API).
+if (!cage_user_can_write_mouse($con, $user_id, $_SESSION['role'] ?? null, $row['current_cage_id'])) {
+    $_SESSION['message'] = 'Access denied. You can only modify mice in cages you are assigned to.';
+    header("Location: mouse_view.php?id=" . urlencode($mouse_id)); exit;
+}
 
 if ($row['status'] === 'sacrificed') {
     $_SESSION['message'] = 'Mouse is already marked sacrificed.';

@@ -16,6 +16,7 @@ require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
 require_once 'services/roles.php';
+require_once 'includes/cage_access.php';
 
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
@@ -52,6 +53,15 @@ if ($res->num_rows !== 1) {
 }
 $mouse = $res->fetch_assoc();
 $stmt->close();
+
+// Per-cage authorization: a non-admin may only edit a mouse in a cage they are
+// assigned to (matches the cage pages and the API). Gates both the edit form
+// and the write below.
+if (!cage_user_can_write_mouse($con, $_SESSION['user_id'] ?? null, $_SESSION['role'] ?? null, $mouse['current_cage_id'])) {
+    $_SESSION['message'] = 'Access denied. You can only edit mice in cages you are assigned to.';
+    header("Location: mouse_view.php?id=" . urlencode($mouse_id));
+    exit;
+}
 
 $strainRows = [];
 $rs = $con->query("SELECT str_id, str_name FROM strains ORDER BY str_id");
