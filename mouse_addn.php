@@ -77,6 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($mouse_id === '') $errors[] = 'Mouse ID is required.';
     if ($sex === 'unknown') $errors[] = 'Sex is required (male/female).';
     if (!$dob) $errors[] = 'DOB is required.';
+    // A mouse cannot be its own parent (mirrors mouse_edit.php).
+    if ($sire_id && $sire_id === $mouse_id) $errors[] = 'A mouse cannot be its own sire.';
+    if ($dam_id  && $dam_id  === $mouse_id) $errors[] = 'A mouse cannot be its own dam.';
 
     if (!$errors) {
         $check = $con->prepare("SELECT 1 FROM mice WHERE mouse_id = ?");
