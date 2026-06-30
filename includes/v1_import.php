@@ -198,6 +198,17 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
             if (!empty($m['cage_id'])) $miceByCage[$m['cage_id']][] = $m;
         }
 
+        // Set of cage_ids that actually exist (imported above, or pre-existing).
+        // A V1 mouse/holding row may reference a cage absent from the V1 cages
+        // table (orphaned/typo'd data); since the import runs with FK checks
+        // off, an unresolved cage would become a dangling current_cage_id.
+        // We NULL those out, keeping the original label as a breadcrumb.
+        $existingCageIds = [];
+        $cr = $con->query("SELECT cage_id FROM cages");
+        while ($row = $cr->fetch_assoc()) $existingCageIds[$row['cage_id']] = true;
+        $cr->close();
+        $droppedCageRefs = 0;
+
         // 3a. For each V1 mouse, merge in its cage's holding row defaults.
         // V1's mouse_id is only unique per cage; V2's is a global primary
         // key. Track the ids we've inserted so a mouse_id reused across two
@@ -216,8 +227,17 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
 
             // Disambiguate a duplicate mouse_id (same id in another V1 cage)
             // so the second occurrence is preserved rather than dropped.
+            // Resolve the mouse's cage; drop dangling references to NULL.
+            $cageValid   = ($cageId !== null && $cageId !== '' && isset($existingCageIds[$cageId]));
+            $currentCage = $cageValid ? $cageId : null;
+
             $mouseId = (string)$m['mouse_id'];
             $notes   = $m['notes'] ?? null;
+            if (!$cageValid && $cageId !== null && $cageId !== '') {
+                $cageNote = 'Original V1 cage "' . $cageId . '" not found at import; cage cleared.';
+                $notes = ($notes !== null && $notes !== '') ? $notes . ' ' . $cageNote : $cageNote;
+                $droppedCageRefs++;
+            }
             if (isset($usedMouseIds[$mouseId])) {
                 $suffix  = $cageId !== null ? '_' . $cageId : '_dup' . ($renamedDuplicates + 1);
                 $newId   = $mouseId . $suffix;
@@ -237,7 +257,7 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
                     'mouse_id'          => $mouseId,
                     'sex'               => $sex,
                     'dob'               => $holding['dob']    ?? null,
-                    'current_cage_id'   => $cageId,
+                    'current_cage_id'   => $currentCage,
                     'strain'            => $holding['strain'] ?? null,
                     'genotype'          => $m['genotype']     ?? null,
                     'status'            => 'alive',
@@ -262,22 +282,30 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
             if (!in_array($sex, ['male', 'female'], true)) $sex = 'unknown';
             $synthId = 'H_' . $cageId . '_' . ($h['id'] ?? '0');
             if (isset($usedMouseIds[$synthId])) continue;
+            // Same dangling-cage guard as 3a.
+            $cageValid   = isset($existingCageIds[$cageId]);
+            $synthNote   = 'Synthesized from v1 holding row (no individual mice listed for this cage in v1).';
+            if (!$cageValid) {
+                $synthNote .= ' Original V1 cage "' . $cageId . '" not found at import; cage cleared.';
+                $droppedCageRefs++;
+            }
             insert_row($con, 'mice',
                 ['mouse_id','sex','dob','current_cage_id','strain','status','notes','source_cage_label'],
                 [
                     'mouse_id'          => $synthId,
                     'sex'               => $sex,
                     'dob'               => $h['dob'] ?? null,
-                    'current_cage_id'   => $cageId,
+                    'current_cage_id'   => $cageValid ? $cageId : null,
                     'strain'            => $h['strain'] ?? null,
                     'status'            => 'alive',
-                    'notes'             => 'Synthesized from v1 holding row (no individual mice listed for this cage in v1).',
+                    'notes'             => $synthNote,
                     'source_cage_label' => $h['parent_cg'] ?? null,
                 ]);
             $usedMouseIds[$synthId] = true;
             $synthFromHolding++;
         }
         if ($synthFromHolding > 0) $counts['mice_synthesized_from_orphan_holding'] = $synthFromHolding;
+        if ($droppedCageRefs > 0)  $counts['mice_dangling_cage_cleared'] = $droppedCageRefs;
 
         // 3c. Breeding parents — synthesize archived mouse rows for any
         // male_id/female_id values that the V1 breeding row references but
