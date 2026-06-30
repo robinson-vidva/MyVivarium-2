@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Execute the statements and check if they were successful
         if ($insert_cage_query->execute() && $insert_breeding_query->execute()) {
             // Set a success message
-            $_SESSION['message'] = "New breeding cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' added successfully. <a href='bc_view.php?id=" . urlencode($cage_id) . "'>View cage</a>";
+            $_SESSION['message_html'] = "New breeding cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' added successfully. <a href='bc_view.php?id=" . urlencode($cage_id) . "'>View cage</a>";
 
             // Log activity
             log_activity($con, 'create', 'cage', $cage_id, 'Created breeding cage');

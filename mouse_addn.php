@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             log_activity($con, 'create', 'mouse', $mouse_id,
                 "Registered mouse" . ($cage_id ? " in cage $cage_id" : " (no cage assigned)"));
 
-            $_SESSION['message'] = "Mouse '<strong>" . htmlspecialchars($mouse_id) . "</strong>' registered successfully. <a href='mouse_view.php?id=" . urlencode($mouse_id) . "'>View mouse</a>";
+            $_SESSION['message_html'] = "Mouse '<strong>" . htmlspecialchars($mouse_id) . "</strong>' registered successfully. <a href='mouse_view.php?id=" . urlencode($mouse_id) . "'>View mouse</a>";
             header("Location: mouse_dash.php");
             exit;
         } catch (Exception $e) {
@@ -131,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $_SESSION['message'] = implode('<br>', array_map('htmlspecialchars', $errors));
+    $_SESSION['message_html'] = implode('<br>', array_map('htmlspecialchars', $errors));
 }
 
 require 'header.php';

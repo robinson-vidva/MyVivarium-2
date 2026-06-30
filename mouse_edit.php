@@ -105,7 +105,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+        $isRename = ($new_id !== $mouse_id);
         try {
+            $con->begin_transaction();
+
+            // InnoDB does NOT honor ON UPDATE CASCADE on a self-referential FK
+            // (mice.sire_id/dam_id -> mice.mouse_id), so renaming a mouse that
+            // is another mouse's parent otherwise fails with errno 1451. For a
+            // rename we disable FK checks for the duration and propagate every
+            // reference by hand; the non-self FKs (history, breeding) would
+            // cascade on their own, but with checks off we must move them too.
+            if ($isRename) {
+                $con->query("SET FOREIGN_KEY_CHECKS = 0");
+            }
+
             $upd = $con->prepare("
                 UPDATE mice SET
                   mouse_id = ?, sex = ?, dob = ?, strain = ?, genotype = ?, ear_code = ?,
@@ -122,18 +135,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $upd->execute();
             $upd->close();
 
+            if ($isRename) {
+                // Re-point every column that references the old mouse_id.
+                $refSqls = [
+                    "UPDATE mice SET sire_id = ? WHERE sire_id = ?",
+                    "UPDATE mice SET dam_id  = ? WHERE dam_id  = ?",
+                    "UPDATE mouse_cage_history SET mouse_id = ? WHERE mouse_id = ?",
+                    "UPDATE breeding SET male_id   = ? WHERE male_id   = ?",
+                    "UPDATE breeding SET female_id = ? WHERE female_id = ?",
+                ];
+                foreach ($refSqls as $sql) {
+                    $s = $con->prepare($sql);
+                    $s->bind_param("ss", $new_id, $mouse_id);
+                    $s->execute();
+                    $s->close();
+                }
+                $con->query("SET FOREIGN_KEY_CHECKS = 1");
+            }
+
+            $con->commit();
+
             log_activity($con, 'update', 'mouse', $new_id,
-                $new_id !== $mouse_id ? "Renamed from $mouse_id" : 'Edited fields');
+                $isRename ? "Renamed from $mouse_id" : 'Edited fields');
 
             $_SESSION['message'] = "Mouse updated.";
             header("Location: mouse_view.php?id=" . urlencode($new_id));
             exit;
         } catch (Exception $e) {
+            $con->rollback();
+            $con->query("SET FOREIGN_KEY_CHECKS = 1");
             $errors[] = 'Update failed: ' . $e->getMessage();
         }
     }
 
-    $_SESSION['message'] = implode('<br>', array_map('htmlspecialchars', $errors));
+    $_SESSION['message_html'] = implode('<br>', array_map('htmlspecialchars', $errors));
     // re-render with submitted values
     $mouse = array_merge($mouse, [
         'mouse_id' => $new_id, 'sex' => $sex, 'dob' => $dob, 'strain' => $strain,

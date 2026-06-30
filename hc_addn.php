@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_commit($con);
         log_activity($con, 'create', 'cage', $cage_id, 'Created holding cage');
 
-        $_SESSION['message'] = "Cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' created. "
+        $_SESSION['message_html'] = "Cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' created. "
             . "<a href='mouse_addn.php?cage_id=" . urlencode($cage_id) . "'>Add mice to this cage</a> "
             . "or <a href='hc_view.php?id=" . urlencode($cage_id) . "'>view it</a>.";
     } catch (Exception $e) {
