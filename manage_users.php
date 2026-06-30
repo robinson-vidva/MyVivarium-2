@@ -32,6 +32,24 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+/**
+ * How many cages a user owns (PI) and is assigned to. Used to warn an admin
+ * before deleting a user that those cages will be left orphaned (no PI, and
+ * admin-only until reassigned).
+ */
+function user_cage_impact(mysqli $con, string $username): array
+{
+    $stmt = $con->prepare("
+        SELECT (SELECT COUNT(*) FROM cages c       WHERE c.pi_name  = u.id) AS owned,
+               (SELECT COUNT(*) FROM cage_users cu WHERE cu.user_id = u.id) AS assigned
+          FROM users u WHERE u.username = ?");
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $r = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return ['owned' => (int)($r['owned'] ?? 0), 'assigned' => (int)($r['assigned'] ?? 0)];
+}
+
 // Handle POST requests for user status and role updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
@@ -79,6 +97,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Orphan-warning backstop for deletes: if the target owns or is assigned to
+    // cages, require an explicit confirmation (the JS confirm sets confirm_orphan
+    // when the admin accepts the warning). Protects against a direct POST too.
+    $deleteImpact = null;
+    if ($action === 'delete') {
+        $deleteImpact = user_cage_impact($con, $username);
+        if (($_POST['confirm_orphan'] ?? '') !== '1'
+            && ($deleteImpact['owned'] + $deleteImpact['assigned']) > 0) {
+            $_SESSION['message'] = sprintf(
+                'Delete not confirmed: "%s" owns %d cage(s) and is assigned to %d. '
+                . 'Deleting would leave those cages without a PI. Click Delete again and confirm the warning to proceed.',
+                $username, $deleteImpact['owned'], $deleteImpact['assigned']);
+            header('Location: manage_users.php');
+            exit;
+        }
+    }
+
     // Initialize query variables. A role change is any action that names a
     // valid role (admin, vivarium_manager, veterinarian, iacuc_member, user).
     $query = "";
@@ -120,6 +155,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Log role changes
             if ($isRoleChange) {
                 log_activity($con, 'role_change', 'user', $username, "Changed role to " . role_label($action));
+            }
+
+            // After a delete that orphaned cages, tell the admin so they can
+            // reassign a PI. (Reminders/maintenance the user created are kept
+            // but now show as "Unknown".)
+            if ($action === 'delete') {
+                log_activity($con, 'delete', 'user', $username, 'Admin deleted user');
+                if ($deleteImpact && $deleteImpact['owned'] > 0) {
+                    $_SESSION['message'] = sprintf(
+                        'User "%s" deleted. %d cage(s) are now without a PI — reassign an owner on the cage pages.',
+                        $username, $deleteImpact['owned']);
+                }
             }
         } else {
             // Log error and handle it gracefully
@@ -169,14 +216,20 @@ if (!empty($search)) {
     $total_records = $count_stmt->get_result()->fetch_assoc()['total'];
     $count_stmt->close();
 
-    $user_stmt = $con->prepare("SELECT * FROM users WHERE $whereSql ORDER BY name ASC LIMIT ? OFFSET ?");
+    $user_stmt = $con->prepare("SELECT *,
+            (SELECT COUNT(*) FROM cages c       WHERE c.pi_name  = users.id) AS owned_cages,
+            (SELECT COUNT(*) FROM cage_users cu WHERE cu.user_id = users.id) AS assigned_cages
+        FROM users WHERE $whereSql ORDER BY name ASC LIMIT ? OFFSET ?");
     $user_stmt->bind_param($baseTypes . 'ii', ...array_merge($baseParams, [$records_per_page, $offset]));
     $user_stmt->execute();
     $userresult = $user_stmt->get_result();
     $user_stmt->close();
 } else {
     $total_records = mysqli_query($con, "SELECT COUNT(*) as total FROM users")->fetch_assoc()['total'];
-    $user_stmt = $con->prepare("SELECT * FROM users ORDER BY name ASC LIMIT ? OFFSET ?");
+    $user_stmt = $con->prepare("SELECT *,
+            (SELECT COUNT(*) FROM cages c       WHERE c.pi_name  = users.id) AS owned_cages,
+            (SELECT COUNT(*) FROM cage_users cu WHERE cu.user_id = users.id) AS assigned_cages
+        FROM users ORDER BY name ASC LIMIT ? OFFSET ?");
     $user_stmt->bind_param("ii", $records_per_page, $offset);
     $user_stmt->execute();
     $userresult = $user_stmt->get_result();
@@ -248,6 +301,22 @@ mysqli_close($con);
             }
             return true;
         }
+
+        // Delete confirmation. Warns when the user owns or is assigned to cages,
+        // and arms the server-side confirm_orphan backstop when accepted.
+        function confirmDeleteUser(form, owned, assigned, username) {
+            var msg;
+            if (owned > 0 || assigned > 0) {
+                msg = 'WARNING: "' + username + '" owns ' + owned + ' cage(s) and is assigned to ' + assigned + ' cage(s).\n\n'
+                    + 'Deleting will leave owned cages WITHOUT a PI (admin-only until you reassign one) and remove their cage assignments. '
+                    + 'Reminders and maintenance logs they created are kept but will show as "Unknown".\n\nDelete anyway?';
+            } else {
+                msg = 'Delete user "' + username + '"? This cannot be undone.';
+            }
+            if (!confirm(msg)) return false;
+            if (form.confirm_orphan) form.confirm_orphan.value = '1';
+            return true;
+        }
     </script>
 </head>
 
@@ -313,6 +382,7 @@ mysqli_close($con);
                                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                                         <input type="hidden" name="name" value="<?php echo htmlspecialchars($row['name']); ?>">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars($row['username']); ?>">
+                                        <input type="hidden" name="confirm_orphan" value="">
 
                                         <?php if ($row['status'] === 'pending') { ?>
                                             <button type="submit" class="btn btn-success btn-sm" name="action" value="approve" title="Approve User"><i class="fas fa-check"></i></button>
@@ -325,7 +395,7 @@ mysqli_close($con);
                                             <button type="submit" class="btn <?= $roleMeta['btn']; ?> btn-sm" name="action" value="<?= htmlspecialchars($roleKey); ?>" title="Make <?= htmlspecialchars(role_label($roleKey)); ?>"><i class="fas <?= $roleMeta['icon']; ?>"></i></button>
                                         <?php endforeach; ?>
 
-                                        <button type="submit" class="btn btn-danger btn-sm" name="action" value="delete" title="Delete User"><i class="fas fa-trash"></i></button>
+                                        <button type="submit" class="btn btn-danger btn-sm" name="action" value="delete" title="Delete User" onclick="return confirmDeleteUser(this.form, <?php echo (int)$row['owned_cages']; ?>, <?php echo (int)$row['assigned_cages']; ?>, '<?php echo htmlspecialchars(addslashes($row['username']), ENT_QUOTES); ?>')"><i class="fas fa-trash"></i></button>
                                     </form>
                                 </td>
                             </tr>

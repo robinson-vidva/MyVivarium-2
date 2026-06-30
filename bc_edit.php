@@ -1320,9 +1320,9 @@ require 'header.php';
                                 <?php
                                 // Fetch the maintenance logs for the current cage
                                 $maintenanceQuery = "
-                                    SELECT m.id, m.timestamp, u.name AS user_name, m.comments, m.user_id 
+                                    SELECT m.id, m.timestamp, COALESCE(u.name, 'Unknown') AS user_name, m.comments, m.user_id
                                     FROM maintenance m
-                                    JOIN users u ON m.user_id = u.id
+                                    LEFT JOIN users u ON m.user_id = u.id
                                     WHERE m.cage_id = ?
                                     ORDER BY m.timestamp DESC";
                                 $stmtMaintenance = $con->prepare($maintenanceQuery);

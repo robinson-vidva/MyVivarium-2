@@ -94,10 +94,10 @@ $dataSql = "SELECT m.id, m.cage_id, m.comments, $noteTypeSelect, m.timestamp,
                    c.room, c.rack,
                    (CASE WHEN EXISTS (SELECT 1 FROM breeding b WHERE b.cage_id = c.cage_id)
                          THEN 'breeding' ELSE 'holding' END) AS cage_type,
-                   u.name AS user_name
+                   COALESCE(u.name, 'Unknown') AS user_name
               FROM maintenance m
               JOIN cages c ON m.cage_id = c.cage_id
-              JOIN users u ON m.user_id = u.id
+              LEFT JOIN users u ON m.user_id = u.id
              WHERE $where
           ORDER BY m.timestamp DESC
              LIMIT ? OFFSET ?";

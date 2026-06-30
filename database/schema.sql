@@ -253,7 +253,10 @@ CREATE TABLE `reminders` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `title` VARCHAR(255) NOT NULL,
   `description` TEXT NOT NULL,
-  `assigned_by` INT NOT NULL,
+  -- Nullable + ON DELETE SET NULL so a reminder created by a user who is later
+  -- deleted survives (orphaned) rather than being cascade-deleted out from under
+  -- the people it's assigned to.
+  `assigned_by` INT DEFAULT NULL,
   `assigned_to` VARCHAR(255) NOT NULL,
   `recurrence_type` ENUM('daily', 'weekly', 'monthly') NOT NULL,
   `day_of_week` ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday') DEFAULT NULL,
@@ -266,7 +269,7 @@ CREATE TABLE `reminders` (
   `last_task_created` DATETIME NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE,
-  FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_reminders_assigned_by` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 );
 
 -- Table for in-app notifications
@@ -291,7 +294,9 @@ CREATE TABLE `notifications` (
 CREATE TABLE `maintenance` (
   `id` int NOT NULL AUTO_INCREMENT,
   `cage_id` varchar(255) NOT NULL,
-  `user_id` int NOT NULL,
+  -- Nullable + ON DELETE SET NULL so the maintenance audit trail survives when
+  -- the logging user is deleted (the record is kept, attribution is cleared).
+  `user_id` int DEFAULT NULL,
   `comments` text DEFAULT NULL,
   `note_type` varchar(64) DEFAULT NULL,
   `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -299,7 +304,7 @@ CREATE TABLE `maintenance` (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`cage_id`) REFERENCES `cages` (`cage_id`) ON UPDATE CASCADE,
-  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_maintenance_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 );
 
 -- Table for storing activity/audit log

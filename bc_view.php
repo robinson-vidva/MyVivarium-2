@@ -192,9 +192,9 @@ $userDisplayString = implode(', ', $userDisplay);
 
 // Fetch the maintenance logs for the current cage
 $maintenanceQuery = "
-    SELECT m.timestamp, u.name AS user_name, m.comments 
+    SELECT m.timestamp, COALESCE(u.name, 'Unknown') AS user_name, m.comments
     FROM maintenance m
-    JOIN users u ON m.user_id = u.id
+    LEFT JOIN users u ON m.user_id = u.id
     WHERE m.cage_id = ?
     ORDER BY m.timestamp DESC";
 
