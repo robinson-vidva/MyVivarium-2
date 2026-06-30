@@ -564,8 +564,6 @@ Vidva, R., Raza, M. A., Prabhakaran, J., Sheikh, A., Sharp, A., Ott, H., Moore, 
 }
 ```
 
-The work was first released as a preprint: Vidva et al. (2024), *bioRxiv*, https://doi.org/10.1101/2024.08.10.607395. Please cite the published *Computational and Structural Biotechnology Journal* version above.
-
 ## Testing & Quality
 
 Regression tests, the test plan, and historical regression reports live in a companion repository: [MyVivarium-2-tests](https://github.com/robinson-vidva/MyVivarium-2-tests).
