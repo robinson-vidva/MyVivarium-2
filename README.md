@@ -10,7 +10,7 @@
 
 MyVivarium is an online platform designed to manage your vivarium effectively. It provides features such as user registration, profile management, lab management, task and reminder scheduling, calendar views, and real-time environmental monitoring with IoT sensors.
 
-**MyVivarium-2** is the enhanced version with improved security, new features, and a better user experience. The original [MyVivarium](https://github.com/myvivarium/MyVivarium) repository is preserved as the initial release.
+**MyVivarium-2** is the enhanced version with improved security, new features, and a better user experience. It builds on the original **MyVivarium v1** — the release described in the published paper (see [Citations](#citations)) — which remains available at [myvivarium/MyVivarium](https://github.com/myvivarium/MyVivarium) and is preserved as the initial release. If you are upgrading from v1, see [Migrating from v1](#migrating-from-v1).
 
 ## Table of Contents
 - [What's New in v2](#whats-new-in-v2)
@@ -238,6 +238,23 @@ SENDER_EMAIL=sender@example.com
 SENDER_NAME=MyVivarium
 ```
 
+##### Optional Settings
+```bash
+# Encryption key for stored AI-provider and SMTP secrets (AES-256-CBC).
+# Must be 64 hex characters (32 bytes). Generate one with:
+#   php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
+# If omitted, a key is auto-generated and written to .env the first time an
+# admin opens the AI Configuration page. Set a stable value before saving any
+# provider keys or SMTP credentials, or you won't be able to decrypt them later.
+AI_SETTINGS_ENCRYPTION_KEY=
+
+# Set to false only for local HTTP development so session cookies aren't
+# restricted to HTTPS (defaults to true).
+SESSION_COOKIE_SECURE=true
+```
+
+See [database/README.md](database/README.md) for more on the AI/email encryption key.
+
 ## Migrating from v1
 
 V2 is a greenfield rewrite — it doesn't upgrade an existing v1 database
@@ -410,25 +427,26 @@ transforms it into the v2 mouse-as-entity model in a single transaction.
 
 ## Citations
 
-If you use this code, please cite the following paper:
+If you use this code, please cite the peer-reviewed paper:
 
-Vidva, R., Raza, M. A., Prabhakaran, J., Sheikh, A., Sharp, A., Ott, H., Moore, A., Fleisher, C., Pitychoutis, P. M., Nguyen, T. V., & Sathyanesan, A. (2024). MyVivarium: A cloud-based lab animal colony management application with near-realtime ambient sensing. *bioRxiv*. https://doi.org/10.1101/2024.08.10.607395
+Vidva, R., Raza, M. A., Prabhakaran, J., Sheikh, A., Sharp, A., Ott, H., Moore, A., Fleisher, C., Netherton, H., Goldstein, E., Pitychoutis, P. M., Nguyen, T. V., & Sathyanesan, A. (2025). MyVivarium: A cloud-based lab animal colony management application with realtime ambient sensing. *Computational and Structural Biotechnology Journal, 27*, 612–623. https://doi.org/10.1016/j.csbj.2025.01.025
 
 ### BibTeX
 
 ```bibtex
-@article {Vidva2024.08.10.607395,
-	author = {Vidva, Robinson and Raza, Mir Abbas and Prabhakaran, Jaswant and Sheikh, Ayesha and Sharp, Alaina and Ott, Hayden and Moore, Amelia and Fleisher, Christopher and Pitychoutis, Pothitos M. and Nguyen, Tam V. and Sathyanesan, Aaron},
-	title = {MyVivarium: A cloud-based lab animal colony management application with near-realtime ambient sensing},
-	elocation-id = {2024.08.10.607395},
-	year = {2024},
-	doi = {10.1101/2024.08.10.607395},
-	publisher = {Cold Spring Harbor Laboratory},
-	URL = {https://www.biorxiv.org/content/early/2024/08/10/2024.08.10.607395},
-	eprint = {https://www.biorxiv.org/content/early/2024/08/10/2024.08.10.607395.full.pdf},
-	journal = {bioRxiv}
+@article{Vidva2025MyVivarium,
+	author  = {Vidva, Robinson and Raza, Mir Abbas and Prabhakaran, Jaswant and Sheikh, Ayesha and Sharp, Alaina and Ott, Hayden and Moore, Amelia and Fleisher, Christopher and Netherton, Hailey and Goldstein, Evan and Pitychoutis, Pothitos M. and Nguyen, Tam V. and Sathyanesan, Aaron},
+	title   = {MyVivarium: A cloud-based lab animal colony management application with realtime ambient sensing},
+	journal = {Computational and Structural Biotechnology Journal},
+	year    = {2025},
+	volume  = {27},
+	pages   = {612--623},
+	doi     = {10.1016/j.csbj.2025.01.025},
+	url     = {https://doi.org/10.1016/j.csbj.2025.01.025}
 }
 ```
+
+The work was first released as a preprint: Vidva et al. (2024), *bioRxiv*, https://doi.org/10.1101/2024.08.10.607395. Please cite the published *Computational and Structural Biotechnology Journal* version above.
 
 ## Testing & Quality
 
