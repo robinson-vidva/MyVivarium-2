@@ -158,64 +158,182 @@ on the mouse, not the cage.
 
 5. **Follow the prompts** to configure email, domain, database password, and SMTP settings.
 
-### 2. Custom Installation
+### 2. Manual Install on Any Linux Server
+
+MyVivarium is a standard PHP + MySQL application, so it runs on any Linux
+distribution that can provide a web server, PHP, and MySQL/MariaDB. The steps
+below are distribution-agnostic; only the package-install command and a couple
+of default names (the web-server user and document root) differ between
+distributions — those differences are called out inline.
 
 #### Prerequisites
-- PHP 8.1+
-- MySQL 8.0+
-- Apache 2.4+
-- Composer
-- [LAMP Stack Tutorial](https://www.digitalocean.com/community/tutorials/how-to-install-lamp-stack-on-ubuntu)
+- **PHP 8.1+** with the `mysqli`, `mbstring`, `openssl`, `curl`, and `json` extensions
+- **MySQL 8.0+** or **MariaDB 10.5+**
+- A web server: **Apache 2.4+** (with `mod_php` or PHP-FPM) or **Nginx + PHP-FPM**
+- **Composer** (PHP dependency manager)
+- **git** and **cron** (most distros ship cron as `cron` or `cronie`)
 
-#### Steps
+#### Step 1 — Install the dependencies for your distribution
 
-1. **Clone the repository:**
-    ```bash
-    git clone https://github.com/robinson-vidva/MyVivarium-2.git
-    cd MyVivarium-2
-    ```
+<details>
+<summary><strong>Debian / Ubuntu</strong> (and derivatives: Mint, Pop!_OS, Raspberry Pi OS)</summary>
 
-2. **Set up the environment configuration:**
-    ```bash
-    cp .env.example .env
-    ```
-    Update `.env` with your database and SMTP settings (see [Configuration](#configuration)).
+```bash
+sudo apt update
+sudo apt install -y apache2 mariadb-server php php-cli php-mysqli \
+    php-mbstring php-curl php-xml libapache2-mod-php composer git cron
+```
+</details>
 
-3. **Install dependencies:**
-    ```bash
-    composer install
-    ```
+<details>
+<summary><strong>RHEL / CentOS Stream / Rocky / AlmaLinux / Fedora</strong></summary>
 
-4. **Place files in the web server directory:**
-    ```bash
-    sudo cp -r . /var/www/html/
-    ```
+```bash
+# RHEL family uses dnf (yum on older releases)
+sudo dnf install -y httpd mariadb-server php php-cli php-mysqlnd \
+    php-mbstring php-curl php-xml php-json composer git cronie
+sudo systemctl enable --now httpd mariadb crond
+```
+</details>
 
-5. **Set up the database:**
-    ```bash
-    # Create the empty database (the installer doesn't CREATE DATABASE itself)
-    mysql -u yourusername -p -e "CREATE DATABASE myvivarium;"
+<details>
+<summary><strong>Arch Linux / Manjaro</strong></summary>
 
-    # Apply the schema using the installer (reads .env, reports each table created)
-    php /var/www/html/database/install.php
-    ```
-    Need to wipe a dev database and re-apply? `php database/install.php --reset` drops every table, then re-installs. Lost the seeded admin password? `php database/reset_admin.php --email=you@lab.org --password='...'`.
+```bash
+sudo pacman -Syu --needed apache mariadb php php-apache \
+    composer git cronie
+# Initialize MariaDB's data directory on first install:
+sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+sudo systemctl enable --now httpd mariadb cronie
+```
+</details>
 
-6. **Set up cron jobs:**
-    ```bash
-    crontab -e
-    ```
-    Add:
-    ```
-    * * * * * /usr/bin/php /var/www/html/send_email.php > /dev/null 2>&1
-    * * * * * /usr/bin/php /var/www/html/process_reminders.php > /dev/null 2>&1
-    ```
+<details>
+<summary><strong>openSUSE</strong></summary>
 
-7. **Set ownership and permissions:**
-    ```bash
-    sudo chown -R www-data:www-data /var/www/html
-    sudo chmod -R 755 /var/www/html
-    ```
+```bash
+sudo zypper install -y apache2 mariadb php8 php8-cli php8-mysql \
+    php8-mbstring php8-curl php8-openssl apache2-mod_php8 composer git cron
+sudo systemctl enable --now apache2 mariadb cron
+```
+</details>
+
+> **Web-server user and document root vary by distribution.** Use the right
+> values for yours in the ownership and virtual-host steps below:
+>
+> | Distribution family | Web-server user:group | Default document root |
+> |---|---|---|
+> | Debian / Ubuntu | `www-data:www-data` | `/var/www/html` |
+> | RHEL / Fedora / Rocky / Alma | `apache:apache` | `/var/www/html` |
+> | Arch / Manjaro | `http:http` | `/srv/http` |
+> | openSUSE | `wwwrun:www` | `/srv/www/htdocs` |
+>
+> The rest of this guide uses `www-data` and `/var/www/html` as examples —
+> substitute your distribution's values. You can confirm the web-server user
+> with `ps aux | grep -E 'apache|httpd|php-fpm'`.
+
+#### Step 2 — Clone the repository
+```bash
+git clone https://github.com/robinson-vidva/MyVivarium-2.git
+cd MyVivarium-2
+```
+
+#### Step 3 — Configure the environment
+```bash
+cp .env.example .env
+```
+Edit `.env` with your database and SMTP settings (see [Configuration](#configuration)).
+
+#### Step 4 — Install PHP dependencies
+```bash
+composer install
+```
+
+#### Step 5 — Deploy the files to the web root
+```bash
+# Use your distribution's document root from the table above.
+sudo cp -r . /var/www/html/
+```
+
+#### Step 6 — Create and populate the database
+```bash
+# Secure the database server on a fresh install (sets the root password, etc.):
+sudo mysql_secure_installation
+
+# Create the empty database (the installer doesn't CREATE DATABASE itself):
+sudo mysql -e "CREATE DATABASE myvivarium;"
+
+# Apply the schema using the installer (reads .env, reports each table created):
+php /var/www/html/database/install.php
+```
+Need to wipe a dev database and re-apply? `php database/install.php --reset` drops every table, then re-installs. Lost the seeded admin password? `php database/reset_admin.php --email=you@lab.org --password='...'`.
+
+#### Step 7 — Set ownership and permissions
+```bash
+# Substitute your distribution's web-server user:group and document root.
+sudo chown -R www-data:www-data /var/www/html
+sudo chmod -R 755 /var/www/html
+```
+
+#### Step 8 — Schedule the background jobs (cron)
+
+MyVivarium sends queued emails and processes reminders from two CLI scripts
+that should run every minute. Install them under the web-server user so they
+share the same file permissions:
+
+```bash
+sudo crontab -u www-data -e
+```
+Add (adjust the PHP path — `which php` — and document root for your system):
+```
+* * * * * /usr/bin/php /var/www/html/send_email.php > /dev/null 2>&1
+* * * * * /usr/bin/php /var/www/html/process_reminders.php > /dev/null 2>&1
+```
+
+#### Step 9 — Configure the web server
+
+**Apache** — enable URL rewriting and point a virtual host at the document root:
+```bash
+# Debian/Ubuntu: sudo a2enmod rewrite && sudo systemctl reload apache2
+# RHEL/Fedora:   mod_rewrite ships enabled; sudo systemctl reload httpd
+```
+Ensure the `<Directory>` for your document root has `AllowOverride All` so the
+app's settings take effect, then reload the service.
+
+**Nginx + PHP-FPM** — use a server block like:
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+    root /var/www/html;
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass unix:/run/php/php-fpm.sock;  # path varies by distro
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    }
+}
+```
+
+#### Step 10 — (Recommended) Enable HTTPS
+
+Use [Certbot](https://certbot.eff.org/) to obtain a free Let's Encrypt
+certificate (`certbot --apache` or `certbot --nginx`). Keep
+`SESSION_COOKIE_SECURE=true` (the default) once HTTPS is in place.
+
+> **Want this automated?** On a Debian/Ubuntu host the `setup/setup.sh` script
+> performs steps 2–10 (packages, database, Apache vhost, SSL, and cron) for you:
+> ```bash
+> curl -O https://raw.githubusercontent.com/robinson-vidva/MyVivarium-2/main/setup/setup.sh
+> chmod +x setup.sh
+> sudo ./setup.sh
+> ```
+> It assumes `apt` and the `www-data` user, so use the manual steps above on
+> non-Debian distributions.
 
 #### Configuration
 
