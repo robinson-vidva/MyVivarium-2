@@ -43,6 +43,14 @@ if ($mode === 'create_cage') {
         echo json_encode(['ok' => false, 'error' => 'CSRF validation failed']);
         exit;
     }
+    // Role gate: only cage-creating roles may add a cage here. View-only roles
+    // (vivarium_manager, iacuc_member) are rejected even though they can reach
+    // this endpoint — mirrors role_can_add_cage enforcement elsewhere.
+    if (!role_can_add_cage($_SESSION['role'] ?? null)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Your role cannot create cages']);
+        exit;
+    }
     $cage_id = trim($_POST['cage_id'] ?? '');
     $room    = trim($_POST['room'] ?? '');
     $rack    = trim($_POST['rack'] ?? '');

@@ -385,12 +385,11 @@ transforms it into the v2 mouse-as-entity model in a single transaction.
 ### Database
 | File | Description |
 |------|-------------|
-| `database/schema.sql` | Canonical v2 schema (19 tables, mouse-as-entity model) |
+| `database/schema.sql` | Canonical, complete v2 schema (31 tables: core + REST API + AI chatbot, mouse-as-entity model) |
 | `database/install.php` | CLI installer: applies `schema.sql` to the DB configured in `.env`. `--reset` drops existing tables first |
 | `database/reset_admin.php` | CLI helper to create or reset an admin user with a known email/password |
-| `database/import_from_v1.sql` | Cross-database SQL import from a v1 source DB |
-| `database/sync_from_v1.sh` | One-command shell wrapper for v1→v2 sync (same- or cross-server) |
-| `database/README.md` | Schema and migration documentation |
+| `database/api_setup.php` | Idempotent upgrader that adds the API/AI tables to an older v2 DB (no-op on a fresh install) |
+| `database/README.md` | Schema and V1-import documentation |
 | `database/erd.png` | Entity-Relationship Diagram (stale — pending regeneration) |
 
 ### Setup & Configuration

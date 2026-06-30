@@ -9,16 +9,13 @@ tracked at the mouse level, not duplicated per cage.
 
 | File | Purpose |
 |---|---|
-| `schema.sql` | Canonical V2 schema. Apply once to a new database. |
+| `schema.sql` | Canonical, **complete** V2 schema — core tables **plus** the REST API and AI-chatbot tables. Apply once to a new database and everything works (no follow-up scripts needed). |
 | `install.php` | CLI installer. Reads `.env`, connects to your configured database, applies `schema.sql`. Use `--reset` to drop existing tables first (dev only). |
 | `reset_admin.php` | CLI helper to create or reset an admin user with a known email/password. Useful after a `--reset` if you don't remember the seeded admin password. |
-| `import_from_v1.sql` | Alternative SQL-based import (cross-database INSERT/SELECT) for users who'd rather operate at the SQL level than the UI uploader. |
-| `sync_from_v1.sh` | One-command shell wrapper around `import_from_v1.sql`. Handles same-server runs (just substitutes DB names) and cross-server runs (mysqldump V1 → load into a temp schema on V2 → import → drop temp schema). |
+| `api_setup.php` | Idempotent upgrader for **existing** V2 databases created before the API/AI tables were folded into `schema.sql`. Adds any missing API/AI tables and columns; a no-op on a database built from the current `schema.sql`. Not needed for fresh installs. |
+| `api_schema.sql` | Raw `CREATE TABLE IF NOT EXISTS` form of the API/AI additions, for reference or manual application. Superseded by `schema.sql` for fresh installs; prefer `api_setup.php` for upgrading an old DB (it guards the `ALTER`s). |
+| `migrations/` | Dated, idempotent SQL migrations for upgrading older deployments in place. New installs already include these changes via `schema.sql`. |
 | `erd.png` | ER diagram. **Stale** — depicts the V1 schema and needs regeneration. |
-
-The V1 *export* side (the page that produces the JSON file V2 imports)
-lives in the V1 repo. See `admin_import.php` in this V2 repo for the
-JSON shape it expects.
 
 ## Set up a fresh V2 database
 
@@ -35,13 +32,18 @@ $EDITOR .env   # set DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE
 #    have created it and granted privileges to DB_USERNAME.)
 mysql -e "CREATE DATABASE myvivarium;"
 
-# 3. Apply the schema.
+# 3. Apply the schema (installs core + API + AI tables in one shot).
 php database/install.php
 ```
 
-The installer reports each table it creates. The default admin user is
-seeded by `schema.sql` — log in and change the password before doing
+The installer reports each table it creates (31 in total). The default admin
+user is seeded by `schema.sql` — log in and change the password before doing
 anything else.
+
+> **AI / email encryption key.** The AI-config and email-settings tables store
+> secrets as AES-256-CBC ciphertext keyed by `AI_SETTINGS_ENCRYPTION_KEY` in
+> `.env`. Set a stable value before saving any provider keys or SMTP
+> credentials, or you won't be able to decrypt them later.
 
 ### Reset a dev database
 
@@ -54,66 +56,61 @@ php database/install.php --reset
 
 Don't run `--reset` against a database that has data you care about.
 
+### Upgrading an older V2 database
+
+If you have a V2 database that predates the API/AI tables (i.e. it was built
+from an earlier `schema.sql` that only had the core tables), bring it up to
+date without losing data:
+
+```bash
+php database/api_setup.php
+```
+
+It checks `INFORMATION_SCHEMA` before each change, so it's safe to re-run and
+is a no-op once the database is current.
+
 ## Import data from a V1 production database
 
-V2 is greenfield: it doesn't upgrade an existing V1 database in place.
-There are two paths for moving V1 data across.
+V2 is greenfield: it doesn't upgrade a V1 database in place. To move V1 data
+across, use the **JSON export → admin upload** flow. It's portable (no shell
+access on either host), works across MySQL servers and operating systems, and
+handles the V1→V2 transformation — including the schema differences between a
+stock V1 database and V2 — internally.
 
-There are three flavors of import. Pick one:
+1. **In V1** ([myvivarium/MyVivarium](https://github.com/myvivarium/MyVivarium)):
+   log in as admin → **Administration → Export for V2 Migration**
+   (`export_for_v2.php`) → your browser downloads
+   `v1_export_YYYYMMDD_HHMMSS.json`.
+2. **In V2**: log in as admin → **Administration → Import V1 Data**
+   (`admin_import.php`) → upload the JSON. The importer validates the file,
+   transforms it (V1 `holding` + `mice` + breeding parents → V2 `mice`; seeds
+   `mouse_cage_history`; slims `breeding`), and applies everything in a single
+   transaction. If the destination already has data, it stops and asks you to
+   confirm an overwrite first.
 
-- **JSON / UI** — admin clicks export in V1, uploads in V2. No shell access
-  needed on either side. (Recommended for non-technical operators.)
-- **`sync_from_v1.sh`** — one-command shell wrapper. Same-server or
-  cross-server, handles dump/load + import in one shot.
-- **`import_from_v1.sql`** — raw SQL you run yourself. Maximum control,
-  minimum magic.
+If you'd rather start from a clean slate, run `php database/install.php --reset`
+before importing.
 
-### Recommended: JSON export + admin upload
+### What the importer handles for you
 
-Portable, no shell access on the V2 host required. Works across MySQL
-servers, hosting environments, and operating systems.
+A stock V1 database is **thinner** than V2 — it has no `status`/`room`/`rack`
+columns on `cages`, no genotype/parent-cage columns on `breeding`, and no
+`notifications`/`activity_log` tables at all. The JSON importer is written to
+absorb these differences:
 
-1. **In V1**: log in as admin → menu → **Administration → Export for V2
-   Migration** → browser downloads `v1_export_YYYYMMDD_HHMMSS.json`.
-   (The exporter is part of the V1 repo; V2 doesn't ship it.)
-2. **In V2**: log in as admin → menu → **Administration → Import V1
-   Data** → upload the JSON. The page validates, transforms (V1 holding
-   + mice + breeding parents → V2 mice; seeds `mouse_cage_history`;
-   slims `breeding`), and applies everything in a single transaction.
+- Missing columns default sensibly (e.g. `cages.status` → `active`).
+- Missing tables are simply skipped (the V1 exporter emits an empty array for
+  any table it doesn't have).
+- A V1 `mouse_id` reused across cages (V1 only required it unique *per cage*)
+  is **re-homed under a disambiguated id** rather than dropped, so no mouse is
+  lost to V2's global `mouse_id` primary key. The import report counts these as
+  `mice_duplicate_ids_rehomed`.
+- Breeding parents referenced by V1 `breeding` but not present as mice are
+  synthesized as `archived` mouse rows so the FK resolves.
 
-If the V2 database isn't empty, run `php database/install.php --reset`
-first.
-
-### Alternative: shell sync (`sync_from_v1.sh`)
-
-One command, both same-server and cross-server runs:
-
-```bash
-# Same-server (V1 + V2 on the same MySQL host):
-database/sync_from_v1.sh \
-    --v1-db myvivarium_v1 \
-    --v2-db myvivarium_v2
-
-# Cross-server (V1 on a remote host):
-database/sync_from_v1.sh \
-    --v1-host db.lab.example --v1-user reader --v1-pass '...' --v1-db myvivarium_v1 \
-    --v2-host localhost      --v2-user root   --v2-pass '...' --v2-db myvivarium_v2
-```
-
-The script: pre-flights that V2 is empty enough → dumps V1 (cross-server
-only) → loads into a temp schema on V2 → runs `import_from_v1.sql` →
-prints sanity counts → drops the temp schema. V1 is never written to.
-
-### Alternative: raw SQL (`import_from_v1.sql`)
-
-If you want full control over the import. Same transformations as the
-shell wrapper, just executed by hand:
-
-```bash
-mysqldump -u root -p myvivarium_v1 > backup_v1_$(date +%Y%m%d).sql
-# Edit database/import_from_v1.sql to point at your two DB names, then:
-mysql -u root -p < database/import_from_v1.sql
-```
+The import engine itself lives in `includes/v1_import.php` (shared by the admin
+page and the test harness); the JSON shape it expects is whatever V1's
+`export_for_v2.php` emits.
 
 ## Schema overview
 
@@ -139,16 +136,36 @@ mysql -u root -p < database/import_from_v1.sql
 
 | Table | Description |
 |---|---|
-| `users` | Accounts, roles (admin / vivarium_manager / user), email-verification & lockout fields. |
+| `users` | Accounts, roles (admin / vivarium_manager / veterinarian / iacuc_member / user), email-verification & lockout fields. |
 | `tasks` | Task tracking (Pending / In Progress / Completed). |
 | `reminders` | Recurring reminders (daily / weekly / monthly). |
 | `outbox` | Outgoing email queue. |
 | `notifications` | In-app notifications. |
-| `maintenance` | Per-cage maintenance log. |
+| `maintenance` | Per-cage maintenance log (with API note metadata: note_type, deleted_at, updated_at). |
 | `notes` | Sticky notes per cage. |
 | `files` | File attachments per cage. |
 | `activity_log` | Audit trail (action, entity, IP, timestamp). |
 | `settings` | System config (key-value pairs). |
+| `email_settings` | SMTP transport config managed from the admin Email Settings page (secret rows AES-256-CBC encrypted). |
+
+### REST API tables
+
+| Table | Description |
+|---|---|
+| `api_keys` | Hashed API tokens with scopes (read/write), expiry, and revocation. |
+| `rate_limit` | Per-key request-count window. |
+| `api_request_log` | Per-request audit (endpoint, method, status, latency). |
+| `pending_operations` | Two-phase confirm records for destructive API writes (body + diff, with expiry). |
+
+### AI chatbot tables
+
+| Table | Description |
+|---|---|
+| `ai_conversations` / `ai_messages` | Chat history: one row per conversation, one per message (with tool-call/result, suggestions, and token JSON). |
+| `ai_usage_log` | Per-response token accounting (prompt/completion/estimated), attributed by user, conversation, provider, and config. |
+| `ai_chat_rate` | Per-user chat rate-limit counters (minute/day windows). |
+| `ai_settings` | Legacy single-slot AI config (retained; migrated lazily into `ai_configs`). |
+| `ai_configs` / `ai_config_settings` | Multi-configuration provider profiles + free-form per-config params/headers. Secret columns AES-256-CBC encrypted. |
 
 ## Foreign key behavior
 
@@ -175,13 +192,11 @@ SELECT COUNT(*) AS n FROM mice;
 SELECT status, COUNT(*) FROM mice GROUP BY status;
 SELECT COUNT(*) AS open_intervals FROM mouse_cage_history WHERE moved_out_at IS NULL;
 
+-- Referential integrity (both should be 0)
+SELECT COUNT(*) FROM mouse_cage_history h LEFT JOIN mice m ON m.mouse_id = h.mouse_id WHERE m.mouse_id IS NULL;
+SELECT COUNT(*) FROM breeding b LEFT JOIN mice m ON m.mouse_id = b.male_id WHERE b.male_id IS NOT NULL AND m.mouse_id IS NULL;
+
 -- Spot-check a mouse and its history
 SELECT * FROM mice WHERE mouse_id = '<some_id>';
 SELECT * FROM mouse_cage_history WHERE mouse_id = '<some_id>' ORDER BY moved_in_at DESC;
-
--- Schema parity
-SHOW TABLES;
-DESCRIBE mice;
-DESCRIBE mouse_cage_history;
-DESCRIBE breeding;
 ```

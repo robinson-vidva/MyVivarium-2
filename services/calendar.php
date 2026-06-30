@@ -81,8 +81,16 @@ function calendar_list(mysqli $con, int $user_id, array $filters): array
     while ($r = $res->fetch_assoc()) {
         $next = reminder_next_due($r);
         if (!$next) continue;
-        if ($fromDt && $next < $fromDt) continue;
-        if ($toDt   && $next > $toDt . ' 23:59:59') continue;
+        // reminder_next_due returns ISO-8601 ("...T09:00:00+00:00"); $fromDt/$toDt
+        // are "Y-m-d H:i:s". Normalize before comparing so the boundary check
+        // isn't thrown off by the differing separators/timezone suffix.
+        $nextCmp = date('Y-m-d H:i:s', strtotime($next));
+        if ($fromDt && $nextCmp < $fromDt) continue;
+        if ($toDt) {
+            // 'to' is inclusive of the whole day; $toDt itself is at 00:00:00.
+            $toEnd = date('Y-m-d', strtotime($toDt)) . ' 23:59:59';
+            if ($nextCmp > $toEnd) continue;
+        }
         $events[] = [
             'source_type' => 'reminder',
             'source_id'   => (int)$r['id'],
