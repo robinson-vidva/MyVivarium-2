@@ -22,7 +22,8 @@ CREATE TABLE `users` (
   `email_verified` tinyint DEFAULT 0,
   `email_token` varchar(255) DEFAULT NULL,
   `initials` varchar(5) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_users_username` (`username`)
 );
 
 -- Table for storing cage information

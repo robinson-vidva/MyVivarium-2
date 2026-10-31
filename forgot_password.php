@@ -35,12 +35,11 @@ while ($row = mysqli_fetch_assoc($labResult)) {
     }
 }
 
-// Derive the reset link host from the request itself, not from a DB-editable
-// setting. This prevents a compromised/malicious admin from rerouting future
-// reset emails to an attacker-controlled domain via the `url` setting.
-$resetBaseUrl = (
-    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://'
-) . ($_SERVER['HTTP_HOST'] ?? $url);
+// Reset links must never be built from the request Host header: an attacker
+// could then have a genuine reset email delivered with a link to their own
+// domain. Use APP_URL / the configured lab URL instead.
+require_once __DIR__ . '/includes/app_url.php';
+$resetBaseUrl = mv_app_base_url($con);
 
 // Generic message used both for "email sent" and "email not found", to avoid
 // turning this endpoint into a username-enumeration oracle.
@@ -98,10 +97,11 @@ function handlePasswordReset($con, $email, $resetBaseUrl, $genericSuccess) {
         // `account_locked` — that would let anyone lift a brute-force lockout
         // by triggering a reset for someone else's email.
         $resetToken = bin2hex(random_bytes(32));
-        $expirationTime = date('Y-m-d H:i:s', time() + 3600); // 1 hour
 
-        $updateStmt = $con->prepare("UPDATE users SET reset_token = ?, reset_token_expiration = ? WHERE username = ?");
-        $updateStmt->bind_param("sss", $resetToken, $expirationTime, $email);
+        // Expiry is computed in SQL so it is compared against the same clock
+        // (reset_password.php checks it with NOW()).
+        $updateStmt = $con->prepare("UPDATE users SET reset_token = ?, reset_token_expiration = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE username = ?");
+        $updateStmt->bind_param("ss", $resetToken, $email);
         $updateStmt->execute();
         $updateStmt->close();
 

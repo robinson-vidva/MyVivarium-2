@@ -46,8 +46,9 @@ while ($row = mysqli_fetch_assoc($labResult)) {
 // Function to send confirmation email
 function sendConfirmationEmail($to, $token)
 {
-    global $url;
-    $confirmLink = "https://" . $url . "/confirm_email.php?token=$token";
+    global $con;
+    require_once __DIR__ . '/includes/app_url.php';
+    $confirmLink = mv_app_base_url($con) . "/confirm_email.php?token=" . urlencode($token);
     $subject = 'Email Confirmation';
     $message = "Please click the link below to confirm your email address:\n$confirmLink";
 
@@ -119,7 +120,11 @@ if (isset($_POST['login'])) {
 
     if ($row = mysqli_fetch_assoc($result)) {
         // Check if the email is verified
-        if ($row['email_verified'] == 0) {
+        if ($row['email_verified'] == 0 && !password_verify($password, $row['password'])) {
+            // Do not resend verification mail (or reveal account state) for a
+            // wrong password; anyone could otherwise flood the inbox.
+            $error_message = "Invalid credentials. Please try again.";
+        } elseif ($row['email_verified'] == 0) {
             // Check if email_token is empty
             if (empty($row['email_token'])) {
                 // Generate a new token

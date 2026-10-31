@@ -40,8 +40,9 @@ while ($row = mysqli_fetch_assoc($labResult)) {
 // Function to send confirmation email
 function sendConfirmationEmail($to, $token)
 {
-    global $url;
-    $confirmLink = "https://" . $url . "/confirm_email.php?token=$token";
+    global $con;
+    require_once __DIR__ . '/includes/app_url.php';
+    $confirmLink = mv_app_base_url($con) . "/confirm_email.php?token=" . urlencode($token);
     $subject = 'Email Confirmation';
     $message = "Please click the link below to confirm your email address:\n$confirmLink";
 

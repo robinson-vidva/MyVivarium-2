@@ -13,8 +13,8 @@
 require 'session_config.php';
 require 'dbcon.php'; // Database connection
 require 'config.php'; // Configuration file for email settings
-require 'header.php'; // Include the header file
 require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/app_url.php';
 
 // Check if the user is logged in
 if (!isset($_SESSION['username'])) {
@@ -23,20 +23,29 @@ if (!isset($_SESSION['username'])) {
     exit; // Exit to ensure no further code is executed
 }
 
+require 'header.php'; // Include the header file (after the auth check so the redirect works)
+
 // Generate CSRF token if not already set
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Fetch user details from the database
+// Fetch user details from the database (keyed by id so a shared or renamed
+// username can never resolve to another account).
 $username = $_SESSION['username'];
-$query = "SELECT * FROM users WHERE username = ?";
+$currentUserId = (int)($_SESSION['user_id'] ?? 0);
+$query = "SELECT * FROM users WHERE id = ?";
 $stmt = $con->prepare($query);
-$stmt->bind_param("s", $username);
+$stmt->bind_param("i", $currentUserId);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 $stmt->close();
+if (!$user) {
+    header("Location: logout.php");
+    exit;
+}
+$username = $user['username'];
 
 $updateMessage = ''; // Initialize message for profile update
 
@@ -102,9 +111,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
         die('CSRF token validation failed');
     }
 
-    $submittedUsername = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_EMAIL);
+    $submittedUsername = trim((string)filter_input(INPUT_POST, 'username', FILTER_SANITIZE_EMAIL));
     // If the username field was not submitted (e.g. demo mode hides it) or is empty, keep the existing one
-    $newUsername = !empty($submittedUsername) ? $submittedUsername : $username;
+    $newUsername = $submittedUsername !== '' ? $submittedUsername : $username;
     $name = trim($_POST['name'] ?? '');
     $initials = trim($_POST['initials'] ?? '');
     $position = trim($_POST['position'] ?? '');
@@ -112,10 +121,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     // Check if the email address (username) has changed
     $emailChanged = ($newUsername !== $username);
 
+    // A changed login email must be a valid address not used by another account
+    $usernameError = '';
+    if ($emailChanged) {
+        if (!filter_var($newUsername, FILTER_VALIDATE_EMAIL)) {
+            $usernameError = "Please enter a valid email address.";
+        } else {
+            $dupStmt = $con->prepare("SELECT 1 FROM users WHERE username = ? AND id != ?");
+            $dupStmt->bind_param("si", $newUsername, $currentUserId);
+            $dupStmt->execute();
+            if ($dupStmt->get_result()->num_rows > 0) {
+                $usernameError = "That email address is already in use by another account.";
+            }
+            $dupStmt->close();
+        }
+    }
+
     // Ensure initials are unique
     $uniqueInitials = ensureUniqueInitials($con, $initials, $username);
 
-    if ($uniqueInitials !== $initials) {
+    if ($usernameError !== '') {
+        $updateMessage = $usernameError;
+    } elseif ($uniqueInitials !== $initials) {
         $updateMessage = "The initials '$initials' are already in use by another user. Please choose different initials.";
     } else {
         // Update user details in the database
@@ -123,14 +150,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
         if ($emailChanged) {
             $updateQuery .= ", email_verified = 0";
         }
-        $updateQuery .= " WHERE username = ?";
+        $updateQuery .= " WHERE id = ?";
         $updateStmt = $con->prepare($updateQuery);
-
-        if ($emailChanged) {
-            $updateStmt->bind_param("sssss", $newUsername, $name, $position, $uniqueInitials, $username);
-        } else {
-            $updateStmt->bind_param("sssss", $newUsername, $name, $position, $uniqueInitials, $username);
-        }
+        $updateStmt->bind_param("ssssi", $newUsername, $name, $position, $uniqueInitials, $currentUserId);
 
         if ($updateStmt->execute()) {
             // Update the session username if it was changed
@@ -149,7 +171,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
 
         // Refresh user data
         $stmt = $con->prepare($query);
-        $stmt->bind_param("s", $username);
+        $stmt->bind_param("i", $currentUserId);
         $stmt->execute();
         $result = $stmt->get_result();
         $user = $result->fetch_assoc();
@@ -177,16 +199,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset'])) {
     if ($result->num_rows == 1) {
         // Email exists, generate and save a reset token
         $resetToken = bin2hex(random_bytes(32));
-        $expirationTimeUnix = time() + 3600; // 1 hour expiration time
-        $expirationTime = date('Y-m-d H:i:s', $expirationTimeUnix);
 
-        $updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiration = ?, login_attempts = 0, account_locked = NULL WHERE username = ?";
+        $updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiration = DATE_ADD(NOW(), INTERVAL 1 HOUR), login_attempts = 0, account_locked = NULL WHERE id = ?";
         $updateStmt = $con->prepare($updateQuery);
-        $updateStmt->bind_param("sss", $resetToken, $expirationTime, $email);
+        $updateStmt->bind_param("si", $resetToken, $currentUserId);
         $updateStmt->execute();
 
         // Send the password reset email
-        $resetLink = "https://" . $url . "/reset_password.php?token=$resetToken";
+        $resetLink = mv_app_base_url($con) . "/reset_password.php?token=" . urlencode($resetToken);
         $to = $email;
         $subject = 'Password Reset';
         $message = "To reset your password, click the following link:\n$resetLink";
