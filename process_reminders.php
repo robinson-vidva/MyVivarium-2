@@ -50,8 +50,15 @@ if ($reminderResult) {
             $taskCreationTime->setDate($now->format('Y'), $now->format('m'), $now->format('d'));
             $taskCreationTime->modify('-1 day');
         } elseif ($reminder['recurrence_type'] == 'weekly') {
+            // A weekly reminder needs a valid day name; an empty value would
+            // make modify('next ') throw and abort the whole run.
+            $dow = strtolower(trim((string)$reminder['day_of_week']));
+            if (!in_array($dow, ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'], true)) {
+                error_log("process_reminders: reminder {$reminder['id']} is weekly but has no valid day_of_week; skipped");
+                continue;
+            }
             // Set to the next occurrence of the specified day of the week
-            $reminderTime->modify('next ' . $reminder['day_of_week']);
+            $reminderTime->modify('next ' . $dow);
             $taskCreationTime = clone $reminderTime;
             $taskCreationTime->modify('-1 day');
         } elseif ($reminder['recurrence_type'] == 'monthly') {

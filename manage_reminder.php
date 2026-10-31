@@ -84,6 +84,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $timeOfDay = trim($_POST['time_of_day']);
         $status = trim($_POST['status']);
         $cageId = empty($_POST['cage_id']) ? NULL : trim($_POST['cage_id']);
+
+        // Server-side recurrence validation (the form only hides the fields).
+        $validDays = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        if (!in_array($recurrenceType, ['daily','weekly','monthly'], true)) {
+            redirectToPage("Error: Please choose a recurrence type.");
+        }
+        if ($recurrenceType === 'weekly' && !in_array(strtolower((string)$dayOfWeek), $validDays, true)) {
+            redirectToPage("Error: Please choose a day of the week for a weekly reminder.");
+        }
+        if ($recurrenceType === 'monthly' && ($dayOfMonth === null || $dayOfMonth < 1 || $dayOfMonth > 31)) {
+            redirectToPage("Error: Please choose a day of the month (1-31) for a monthly reminder.");
+        }
+        if ($recurrenceType !== 'weekly') $dayOfWeek = null;
+        if ($recurrenceType !== 'monthly') $dayOfMonth = null;
     }
 
     if (isset($_POST['add'])) {

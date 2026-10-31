@@ -33,13 +33,18 @@
  *
  */
 
+// Load .env so SESSION_COOKIE_SECURE is honoured even though this file runs
+// before dbcon.php (getenv() alone never sees values from .env).
+require_once __DIR__ . '/includes/env.php';
+env_load_into_superglobals();
+
 // Only configure and start session if one is not already active
 if (session_status() === PHP_SESSION_NONE) {
     // Configure session cookie parameters (must be set BEFORE session_start)
     session_set_cookie_params([
         'lifetime' => 1800,           // Cookie expires after 30 minutes
         'path'     => '/',
-        'secure'   => filter_var(getenv('SESSION_COOKIE_SECURE') ?: 'true', FILTER_VALIDATE_BOOLEAN),           // Only send cookie over HTTPS (set to false for HTTP dev)
+        'secure'   => filter_var(env_get('SESSION_COOKIE_SECURE') ?? 'true', FILTER_VALIDATE_BOOLEAN),           // Only send cookie over HTTPS (set to false for HTTP dev)
         'httponly'  => true,           // Prevent JavaScript access to session cookie (XSS protection)
         'samesite'  => 'Strict'       // Prevent CSRF attacks
     ]);
