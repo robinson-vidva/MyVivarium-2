@@ -148,99 +148,119 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Set an error message if cage_id already exists
         $_SESSION['message'] = "Cage ID '" . htmlspecialchars($cage_id) . "' already exists. Please use a different Cage ID.";
     } else {
-        // Insert into the cages table
-        $insert_cage_query = $con->prepare("INSERT INTO cages (`cage_id`, `pi_name`, `remarks`, `room`, `rack`) VALUES (?, ?, ?, ?, ?)");
-        $insert_cage_query->bind_param("sssss", $cage_id, $pi_id, $remarks, $room, $rack);
-
-        // v2 breeding insert: only the cage + cross label + parent FKs.
-        $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`) VALUES (?, ?, ?, ?)");
-        $insert_breeding_query->bind_param("ssss", $cage_id, $cross, $male_id, $female_id);
-
-        // Execute the statements and check if they were successful
-        if ($insert_cage_query->execute() && $insert_breeding_query->execute()) {
-            // Set a success message
-            $_SESSION['message_html'] = "New breeding cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' added successfully. <a href='bc_view.php?id=" . urlencode($cage_id) . "'>View cage</a>";
-
-            // Log activity
-            log_activity($con, 'create', 'cage', $cage_id, 'Created breeding cage');
-
-            // Insert IACUC associations
-            foreach ($iacuc_ids as $iacuc_id) {
-                $insert_cage_iacuc_query = $con->prepare("INSERT INTO cage_iacuc (`cage_id`, `iacuc_id`) VALUES (?, ?)");
-                $insert_cage_iacuc_query->bind_param("ss", $cage_id, $iacuc_id);
-                $insert_cage_iacuc_query->execute();
-                $insert_cage_iacuc_query->close();
+        // v2: male_id / female_id are FKs into mice. Refuse unknown parents up
+        // front so a failed breeding INSERT cannot leave an orphan cage row.
+        $missingParent = null;
+        foreach ([$male_id, $female_id] as $parentId) {
+            if ($parentId === null) continue;
+            $parentCheck = $con->prepare("SELECT 1 FROM mice WHERE mouse_id = ?");
+            $parentCheck->bind_param("s", $parentId);
+            $parentCheck->execute();
+            $parentExists = $parentCheck->get_result()->num_rows > 0;
+            $parentCheck->close();
+            if (!$parentExists) {
+                $missingParent = $parentId;
+                break;
             }
-
-            // Insert user associations
-            foreach ($user_ids as $user_id) {
-                $insert_cage_user_query = $con->prepare("INSERT INTO cage_users (`cage_id`, `user_id`) VALUES (?, ?)");
-                $insert_cage_user_query->bind_param("ss", $cage_id, $user_id);
-                $insert_cage_user_query->execute();
-                $insert_cage_user_query->close();
-            }
-
-            // Notify all assigned users about the new cage
-            try {
-            $creatorName = $_SESSION['name'] ?? 'Someone';
-            foreach ($user_ids as $uid) {
-                $uid = intval($uid);
-                if ($uid > 0) {
-                    $nTitle = "Added to Cage: $cage_id";
-                    $nMessage = "$creatorName added you to breeding cage $cage_id";
-                    $nLink = "bc_view.php?id=" . urlencode($cage_id);
-                    $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
-                    $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
-                    $nStmt->execute();
-                    $nStmt->close();
-                }
-            }
-            } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
-
-            // Process litter data insertion if provided
-            if (isset($_POST['dom'])) {
-                $dom = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['dom']);
-                $litter_dob = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['litter_dob']);
-                $pups_alive = array_map(function ($value) {
-                    return !empty($value) ? intval($value) : 0;
-                }, $_POST['pups_alive']);
-                $pups_dead = array_map(function ($value) {
-                    return !empty($value) ? intval($value) : 0;
-                }, $_POST['pups_dead']);
-                $pups_male = array_map(function ($value) {
-                    return !empty($value) ? intval($value) : 0;
-                }, $_POST['pups_male']);
-                $pups_female = array_map(function ($value) {
-                    return !empty($value) ? intval($value) : 0;
-                }, $_POST['pups_female']);
-                $litter_remarks = $_POST['remarks_litter'];
-
-                // Loop through each litter entry and insert into the database
-                for ($i = 0; $i < count($dom); $i++) {
-                    $insert_litter_query = $con->prepare("INSERT INTO litters (`cage_id`, `dom`, `litter_dob`, `pups_alive`, `pups_dead`, `pups_male`, `pups_female`, `remarks`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                    $insert_litter_query->bind_param("ssssssss", $cage_id, $dom[$i], $litter_dob[$i], $pups_alive[$i], $pups_dead[$i], $pups_male[$i], $pups_female[$i], $litter_remarks[$i]);
-
-                    // Execute the statement and check if it was successful
-                    if ($insert_litter_query->execute()) {
-                        // Append success message for litter data
-                        $_SESSION['message'] .= " Litter data added successfully.";
-                    } else {
-                        // Append error message for litter data
-                        $_SESSION['message'] .= " Failed to add litter data: " . $insert_litter_query->error;
-                    }
-
-                    // Close the prepared statement for litter data
-                    $insert_litter_query->close();
-                }
-            }
-        } else {
-            // Set an error message if the cage insertion failed
-            $_SESSION['message'] = "Failed to add new breeding cage.";
         }
 
-        // Close the prepared statements for cage and breeding data
-        $insert_cage_query->close();
-        $insert_breeding_query->close();
+        if ($missingParent !== null) {
+            $_SESSION['message'] = "Parent mouse '" . htmlspecialchars($missingParent) . "' does not exist. Please add the mouse first.";
+        } else {
+            mysqli_begin_transaction($con);
+            try {
+                // Insert into the cages table
+                $insert_cage_query = $con->prepare("INSERT INTO cages (`cage_id`, `pi_name`, `remarks`, `room`, `rack`) VALUES (?, ?, ?, ?, ?)");
+                $insert_cage_query->bind_param("sssss", $cage_id, $pi_id, $remarks, $room, $rack);
+                if (!$insert_cage_query->execute()) {
+                    throw new Exception($insert_cage_query->error);
+                }
+                $insert_cage_query->close();
+
+                // v2 breeding insert: only the cage + cross label + parent FKs.
+                $insert_breeding_query = $con->prepare("INSERT INTO breeding (`cage_id`, `cross`, `male_id`, `female_id`) VALUES (?, ?, ?, ?)");
+                $insert_breeding_query->bind_param("ssss", $cage_id, $cross, $male_id, $female_id);
+                if (!$insert_breeding_query->execute()) {
+                    throw new Exception($insert_breeding_query->error);
+                }
+                $insert_breeding_query->close();
+
+                // Insert IACUC associations
+                foreach ($iacuc_ids as $iacuc_id) {
+                    $insert_cage_iacuc_query = $con->prepare("INSERT INTO cage_iacuc (`cage_id`, `iacuc_id`) VALUES (?, ?)");
+                    $insert_cage_iacuc_query->bind_param("ss", $cage_id, $iacuc_id);
+                    $insert_cage_iacuc_query->execute();
+                    $insert_cage_iacuc_query->close();
+                }
+
+                // Insert user associations
+                foreach ($user_ids as $user_id) {
+                    $insert_cage_user_query = $con->prepare("INSERT INTO cage_users (`cage_id`, `user_id`) VALUES (?, ?)");
+                    $insert_cage_user_query->bind_param("ss", $cage_id, $user_id);
+                    $insert_cage_user_query->execute();
+                    $insert_cage_user_query->close();
+                }
+
+                // Process litter data insertion if provided
+                $litterMessage = '';
+                if (isset($_POST['dom'])) {
+                    $dom = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['dom']);
+                    $litter_dob = array_map(function($v) { return !empty($v) ? trim($v) : null; }, $_POST['litter_dob']);
+                    $pups_alive = array_map(function ($value) {
+                        return !empty($value) ? intval($value) : 0;
+                    }, $_POST['pups_alive']);
+                    $pups_dead = array_map(function ($value) {
+                        return !empty($value) ? intval($value) : 0;
+                    }, $_POST['pups_dead']);
+                    $pups_male = array_map(function ($value) {
+                        return !empty($value) ? intval($value) : 0;
+                    }, $_POST['pups_male']);
+                    $pups_female = array_map(function ($value) {
+                        return !empty($value) ? intval($value) : 0;
+                    }, $_POST['pups_female']);
+                    $litter_remarks = $_POST['remarks_litter'];
+
+                    // Loop through each litter entry and insert into the database
+                    for ($i = 0; $i < count($dom); $i++) {
+                        $insert_litter_query = $con->prepare("INSERT INTO litters (`cage_id`, `dom`, `litter_dob`, `pups_alive`, `pups_dead`, `pups_male`, `pups_female`, `remarks`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $insert_litter_query->bind_param("ssssssss", $cage_id, $dom[$i], $litter_dob[$i], $pups_alive[$i], $pups_dead[$i], $pups_male[$i], $pups_female[$i], $litter_remarks[$i]);
+                        if (!$insert_litter_query->execute()) {
+                            throw new Exception("Failed to add litter data: " . $insert_litter_query->error);
+                        }
+                        $insert_litter_query->close();
+                        $litterMessage = " Litter data added successfully.";
+                    }
+                }
+
+                mysqli_commit($con);
+
+                // Set a success message
+                $_SESSION['message_html'] = "New breeding cage '<strong>" . htmlspecialchars($cage_id) . "</strong>' added successfully. <a href='bc_view.php?id=" . urlencode($cage_id) . "'>View cage</a>" . $litterMessage;
+
+                // Log activity
+                log_activity($con, 'create', 'cage', $cage_id, 'Created breeding cage');
+
+                // Notify all assigned users about the new cage
+                try {
+                $creatorName = $_SESSION['name'] ?? 'Someone';
+                foreach ($user_ids as $uid) {
+                    $uid = intval($uid);
+                    if ($uid > 0) {
+                        $nTitle = "Added to Cage: $cage_id";
+                        $nMessage = "$creatorName added you to breeding cage $cage_id";
+                        $nLink = "bc_view.php?id=" . urlencode($cage_id);
+                        $nStmt = $con->prepare("INSERT INTO notifications (user_id, title, message, link, type) VALUES (?, ?, ?, ?, 'system')");
+                        $nStmt->bind_param("isss", $uid, $nTitle, $nMessage, $nLink);
+                        $nStmt->execute();
+                        $nStmt->close();
+                    }
+                }
+                } catch (Exception $e) { error_log("Notification error: " . $e->getMessage()); }
+            } catch (Exception $e) {
+                mysqli_rollback($con);
+                $_SESSION['message'] = "Failed to add new breeding cage: " . htmlspecialchars($e->getMessage());
+            }
+        }
     }
 
     // Close the check query prepared statement

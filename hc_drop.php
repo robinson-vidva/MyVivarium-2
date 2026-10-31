@@ -132,6 +132,17 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
             }
             $orphanMice->close();
 
+            // Collect uploaded file paths so they can be unlinked after commit.
+            $filePaths = [];
+            $fpStmt = $con->prepare("SELECT file_path FROM files WHERE cage_id = ?");
+            $fpStmt->bind_param("s", $id);
+            $fpStmt->execute();
+            $fpResult = $fpStmt->get_result();
+            while ($fpRow = $fpResult->fetch_assoc()) {
+                $filePaths[] = $fpRow['file_path'];
+            }
+            $fpStmt->close();
+
             // Tables that need explicit cleanup before the cage row goes.
             // The `mice` table FK is ON DELETE SET NULL — current_cage_id auto-clears.
             // The `mouse_cage_history` FK is ON DELETE SET NULL — history rows survive with cage_id NULL.
@@ -161,6 +172,17 @@ if (isset($requestId, $requestConfirm) && $requestConfirm == 'true') {
 
             // Commit the transaction
             mysqli_commit($con);
+
+            // Remove the uploaded files from disk, only if they resolve inside uploads/.
+            $uploadsRoot = realpath(__DIR__ . '/uploads');
+            foreach ($filePaths as $filePath) {
+                $candidate = (strpos($filePath, '/') === 0) ? $filePath : __DIR__ . '/' . $filePath;
+                $realPath = realpath($candidate);
+                if ($uploadsRoot && $realPath && is_file($realPath)
+                    && strpos($realPath, $uploadsRoot . DIRECTORY_SEPARATOR) === 0) {
+                    @unlink($realPath);
+                }
+            }
 
             // Log the activity
             log_activity($con, 'delete', 'cage', $id, 'Cage permanently deleted');

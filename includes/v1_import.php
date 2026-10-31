@@ -117,6 +117,36 @@ function copy_table(mysqli $con, array $tables, string $name, array $columns, ar
 }
 
 /**
+ * Like copy_table, but for tables with a cage_id column. Rows whose cage_id
+ * does not resolve to an existing cage are either skipped ($nullable=false,
+ * NOT NULL column) or inserted with cage_id NULL ($nullable=true), mirroring
+ * how mice.current_cage_id is handled. FK checks are off during the import,
+ * so this is the only thing preventing dangling cage references.
+ */
+function copy_table_cage_checked(mysqli $con, array $tables, string $name, array $columns,
+                                 array $existingCageIds, bool $nullable, array &$counts): void
+{
+    $rows = $tables[$name] ?? [];
+    $kept = 0;
+    $dangling = 0;
+    foreach ($rows as $row) {
+        $cid = $row['cage_id'] ?? null;
+        $cageValid = ($cid !== null && $cid !== '' && isset($existingCageIds[$cid]));
+        if (!$cageValid) {
+            if (!$nullable) { $dangling++; continue; }
+            if ($cid !== null && $cid !== '') $dangling++;
+            $row['cage_id'] = null;
+        }
+        insert_row($con, $name, $columns, $row);
+        $kept++;
+    }
+    $counts[$name] = $kept;
+    if ($dangling > 0) {
+        $counts[$name . ($nullable ? '_dangling_cage_cleared' : '_dangling_cage_skipped')] = $dangling;
+    }
+}
+
+/**
  * Apply the JSON payload. Returns a report (counts per logical step).
  * Throws on hard error so the caller can roll back.
  */
@@ -179,8 +209,15 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
         }
         $counts['cages'] = count($cageRows);
 
-        copy_table($con, $tables, 'cage_iacuc', ['cage_id','iacuc_id'], $counts);
-        copy_table($con, $tables, 'cage_users', ['cage_id','user_id'], $counts);
+        // Set of cage_ids that actually exist (imported above, or pre-existing).
+        // Every cage-referencing table below is checked against it.
+        $existingCageIds = [];
+        $cr = $con->query("SELECT cage_id FROM cages");
+        while ($row = $cr->fetch_assoc()) $existingCageIds[$row['cage_id']] = true;
+        $cr->close();
+
+        copy_table_cage_checked($con, $tables, 'cage_iacuc', ['cage_id','iacuc_id'], $existingCageIds, false, $counts);
+        copy_table_cage_checked($con, $tables, 'cage_users', ['cage_id','user_id'], $existingCageIds, false, $counts);
 
         // 3. Mice. V1 stored cage-level defaults (strain/dob/sex/parent_cg)
         // on `holding` and per-mouse identity (mouse_id/genotype/notes) on
@@ -198,15 +235,10 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
             if (!empty($m['cage_id'])) $miceByCage[$m['cage_id']][] = $m;
         }
 
-        // Set of cage_ids that actually exist (imported above, or pre-existing).
         // A V1 mouse/holding row may reference a cage absent from the V1 cages
         // table (orphaned/typo'd data); since the import runs with FK checks
         // off, an unresolved cage would become a dangling current_cage_id.
         // We NULL those out, keeping the original label as a breadcrumb.
-        $existingCageIds = [];
-        $cr = $con->query("SELECT cage_id FROM cages");
-        while ($row = $cr->fetch_assoc()) $existingCageIds[$row['cage_id']] = true;
-        $cr->close();
         $droppedCageRefs = 0;
 
         // 3a. For each V1 mouse, merge in its cage's holding row defaults.
@@ -366,9 +398,17 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
         $counts['history_open_intervals'] = $seedHistory->affected_rows;
         $seedHistory->close();
 
-        // 5. Breeding rows — slim columns, NULL out parent IDs that don't resolve to a mouse
+        // 5. Breeding rows — slim columns, NULL out parent IDs that don't resolve
+        // to a mouse; skip rows whose cage does not exist (cage_id is NOT NULL).
         $breedingRows = $tables['breeding'] ?? [];
+        $breedingKept = 0;
+        $breedingSkipped = 0;
         foreach ($breedingRows as $b) {
+            $bCage = $b['cage_id'] ?? null;
+            if ($bCage === null || $bCage === '' || !isset($existingCageIds[$bCage])) {
+                $breedingSkipped++;
+                continue;
+            }
             $male   = trim((string)($b['male_id'] ?? ''));
             $female = trim((string)($b['female_id'] ?? ''));
             if ($male !== '' && !isset($existingMouseIds[$male]))   $male   = null;
@@ -385,25 +425,30 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
                     'male_id'   => $male,
                     'female_id' => $female,
                 ]);
+            $breedingKept++;
         }
-        $counts['breeding'] = count($breedingRows);
+        $counts['breeding'] = $breedingKept;
+        if ($breedingSkipped > 0) $counts['breeding_dangling_cage_skipped'] = $breedingSkipped;
 
-        // 6. Tail tables
-        copy_table($con, $tables, 'litters',
-            ['id','cage_id','dom','litter_dob','pups_alive','pups_dead','pups_male','pups_female','remarks'], $counts);
-        copy_table($con, $tables, 'files',
-            ['id','file_name','file_path','uploaded_at','cage_id'], $counts);
-        copy_table($con, $tables, 'notes',
-            ['id','cage_id','note_text','created_at','user_id'], $counts);
-        copy_table($con, $tables, 'tasks',
+        // 6. Tail tables. NOT NULL cage_id (litters, maintenance): skip
+        // dangling rows; nullable cage_id (files, notes, tasks, reminders):
+        // keep the row with cage_id NULL.
+        copy_table_cage_checked($con, $tables, 'litters',
+            ['id','cage_id','dom','litter_dob','pups_alive','pups_dead','pups_male','pups_female','remarks'],
+            $existingCageIds, false, $counts);
+        copy_table_cage_checked($con, $tables, 'files',
+            ['id','file_name','file_path','uploaded_at','cage_id'], $existingCageIds, true, $counts);
+        copy_table_cage_checked($con, $tables, 'notes',
+            ['id','cage_id','note_text','created_at','user_id'], $existingCageIds, true, $counts);
+        copy_table_cage_checked($con, $tables, 'tasks',
             ['id','title','description','assigned_by','assigned_to','status','completion_date',
-             'cage_id','creation_date','updated_at'], $counts);
-        copy_table($con, $tables, 'maintenance',
-            ['id','cage_id','user_id','comments','timestamp'], $counts);
-        copy_table($con, $tables, 'reminders',
+             'cage_id','creation_date','updated_at'], $existingCageIds, true, $counts);
+        copy_table_cage_checked($con, $tables, 'maintenance',
+            ['id','cage_id','user_id','comments','timestamp'], $existingCageIds, false, $counts);
+        copy_table_cage_checked($con, $tables, 'reminders',
             ['id','title','description','assigned_by','assigned_to','recurrence_type',
              'day_of_week','day_of_month','time_of_day','status','cage_id',
-             'creation_date','updated_at','last_task_created'], $counts);
+             'creation_date','updated_at','last_task_created'], $existingCageIds, true, $counts);
         copy_table($con, $tables, 'notifications',
             ['id','user_id','title','message','link','type','is_read','created_at'], $counts);
         copy_table($con, $tables, 'outbox',
@@ -414,8 +459,39 @@ function run_import(mysqli $con, array $payload, array &$errors, ?int $actorUser
         $con->commit();
         $con->query("SET FOREIGN_KEY_CHECKS = 1");
 
-        log_activity($con, 'import', 'v1_data', null,
-            'V1 export imported: ' . json_encode($counts));
+        // The import is committed at this point; nothing below may turn it
+        // into a reported failure. The acting admin's user row may have been
+        // replaced by the import, in which case activity_log.user_id (FK to
+        // users) cannot reference it, and their session is stale.
+        $actorStillExists = false;
+        if ($actorUserId !== null) {
+            $chk = $con->prepare("SELECT 1 FROM users WHERE id = ? LIMIT 1");
+            if ($chk) {
+                $chk->bind_param('i', $actorUserId);
+                $chk->execute();
+                $actorStillExists = $chk->get_result()->num_rows > 0;
+                $chk->close();
+            }
+        }
+        if (!$actorStillExists) {
+            $counts['notice'] = 'Your admin account (id ' . ($actorUserId ?? 'unknown')
+                . ') was replaced by the import. Log out and log in again with an imported admin account.';
+        }
+
+        try {
+            $details = 'V1 export imported: ' . json_encode($counts);
+            if ($actorStillExists) {
+                log_activity($con, 'import', 'v1_data', null, $details);
+            } else {
+                $al = $con->prepare("INSERT INTO activity_log (user_id, action, entity_type, entity_id, details, ip_address) VALUES (NULL, 'import', 'v1_data', NULL, ?, ?)");
+                $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+                $al->bind_param('ss', $details, $ip);
+                $al->execute();
+                $al->close();
+            }
+        } catch (Throwable $e) {
+            error_log('v1 import: activity log failed after commit: ' . $e->getMessage());
+        }
 
         return $counts;
     } catch (Exception $e) {

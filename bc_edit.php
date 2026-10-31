@@ -1229,9 +1229,14 @@ require 'header.php';
                                                             <a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-outline-primary">
                                                                 <i class="fas fa-cloud-download-alt fa-sm"></i>
                                                             </a>
-                                                            <a href="delete_file.php?url=bc_edit&id=<?= intval($file['id']); ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this file?');" aria-label="Delete <?= htmlspecialchars($file['file_name']); ?>">
-                                                                <i class="fas fa-trash fa-sm"></i>
-                                                            </a>
+                                                            <form method="post" action="delete_file.php" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this file?');">
+                                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                                                <input type="hidden" name="url" value="bc_edit">
+                                                                <input type="hidden" name="id" value="<?= intval($file['id']); ?>">
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete <?= htmlspecialchars($file['file_name']); ?>">
+                                                                    <i class="fas fa-trash fa-sm"></i>
+                                                                </button>
+                                                            </form>
                                                         </td>
                                                     </tr>
                                                 <?php endwhile; ?>

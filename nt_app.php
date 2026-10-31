@@ -296,7 +296,7 @@ $result = $stmt->get_result();
                 <div class="sticky-note" id="note-<?= $row['id']; ?>">
                     <?php if ($currentUserId == $row['user_id'] || (isset($_SESSION['role']) && $_SESSION['role'] === 'admin')) : ?>
                         <span class="close-btn" onclick="removeNote(<?php echo $row['id']; ?>)">X</span>
-                        <span class="edit-btn" onclick="editNote(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars(addslashes($row['note_text'])); ?>')">✎</span>
+                        <span class="edit-btn" data-note-text="<?php echo htmlspecialchars($row['note_text']); ?>" onclick="editNote(<?php echo $row['id']; ?>, this.dataset.noteText)">✎</span>
                     <?php endif; ?>
                     <span class="userid">
                         <?php echo htmlspecialchars($row['user_name']); ?>

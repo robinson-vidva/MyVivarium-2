@@ -49,8 +49,10 @@ $cageResult = $con->query($cageQuery);
 
 // Initialize an array to hold all cage options
 $cageOptions = [];
+$validCageIds = [];
 while ($cageRow = $cageResult->fetch_assoc()) {
     $cageOptions[] = htmlspecialchars($cageRow['cage_id']);
+    $validCageIds[] = $cageRow['cage_id'];
 }
 
 // Process the form submission
@@ -62,21 +64,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Retrieve and sanitize form data
-    $selectedCages = $_POST['cage_id'];
-    $comments = $_POST['comments'];
+    $selectedCages = is_array($_POST['cage_id'] ?? null) ? $_POST['cage_id'] : [];
+    $comments = is_array($_POST['comments'] ?? null) ? $_POST['comments'] : [];
     $userId = $_SESSION['user_id']; // Assume user session is started and user_id is stored in session
+    $redirectUrl = $redirectFrom === 'bc_dash' ? 'bc_dash.php' : 'hc_dash.php';
 
-    $stmt = $con->prepare("INSERT INTO maintenance (cage_id, user_id, comments) VALUES (?, ?, ?)");
-
-    foreach ($selectedCages as $index => $cage_id) {
-        $comment = !empty($comments[$index]) ? $comments[$index] : null;
-        $stmt->bind_param("sis", $cage_id, $userId, $comment);
-        $stmt->execute();
+    // Every submitted cage must be one of the cages loaded above.
+    $unknownCages = array_diff($selectedCages, $validCageIds);
+    if (empty($selectedCages) || !empty($unknownCages)) {
+        $_SESSION['message'] = 'Invalid cage selection. Please choose cages from the list.';
+        header("Location: $redirectUrl");
+        exit();
     }
 
-    // Set success message and redirect based on the originating page
-    $_SESSION['message'] = 'Maintenance records added successfully.';
-    $redirectUrl = $redirectFrom === 'bc_dash' ? 'bc_dash.php' : 'hc_dash.php';
+    mysqli_begin_transaction($con);
+    try {
+        $stmt = $con->prepare("INSERT INTO maintenance (cage_id, user_id, comments) VALUES (?, ?, ?)");
+
+        foreach ($selectedCages as $index => $cage_id) {
+            $comment = !empty($comments[$index]) ? $comments[$index] : null;
+            $stmt->bind_param("sis", $cage_id, $userId, $comment);
+            if (!$stmt->execute()) {
+                throw new Exception($stmt->error);
+            }
+        }
+        $stmt->close();
+        mysqli_commit($con);
+        $_SESSION['message'] = 'Maintenance records added successfully.';
+    } catch (Exception $e) {
+        mysqli_rollback($con);
+        $_SESSION['message'] = 'Failed to add maintenance records: ' . htmlspecialchars($e->getMessage());
+    }
+
+    // Redirect based on the originating page
     header("Location: $redirectUrl");
     exit();
 }

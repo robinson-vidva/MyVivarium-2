@@ -288,7 +288,7 @@ foreach ($ids as $id) {
                             <tr>
                                 <td colspan="3" style="width: 100%; text-align:center;">
                                     <span style="font-weight: bold; font-size: 10pt; text-transform: uppercase; padding:3px;">
-                                        Holding Cage - # <?= $cage["cage_id"] ?> </span>
+                                        Holding Cage - # <?= htmlspecialchars($cage["cage_id"]) ?> </span>
                                 </td>
                             </tr>
                             <tr>
@@ -298,10 +298,10 @@ foreach ($ids as $id) {
                                 </td>
                                 <td style="width:40%;">
                                     <span style="font-weight: bold; padding:3px; text-transform: uppercase;">Strain:</span>
-                                    <span><?= htmlspecialchars($cage["strain"]); ?></span>
+                                    <span><?= htmlspecialchars($cage["str_name"] ?? ''); ?></span>
                                 </td>
                                 <td rowspan="5" style="width:20%; text-align:center;">
-                                    <img src="<?php echo "https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=https://" . $url . "/hc_view.php?id=" . $cage["cage_id"] . "&choe=UTF-8"; ?>" alt="QR Code">
+                                    <img src="<?= htmlspecialchars("https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=" . rawurlencode("https://" . $url . "/hc_view.php?id=" . rawurlencode($cage["cage_id"])) . "&choe=UTF-8") ?>" alt="QR Code">
                                 </td>
                             </tr>
                             <tr>
@@ -372,7 +372,7 @@ foreach ($ids as $id) {
                             <tr>
                                 <td colspan="3" style="width: 100%; text-align:center;">
                                     <span style="font-weight: bold; font-size: 10pt; text-transform: uppercase; padding:3px;">
-                                        Breeding Cage - # <?= $cage["cage_id"] ?> </span>
+                                        Breeding Cage - # <?= htmlspecialchars($cage["cage_id"]) ?> </span>
                                 </td>
                             </tr>
                             <tr>
@@ -385,7 +385,7 @@ foreach ($ids as $id) {
                                     <span><?= htmlspecialchars($cage["cross"] ?? '') ?></span>
                                 </td>
                                 <td rowspan="5" style="width:20%; text-align:center;">
-                                    <img src="<?php echo "https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=https://" . $url . "/bc_view.php?id=" . $cage["cage_id"] . "&choe=UTF-8"; ?>" alt="QR Code">
+                                    <img src="<?= htmlspecialchars("https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=" . rawurlencode("https://" . $url . "/bc_view.php?id=" . rawurlencode($cage["cage_id"])) . "&choe=UTF-8") ?>" alt="QR Code">
                                 </td>
                             </tr>
                             <tr>
@@ -395,7 +395,7 @@ foreach ($ids as $id) {
                                 </td>
                                 <td style="width:40%;">
                                     <span style="font-weight: bold; padding:3px; text-transform: uppercase;">User:</span>
-                                    <span><?= $cage['user_initials']; ?></span>
+                                    <span><?= htmlspecialchars($cage['user_initials']); ?></span>
                                 </td>
                             </tr>
                             <tr>

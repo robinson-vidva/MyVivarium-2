@@ -14,9 +14,21 @@ include_once("dbcon.php");
 // Start or resume the session if not already started
 require 'session_config.php';
 
+// Include the role capability matrix
+require_once 'services/roles.php';
+
+header('Content-Type: application/json');
+
 // Check if the user is logged in
 if (!isset($_SESSION['username'])) {
     echo json_encode(['success' => false, 'message' => 'You must be logged in to add a note.']);
+    exit;
+}
+
+// Role gate: view-only IACUC members may not add sticky notes.
+if (!role_can_add_note($_SESSION['role'] ?? null)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Your role does not have permission to add notes.']);
     exit;
 }
 

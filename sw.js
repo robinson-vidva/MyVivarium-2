@@ -56,7 +56,7 @@ self.addEventListener('fetch', (event) => {
             caches.match(request).then((cached) => {
                 if (cached) return cached;
                 return fetch(request).then((response) => {
-                    if (response.ok) {
+                    if (isCacheableStaticResponse(response)) {
                         const clone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
                     }
@@ -67,16 +67,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // PHP pages — network-first (always try server, fall back to cache)
+    // PHP pages — network only. Authenticated HTML is never written to the
+    // cache, so it cannot be read back offline after logout.
     event.respondWith(
         fetch(request)
-            .then((response) => {
-                if (response.ok) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-                }
-                return response;
-            })
             .catch(() => {
                 return caches.match(request).then((cached) => {
                     if (cached) return cached;
@@ -97,4 +91,16 @@ self.addEventListener('fetch', (event) => {
  */
 function isStaticAsset(pathname) {
     return /\.(css|js|png|jpg|jpeg|gif|webp|ico|svg|woff|woff2|ttf|eot)$/i.test(pathname);
+}
+
+/**
+ * Only cache plain, successful static responses: no redirects to login pages,
+ * no HTML and nothing that sets a cookie.
+ */
+function isCacheableStaticResponse(response) {
+    if (!response.ok || response.type !== 'basic' || response.redirected) return false;
+    const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+    if (contentType.startsWith('text/html')) return false;
+    if (response.headers.get('Set-Cookie')) return false;
+    return true;
 }

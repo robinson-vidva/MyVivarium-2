@@ -41,6 +41,9 @@ if (ini_get("session.use_cookies")) {
 // Finally, destroy the session
 session_destroy();
 
+// Ask the browser to drop its HTTP cache for this origin as well
+header('Clear-Site-Data: "cache"');
+
 // Redirect to the index.php page
 header("Location: index.php");
 exit;  // Ensure no further code is executed

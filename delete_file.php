@@ -3,9 +3,9 @@
 /**
  * File Deletion Script
  *
- * This script handles the deletion of a file from the server and the database based on the file ID passed via a GET request.
- * It starts a session, checks if the file exists, deletes it from the server and database, and then redirects the user
- * to a specified URL.
+ * This script handles the deletion of a file from the server and the database based on the file ID.
+ * The deletion itself requires a POST request with a valid CSRF token; a GET request with an id
+ * renders a small confirmation form that performs that POST.
  *
  */
 
@@ -24,9 +24,52 @@ if (!isset($_SESSION['username'])) {
     exit; // Exit to ensure no further code is executed
 }
 
-// Check if the 'id' parameter is set in the GET request
-if (isset($_GET['id'])) {
-    $id = $_GET['id']; // Get the file ID from the GET request
+// Generate CSRF token if not already set
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Validate and sanitize the redirect page parameter (whitelist only)
+$allowedPages = ['bc_edit', 'hc_edit', 'bc_view', 'hc_view', 'bc_dash', 'hc_dash'];
+$redirect = $_POST['url'] ?? $_GET['url'] ?? 'bc_edit';
+if (!in_array($redirect, $allowedPages, true)) {
+    $redirect = 'bc_edit';
+}
+
+// A plain GET link (e.g. from bc_edit.php) only gets a confirmation form that
+// POSTs back here with the CSRF token; it never deletes anything itself.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $linkId = isset($_GET['id']) ? intval($_GET['id']) : 0;
+    if ($linkId <= 0) {
+        echo "File ID not specified.";
+        exit;
+    }
+    ?>
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>Confirm file deletion</title></head>
+    <body>
+        <form method="post" action="delete_file.php">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
+            <input type="hidden" name="id" value="<?= $linkId; ?>">
+            <input type="hidden" name="url" value="<?= htmlspecialchars($redirect); ?>">
+            <p>Are you sure you want to delete this file?</p>
+            <button type="submit">Delete file</button>
+            <a href="javascript:history.back()">Cancel</a>
+        </form>
+    </body></html>
+    <?php
+    exit;
+}
+
+if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf_token'])) {
+    $_SESSION['message'] = 'CSRF token validation failed.';
+    header("Location: index.php");
+    exit();
+}
+
+// Check if the 'id' parameter is set in the POST request
+if (isset($_POST['id'])) {
+    $id = intval($_POST['id']); // Get the file ID from the POST request
 
     // SQL query to select the file record from the database
     $fileQuery = "SELECT * FROM files WHERE id = ?";
@@ -72,9 +115,13 @@ if (isset($_GET['id'])) {
             exit();
         }
 
-        // Check if the file exists on the server
-        if (file_exists($file['file_path'])) {
-            unlink($file['file_path']); // Delete the file from the server
+        // Delete the file from the server, only if it resolves inside uploads/.
+        $uploadsRoot = realpath(__DIR__ . '/uploads');
+        $candidate = (strpos($file['file_path'], '/') === 0) ? $file['file_path'] : __DIR__ . '/' . $file['file_path'];
+        $realPath = realpath($candidate);
+        if ($uploadsRoot && $realPath && is_file($realPath)
+            && strpos($realPath, $uploadsRoot . DIRECTORY_SEPARATOR) === 0) {
+            unlink($realPath);
         }
 
         // SQL query to delete the file record from the database
@@ -84,15 +131,6 @@ if (isset($_GET['id'])) {
         $deleteStmt = $con->prepare($deleteQuery);
         $deleteStmt->bind_param("i", $id);
         $deleteStmt->execute();
-
-        // Validate and sanitize the redirect URL parameter
-        $allowedPages = ['bc_edit', 'hc_edit', 'bc_view', 'hc_view', 'bc_dash', 'hc_dash'];
-        $redirect = isset($_GET['url']) ? $_GET['url'] : 'bc_edit';
-
-        // Only allow whitelisted page names (prevents open redirect vulnerability)
-        if (!in_array($redirect, $allowedPages)) {
-            $redirect = 'bc_edit'; // Default to safe page
-        }
 
         // Defensive: strip control characters before composing the Location
         // header. urlencode() already escapes them, but stripping leaves the
@@ -110,6 +148,6 @@ if (isset($_GET['id'])) {
         echo "File record not found.";
     }
 } else {
-    // Handle the case where the 'id' parameter is not set in the GET request
+    // Handle the case where the 'id' parameter is not set in the POST request
     echo "File ID not specified.";
 }
