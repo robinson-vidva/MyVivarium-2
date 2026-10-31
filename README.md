@@ -308,6 +308,10 @@ server {
     root /var/www/html;
     index index.php;
 
+    # Never serve dotfiles (.env) or server-side-only directories.
+    location ~ /\. { deny all; }
+    location ~ ^/(database|includes|services|setup|tests|vendor)/ { deny all; }
+
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }

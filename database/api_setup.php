@@ -11,6 +11,11 @@
  * Or from the shell with the same credentials as your web user.
  */
 
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "This script must be run from the command line.\n");
+    exit(1);
+}
+
 require __DIR__ . '/../dbcon.php';
 
 function table_exists(mysqli $con, string $name): bool {

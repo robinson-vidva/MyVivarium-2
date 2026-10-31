@@ -13,6 +13,11 @@
  *   php database/migrations/2026_06_29_preserve_on_user_delete.php
  */
 
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "This script must be run from the command line.\n");
+    exit(1);
+}
+
 require __DIR__ . '/../../dbcon.php';
 
 /** Current FK constraint name + delete rule for $table.$column -> users.id. */

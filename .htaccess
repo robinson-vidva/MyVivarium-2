@@ -1,0 +1,17 @@
+# Deny web access to dotfiles (.env, .git, ...) and to directories that hold
+# only server-side code, schema and installer scripts.
+<IfModule mod_authz_core.c>
+    <FilesMatch "^\.">
+        Require all denied
+    </FilesMatch>
+    <FilesMatch "\.(sql|lock|sh|example|dist)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(database|includes|services|setup|tests|vendor)(/|$) - [F,L]
+</IfModule>
+
+Options -Indexes
