@@ -187,6 +187,26 @@ check('chatbot_build_messages includes RESPONSE FORMATTING RULES block',
 check('chatbot_build_messages includes FOLLOW-UP SUGGESTIONS block',
     strpos($aiChat, 'chatbot_follow_up_suggestions_block()') !== false);
 
+// --- pending-op decision hardening + tool_calls/tool pairing ---
+check('ai_chat.php length cap applies to any non-empty message, not only non-decision turns',
+    strpos($aiChat, "if (\$incomingMessage !== '') {\n    if (strlen(\$incomingMessage) > 2000)") !== false);
+check('ai_chat.php validates pending op id as a uuid v4 before use',
+    strpos($aiChat, "function chatbot_pending_op_open(") !== false
+    && strpos($aiChat, "4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}") !== false
+    && strpos($aiChat, "chatbot_pending_op_open(\$con, \$user_id, \$conversation_id") !== false);
+check('ai_chat.php marks a confirmed pending op used before replaying it',
+    strpos($aiChat, "'User confirmed pending operation ' . \$confirm_pending_op") !== false);
+check('ai_chat.php persists synthetic tool rows for 202 pending + skipped calls',
+    strpos($aiChat, "'pending_confirmation', 202") !== false
+    && substr_count($aiChat, "array_slice(\$toolCalls, \$tcIdx + 1), 'skipped')") >= 2);
+check('ai_chat.php persists a synthetic tool row on cancel',
+    strpos($aiChat, "[\$cancelledCall], 'cancelled'") !== false);
+check('ai_chat.php dedupes tool results by tool_call_id when rebuilding history',
+    strpos($aiChat, '$toolResultIdx[$call[\'id\']]') !== false);
+check('ai_chat.php caps tool_result_json before the INSERT',
+    strpos($aiChat, 'CHATBOT_TOOL_RESULT_MAX_BYTES') !== false
+    && strpos($aiChat, "'truncated'      => true") !== false);
+
 // --- per-response token usage display (testing-phase feature) ---
 // Response envelope must carry a tokens field so the widget can render
 // the "X prompt + Y completion = Z tokens" line below assistant bubbles.

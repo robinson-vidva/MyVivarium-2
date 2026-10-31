@@ -72,6 +72,7 @@ server hashes incoming headers and looks the hash up. Revoking a key sets
 
 - Missing/unknown key → `401`
 - Revoked key → `401`
+- Read (GET) request without `read` scope → `403`
 - Write request without `write` scope → `403`
 
 ## Response envelope
@@ -110,7 +111,7 @@ membership rule the UI enforces applies here:
 
 ## Confirm-before-execute
 
-Destructive operations (DELETE, mouse move, sacrifice, mouse PATCH)
+Destructive operations (every PATCH and DELETE, mouse move, sacrifice)
 support a two-step confirm flow. First call with header
 `X-Confirm-Token: pending`:
 
@@ -196,7 +197,7 @@ header. The counter is stored per key in `rate_limit`.
 | GET    | /cages/holding | List active holding cages. `limit`/`offset`. |
 | GET    | /cages/holding/{id} | Detail with occupants and recent maintenance notes. |
 | POST   | /cages/holding | Create. Body: `cage_id`, `pi_name`, `room`, `rack`, `remarks`. |
-| PATCH  | /cages/holding/{id} | Update `pi_name`, `remarks`, `room`, `rack`. |
+| PATCH  | /cages/holding/{id} | Update `pi_name`, `remarks`, `room`, `rack`. Supports confirm flow. |
 
 ### Breeding cages
 
@@ -205,7 +206,7 @@ header. The counter is stored per key in `rate_limit`.
 | GET    | /cages/breeding | List. |
 | GET    | /cages/breeding/{id} | Detail with pairs, litters, and recent maintenance notes. |
 | POST   | /cages/breeding | Create. Body: `cage_id`, `cross`, `male_id`, `female_id`, plus optional cage metadata. |
-| PATCH  | /cages/breeding/{id} | Update editable fields (cage + breeding). |
+| PATCH  | /cages/breeding/{id} | Update editable fields (cage + breeding). Supports confirm flow. |
 
 ### Maintenance notes
 
@@ -214,7 +215,7 @@ header. The counter is stored per key in `rate_limit`.
 | GET    | /maintenance-notes | List. Query: `cage_id`, `from`, `to`, `limit`, `offset`, `include_deleted` (admin-only). |
 | GET    | /maintenance-notes/{id} | Read one note. `include_deleted=true` lets admins read soft-deleted ones. |
 | POST   | /maintenance-notes | Create. Body: `cage_id`, `note_text`, `type`. |
-| PATCH  | /maintenance-notes/{id} | Edit by author within 24h. |
+| PATCH  | /maintenance-notes/{id} | Edit by author within 24h. Supports confirm flow. |
 | DELETE | /maintenance-notes/{id} | Soft-delete by author (or admin). Supports confirm flow. |
 
 ### Activity log

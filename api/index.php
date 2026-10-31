@@ -285,8 +285,17 @@ function confirm_or_execute(
         ], null, 202);
     } elseif ($token !== '') {
         $consumed = pending_op_consume($con, $token, $authUserId, $method, $path);
+        // Claim the row atomically before executing so two concurrent
+        // confirms cannot both run the operation.
+        $claim = $con->prepare("UPDATE pending_operations SET executed_at = NOW() WHERE id = ? AND executed_at IS NULL");
+        $claim->bind_param('s', $consumed['id']);
+        $claim->execute();
+        $claimed = $claim->affected_rows;
+        $claim->close();
+        if ($claimed !== 1) {
+            throw new ApiException('conflict', 'Pending operation has already been executed', 409);
+        }
         $result = $executeFn($consumed['body']);
-        pending_op_mark_executed($con, $consumed['id']);
         api_data($result);
     } else {
         $result = $executeFn($body);
@@ -295,10 +304,14 @@ function confirm_or_execute(
 }
 
 // -----------------------------------------------------------------------------
-// Write-scope guard for non-GET methods
+// Scope guard: GET/HEAD need read scope, everything else needs write scope
 // -----------------------------------------------------------------------------
 
-if ($method !== 'GET') {
+if ($method === 'GET' || $method === 'HEAD') {
+    if (!api_key_has_scope($authKeyRow, 'read')) {
+        api_error('forbidden', 'API key lacks read scope', 403);
+    }
+} else {
     if (!api_key_has_scope($authKeyRow, 'write')) {
         api_error('forbidden', 'API key lacks write scope', 403);
     }
@@ -314,6 +327,55 @@ function api_log_write(string $entity_type, ?string $entity_id, string $details 
     // the action to the API key's owner without changing log_activity itself.
     $_SESSION['user_id'] = $authUserId;
     log_activity($con, 'api_request', $entity_type, $entity_id, "$method $path" . ($details ? " — $details" : ''));
+}
+
+// -----------------------------------------------------------------------------
+// Diff helpers for destructive PATCH routes whose services have no *_diff()
+// -----------------------------------------------------------------------------
+
+/**
+ * before/after diff for a cage PATCH, restricted to the whitelisted fields
+ * the service actually writes (CAGE_PATCH_EDITABLE, plus the breeding
+ * columns for breeding cages).
+ */
+function cage_patch_diff(mysqli $con, string $cage_id, array $body, bool $breeding): array {
+    $cur = cage_load($con, $cage_id);
+    if (!$cur) throw new ApiException('not_found', "Cage $cage_id not found", 404);
+    if ($breeding) {
+        $stmt = $con->prepare("SELECT `cross`, male_id, female_id FROM breeding WHERE cage_id = ? LIMIT 1");
+        $stmt->bind_param('s', $cage_id);
+        $stmt->execute();
+        $br = $stmt->get_result()->fetch_assoc() ?: [];
+        $stmt->close();
+        $cur = array_merge($cur, $br);
+    }
+    $fields = $breeding ? array_merge(CAGE_PATCH_EDITABLE, ['cross', 'male_id', 'female_id']) : CAGE_PATCH_EDITABLE;
+    $before = []; $after = [];
+    foreach ($fields as $field) {
+        if (!array_key_exists($field, $body)) continue;
+        $newVal = $body[$field];
+        if ($newVal === '') $newVal = null;
+        if (($cur[$field] ?? null) === $newVal) continue;
+        $before[$field] = $cur[$field] ?? null;
+        $after[$field]  = $newVal;
+    }
+    return ['before' => $before, 'after' => $after];
+}
+
+function maint_patch_diff(mysqli $con, int $note_id, array $body): array {
+    $cur = maint_load($con, $note_id);
+    if (!$cur || $cur['deleted_at'] !== null) throw new ApiException('not_found', "Note $note_id not found", 404);
+    $map = ['note_text' => 'comments', 'type' => 'note_type'];
+    $before = []; $after = [];
+    foreach ($map as $field => $col) {
+        if (!array_key_exists($field, $body)) continue;
+        $newVal = $body[$field];
+        if ($newVal === '') $newVal = null;
+        if (($cur[$col] ?? null) === $newVal) continue;
+        $before[$field] = $cur[$col] ?? null;
+        $after[$field]  = $newVal;
+    }
+    return ['before' => $before, 'after' => $after];
 }
 
 // -----------------------------------------------------------------------------
@@ -427,9 +489,16 @@ function dispatch(string $method, string $path, array $body): void {
         $cid = urldecode($m[1]);
         if ($method === 'GET')   api_data(holding_get($con, $authUserId, $cid));
         if ($method === 'PATCH') {
-            $r = holding_update($con, $authUserId, $cid, $body);
-            api_log_write('cage', $cid, 'patch_holding');
-            api_data($r);
+            confirm_or_execute(
+                fn($b) => cage_patch_diff($con, $cid, $b, false),
+                function ($b) use ($con, $authUserId, $cid) {
+                    $r = holding_update($con, $authUserId, $cid, $b);
+                    api_log_write('cage', $cid, 'patch_holding');
+                    return $r;
+                },
+                "Update holding cage $cid",
+                $body
+            );
         }
     }
 
@@ -448,9 +517,16 @@ function dispatch(string $method, string $path, array $body): void {
         $cid = urldecode($m[1]);
         if ($method === 'GET')   api_data(breeding_get($con, $authUserId, $cid));
         if ($method === 'PATCH') {
-            $r = breeding_update($con, $authUserId, $cid, $body);
-            api_log_write('cage', $cid, 'patch_breeding');
-            api_data($r);
+            confirm_or_execute(
+                fn($b) => cage_patch_diff($con, $cid, $b, true),
+                function ($b) use ($con, $authUserId, $cid) {
+                    $r = breeding_update($con, $authUserId, $cid, $b);
+                    api_log_write('cage', $cid, 'patch_breeding');
+                    return $r;
+                },
+                "Update breeding cage $cid",
+                $body
+            );
         }
     }
 
@@ -471,9 +547,16 @@ function dispatch(string $method, string $path, array $body): void {
             api_data(maint_get($con, $authUserId, $id, $_GET));
         }
         if ($method === 'PATCH') {
-            $r = maint_update($con, $authUserId, $id, $body);
-            api_log_write('maintenance', (string)$id, 'patch_note');
-            api_data($r);
+            confirm_or_execute(
+                fn($b) => maint_patch_diff($con, $id, $b),
+                function ($b) use ($con, $authUserId, $id) {
+                    $r = maint_update($con, $authUserId, $id, $b);
+                    api_log_write('maintenance', (string)$id, 'patch_note');
+                    return $r;
+                },
+                "Update maintenance note $id",
+                $body
+            );
         }
         if ($method === 'DELETE') {
             confirm_or_execute(

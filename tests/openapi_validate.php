@@ -12,6 +12,9 @@
  *      present in the spec (path + method).
  *   4. Every endpoint in the spec has summary, description, operationId,
  *      and a non-empty responses block.
+ *   5. Every PATCH/DELETE is tagged x-mv-destructive.
+ *   6. Every x-mv-destructive operation is routed through confirm_or_execute()
+ *      in the router (source-level check), so the 202 pending flow applies.
  *
  * Exits 0 on PASS, 1 on any FAIL with a per-check report.
  */
@@ -95,6 +98,19 @@ foreach ($ops as $o) {
 note('every PATCH/DELETE is marked x-mv-destructive',
     count($destructiveMissingTag) === 0,
     $destructiveMissingTag ? implode(' | ', $destructiveMissingTag) : '');
+
+// 6. Every destructive op must go through confirm_or_execute() in the router.
+$routerBlocks = mv_extract_router_blocks($routerSrc);
+$unconfirmed = [];
+foreach ($ops as $o) {
+    if (!$o['destructive']) continue;
+    $key = $o['method'] . ' ' . $o['path'];
+    $block = $routerBlocks[$key] ?? '';
+    if (strpos($block, 'confirm_or_execute(') === false) $unconfirmed[] = $key;
+}
+note('every x-mv-destructive op routes through confirm_or_execute()',
+    count($unconfirmed) === 0,
+    $unconfirmed ? implode(' | ', $unconfirmed) : '');
 
 echo "\n";
 echo "Endpoints in spec   : " . count($ops) . "\n";
@@ -199,6 +215,72 @@ function mv_extract_router_endpoints(string $src): array
     $endpoints = array_values(array_unique($endpoints));
     sort($endpoints);
     return $endpoints;
+}
+
+/**
+ * Walk from $pos (just after an `if (...)` condition) over the statement it
+ * guards: either a `{ ... }` block or a single `...;` statement. Returns
+ * [source, endOffset].
+ */
+function mv_router_stmt_at(string $src, int $pos): array
+{
+    $len = strlen($src);
+    while ($pos < $len && ctype_space($src[$pos])) $pos++;
+    if ($pos < $len && $src[$pos] === '{') {
+        $depth = 1; $i = $pos + 1;
+        while ($i < $len && $depth > 0) {
+            if ($src[$i] === '{') $depth++;
+            elseif ($src[$i] === '}') $depth--;
+            $i++;
+        }
+        return [substr($src, $pos, $i - $pos), $i];
+    }
+    $end = strpos($src, ';', $pos);
+    if ($end === false) $end = $len - 1;
+    return [substr($src, $pos, $end - $pos + 1), $end + 1];
+}
+
+/**
+ * Static-parse dispatch() into a map of "METHOD /template" => handler source.
+ * Mirrors the three forms handled by mv_extract_router_endpoints(). Where a
+ * path block holds several `if ($method === 'X')` guards, the handler is the
+ * statement guarded by each one; a combined `... && $method === 'X')` form
+ * takes the whole guarded statement.
+ */
+function mv_extract_router_blocks(string $src): array
+{
+    $blocks = [];
+    $pattern = '~if\s*\((?:\s*\$path === \'([^\']+)\'|\s*preg_match\(\s*\'#\^([^\']+?)\$#\'\s*,\s*\$path[^)]*\))~';
+    $offset = 0;
+    while (preg_match($pattern, $src, $m, PREG_OFFSET_CAPTURE, $offset)) {
+        $template = ($m[1][0] ?? '') !== '' ? $m[1][0] : mv_regex_to_template($m[2][0]);
+        $matchStart = $m[0][1];
+        // Walk to the matching close-paren of the outer `if (`.
+        $depth = 1; $j = $matchStart + strlen('if');
+        while ($j < strlen($src) && $src[$j] !== '(') $j++;
+        $j++;
+        while ($j < strlen($src) && $depth > 0) {
+            if ($src[$j] === '(') $depth++;
+            elseif ($src[$j] === ')') $depth--;
+            $j++;
+        }
+        $cond = substr($src, $matchStart, $j - $matchStart);
+        [$body, $end] = mv_router_stmt_at($src, $j);
+
+        if (preg_match_all('#\$method === \'([A-Z]+)\'#', $cond, $cm)) {
+            foreach ($cm[1] as $meth) $blocks[strtoupper($meth) . ' ' . $template] = $body;
+        }
+        // Inner `if ($method === 'X')` guards inside the block.
+        $inner = 0;
+        while (preg_match('#if\s*\(\s*\$method === \'([A-Z]+)\'\s*\)#', $body, $im, PREG_OFFSET_CAPTURE, $inner)) {
+            $k = strtoupper($im[1][0]) . ' ' . $template;
+            [$stmt, $innerEnd] = mv_router_stmt_at($body, $im[0][1] + strlen($im[0][0]));
+            $blocks[$k] = ($blocks[$k] ?? '') . $stmt;
+            $inner = $innerEnd;
+        }
+        $offset = $end;
+    }
+    return $blocks;
 }
 
 /**

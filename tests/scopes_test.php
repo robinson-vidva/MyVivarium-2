@@ -64,6 +64,14 @@ expect('missing scopes key => no read',
 expect('missing scopes key => no write',
     api_key_has_scope($missing, 'write') === false);
 
+// 5. Router enforcement: GET/HEAD must require read scope and every other
+//    method must require write scope (source-level check of api/index.php).
+$router = (string)file_get_contents(__DIR__ . '/../api/index.php');
+expect('router requires read scope for GET/HEAD',
+    strpos($router, "if (\$method === 'GET' || \$method === 'HEAD') {\n    if (!api_key_has_scope(\$authKeyRow, 'read'))") !== false);
+expect('router requires write scope for non-GET methods',
+    strpos($router, "if (!api_key_has_scope(\$authKeyRow, 'write'))") !== false);
+
 if ($failures > 0) {
     fwrite(STDERR, "\n$failures test(s) failed\n");
     exit(1);

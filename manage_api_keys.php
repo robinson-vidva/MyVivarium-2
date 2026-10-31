@@ -137,6 +137,7 @@ require 'header.php';
                         <input class="form-check-input" type="checkbox" name="scope_write" id="scope_write">
                         <label class="form-check-label" for="scope_write">write</label>
                     </div>
+                    <div class="form-text">read is required for GET requests; write for POST/PATCH/DELETE.</div>
                 </div>
             </div>
             <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Generate Key</button>

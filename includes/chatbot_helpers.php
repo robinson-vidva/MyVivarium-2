@@ -321,6 +321,29 @@ if (!function_exists('chatbot_resolve_tool')) {
                 return ['data.note_text'];
             case 'listMyNotifications':
                 return ['data[].title', 'data[].message'];
+            case 'listMice':
+            case 'listMouseOffspring':
+                return ['data[].notes'];
+            case 'getMouse':
+            case 'createMouse':
+            case 'updateMouse':
+            case 'moveMouseToCage':
+            case 'sacrificeMouse':
+            case 'archiveMouse':
+                return ['data.notes'];
+            case 'listHoldingCages':
+            case 'listBreedingCages':
+                return ['data[].remarks'];
+            case 'getHoldingCage':
+            case 'createHoldingCage':
+            case 'updateHoldingCage':
+                return ['data.remarks', 'data.recent_maintenance_notes[].note_text'];
+            case 'getBreedingCage':
+            case 'createBreedingCage':
+            case 'updateBreedingCage':
+                return ['data.remarks', 'data.litters[].remarks', 'data.recent_maintenance_notes[].note_text'];
+            case 'getBreedingCageLineage':
+                return ['data.litters[].remarks'];
             default:
                 return [];
         }

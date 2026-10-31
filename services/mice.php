@@ -204,7 +204,8 @@ function mice_create(mysqli $con, int $user_id, array $body): array
         mysqli_commit($con);
     } catch (Throwable $e) {
         mysqli_rollback($con);
-        throw new ApiException('server_error', 'Failed to create mouse: ' . $e->getMessage(), 500);
+        error_log('mice_create failed: ' . $e->getMessage());
+        throw new ApiException('server_error', 'Failed to create mouse', 500);
     }
 
     return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
@@ -321,7 +322,8 @@ function mice_move(mysqli $con, int $user_id, string $mouse_id, array $body): ar
         mysqli_commit($con);
     } catch (Throwable $e) {
         mysqli_rollback($con);
-        throw new ApiException('server_error', 'Failed to move mouse: ' . $e->getMessage(), 500);
+        error_log('mice_move failed: ' . $e->getMessage());
+        throw new ApiException('server_error', 'Failed to move mouse', 500);
     }
 
     return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
@@ -374,7 +376,8 @@ function mice_sacrifice(mysqli $con, int $user_id, string $mouse_id, array $body
         mysqli_commit($con);
     } catch (Throwable $e) {
         mysqli_rollback($con);
-        throw new ApiException('server_error', 'Failed to sacrifice mouse: ' . $e->getMessage(), 500);
+        error_log('mice_sacrifice failed: ' . $e->getMessage());
+        throw new ApiException('server_error', 'Failed to sacrifice mouse', 500);
     }
 
     return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);
@@ -427,7 +430,8 @@ function mice_soft_delete(mysqli $con, int $user_id, string $mouse_id): array
         mysqli_commit($con);
     } catch (Throwable $e) {
         mysqli_rollback($con);
-        throw new ApiException('server_error', 'Failed to archive mouse: ' . $e->getMessage(), 500);
+        error_log('mice_soft_delete failed: ' . $e->getMessage());
+        throw new ApiException('server_error', 'Failed to archive mouse', 500);
     }
 
     return mice_get($con, $user_id, $mouse_id, ['_internal' => true]);

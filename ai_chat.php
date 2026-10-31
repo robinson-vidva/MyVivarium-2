@@ -75,12 +75,12 @@ $cancel_pending_op  = isset($body['cancel_pending_op'])  ? (string)$body['cancel
 // confirm/cancel decision on a previously-pending op.
 $isDecisionTurn = ($confirm_pending_op !== '' || $cancel_pending_op !== '');
 
-if (!$isDecisionTurn) {
-    if ($incomingMessage === '') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'message_required']);
-        exit;
-    }
+if (!$isDecisionTurn && $incomingMessage === '') {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'message_required']);
+    exit;
+}
+if ($incomingMessage !== '') {
     if (strlen($incomingMessage) > 2000) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'message_too_long', 'detail' => 'Message must be 2000 chars or fewer.']);
@@ -94,11 +94,28 @@ if (!$isDecisionTurn) {
     }
 }
 
+// Decision turns must name exactly one well-formed pending op id that belongs
+// to a system_event row in this conversation and has not already been
+// confirmed, cancelled or expired. Anything else is rejected up front so it
+// cannot be used to bypass the rate limit below.
+$decisionRow = null;
+if ($isDecisionTurn) {
+    if ($confirm_pending_op === '' || $cancel_pending_op === '') {
+        $decisionRow = chatbot_pending_op_open($con, $user_id, $conversation_id,
+            $confirm_pending_op !== '' ? $confirm_pending_op : $cancel_pending_op);
+    }
+    if (!$decisionRow) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'unknown_pending_op']);
+        exit;
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Per-user AI rate limit. Applies to USER MESSAGES, not tool calls or LLM
 // round-trips. We check BEFORE the chatbot-enabled gate so a hit returns a
 // clean JSON envelope no matter what the admin config looks like.
-// Decision turns (confirm / cancel) do NOT count against the budget.
+// Validated decision turns (confirm / cancel) do NOT count against the budget.
 // -----------------------------------------------------------------------------
 
 if (!$isDecisionTurn) {
@@ -202,10 +219,61 @@ function chatbot_conversation_create(mysqli $con, int $user_id): string
     return $id;
 }
 
+/**
+ * Look up an open pending op for a confirm/cancel decision. Returns the
+ * originating system_event row (content, tool_call_json) or null when the id
+ * is malformed, the conversation is not the user's, or the op has already
+ * been decided. A decision leaves behind a later system_event row with the
+ * same pending_op_id and no tool_call_json, which is what closes it.
+ */
+function chatbot_pending_op_open(mysqli $con, int $user_id, string $cid, string $opId): ?array
+{
+    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $opId)) return null;
+    if ($cid === '' || !chatbot_conversation_load($con, $user_id, $cid)) return null;
+    $stmt = $con->prepare("SELECT id, content, tool_call_json FROM ai_messages
+                            WHERE conversation_id = ? AND pending_op_id = ? AND role = 'system_event'
+                            ORDER BY id DESC LIMIT 1");
+    $stmt->bind_param('ss', $cid, $opId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc() ?: null;
+    $stmt->close();
+    if (!$row || empty($row['tool_call_json'])) return null;
+    return $row;
+}
+
+/**
+ * Persist a synthetic 'tool' row for every tool call that ends without a real
+ * result (cancel, 202 pending, skipped), so the replayed assistant tool_calls
+ * message always has a matching tool result for the provider.
+ */
+function chatbot_persist_unanswered_tool_calls(mysqli $con, string $cid, array $toolCalls, string $error, int $status = 0, ?string $pending_op_id = null): void
+{
+    foreach ($toolCalls as $tc) {
+        $body = ['ok' => false, 'error' => $error];
+        chatbot_message_persist($con, $cid, 'tool', json_encode($body, JSON_UNESCAPED_SLASHES),
+            ['id' => $tc['id'] ?? null, 'function' => ['name' => $tc['function']['name'] ?? '']],
+            ['status' => $status, 'body' => $body],
+            $pending_op_id
+        );
+    }
+}
+
+// ai_messages.tool_result_json is TEXT (64 KB); large list results must be
+// compacted before the INSERT or the whole turn throws.
+const CHATBOT_TOOL_RESULT_MAX_BYTES = 60000;
+
 function chatbot_message_persist(mysqli $con, string $cid, string $role, ?string $content, ?array $tool_call = null, ?array $tool_result = null, ?string $pending_op_id = null, ?array $suggestions = null, ?array $tokens = null): int
 {
     $callJson        = $tool_call   ? json_encode($tool_call,   JSON_UNESCAPED_SLASHES) : null;
     $resultJson      = $tool_result ? json_encode($tool_result, JSON_UNESCAPED_SLASHES) : null;
+    if (is_string($resultJson) && strlen($resultJson) > CHATBOT_TOOL_RESULT_MAX_BYTES) {
+        $resultJson = json_encode([
+            'status'         => $tool_result['status'] ?? null,
+            'truncated'      => true,
+            'original_bytes' => strlen($resultJson),
+            'body'           => substr($resultJson, 0, 4000) . ' ... [truncated]',
+        ], JSON_UNESCAPED_SLASHES);
+    }
     $suggestionsJson = is_array($suggestions) ? json_encode(array_values($suggestions), JSON_UNESCAPED_SLASHES) : null;
     // tokens_json holds the summed-per-turn {prompt, completion, total} that
     // the chat widget renders below this assistant bubble. Only persisted
@@ -551,6 +619,10 @@ function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, 
     $messages = [['role' => 'system', 'content' => $augmented]];
 
     $msgLimit = chatbot_context_message_limit();
+    // tool_call_id => index in $messages. A later tool row for the same id
+    // (confirm replay after a synthetic pending/cancelled row) replaces the
+    // earlier one so each tool_call has exactly one result.
+    $toolResultIdx = [];
     foreach (chatbot_messages_recent($con, $cid, $msgLimit) as $r) {
         if ($r['role'] === 'system_event') {
             // Hint Groq about prior pending op decisions etc.
@@ -566,6 +638,11 @@ function chatbot_build_messages(mysqli $con, string $cid, string $systemPrompt, 
             ];
             if (is_array($call) && !empty($call['id'])) {
                 $msg['tool_call_id'] = $call['id'];
+                if (isset($toolResultIdx[$call['id']])) {
+                    $messages[$toolResultIdx[$call['id']]]['content'] = $content;
+                    continue;
+                }
+                $toolResultIdx[$call['id']] = count($messages);
             }
             $messages[] = $msg;
             continue;
@@ -650,6 +727,12 @@ function chatbot_fit_to_budget(array $messages, array $tools, int $hardCap = 800
 // -----------------------------------------------------------------------------
 
 if ($cancel_pending_op !== '') {
+    // Close the originating tool call with a synthetic result, then record
+    // the decision (a system_event without tool_call_json marks the op used).
+    $cancelledCall = json_decode((string)$decisionRow['tool_call_json'], true);
+    if (is_array($cancelledCall) && !empty($cancelledCall['id'])) {
+        chatbot_persist_unanswered_tool_calls($con, $conversation_id, [$cancelledCall], 'cancelled', 0, $cancel_pending_op);
+    }
     chatbot_message_persist($con, $conversation_id, 'system_event',
         'User cancelled pending operation ' . $cancel_pending_op . '.',
         null, null, $cancel_pending_op);
@@ -717,22 +800,14 @@ $replayToolName = null;
 $replayToolArgs = null;
 $replayToolCallId = null;
 if ($confirm_pending_op !== '') {
-    $stmt = $con->prepare("SELECT content, tool_call_json FROM ai_messages
-                            WHERE conversation_id = ? AND pending_op_id = ? AND role = 'system_event'
-                            ORDER BY id DESC LIMIT 1");
-    $stmt->bind_param('ss', $conversation_id, $confirm_pending_op);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if (!$row || !$row['tool_call_json']) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'unknown_pending_op']);
-        exit;
-    }
-    $tc = json_decode($row['tool_call_json'], true);
+    $tc = json_decode((string)$decisionRow['tool_call_json'], true);
     $replayToolName    = $tc['function']['name'] ?? null;
     $replayToolArgs    = isset($tc['function']['arguments']) ? (is_string($tc['function']['arguments']) ? (json_decode($tc['function']['arguments'], true) ?: []) : $tc['function']['arguments']) : [];
     $replayToolCallId  = $tc['id'] ?? ('call_' . substr(md5($confirm_pending_op), 0, 12));
+    // Mark the op used before replaying so the same id cannot be confirmed twice.
+    chatbot_message_persist($con, $conversation_id, 'system_event',
+        'User confirmed pending operation ' . $confirm_pending_op . '.',
+        null, null, $confirm_pending_op);
 }
 
 // -----------------------------------------------------------------------------
@@ -948,7 +1023,8 @@ try {
         );
 
         $hadPending = false;
-        foreach ($toolCalls as $tc) {
+        $toolCalls = array_values($toolCalls);
+        foreach ($toolCalls as $tcIdx => $tc) {
             $name = $tc['function']['name'] ?? '';
             $args = $tc['function']['arguments'] ?? [];
             if (is_string($args)) $args = json_decode($args, true) ?: [];
@@ -1006,10 +1082,11 @@ try {
                     error_log("Chatbot aborting loop: tool '$name' failed " . $toolFailureStreak[$name] . "x in one turn (status={$apiRes['status']})");
                     $finalReply = 'The API is not responding correctly. Check that /api/v1 is reachable and the session key is valid.';
                     chatbot_message_persist($con, $conversation_id, 'tool',
-                        json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES),
+                        chatbot_truncate(json_encode($apiRes['body'], JSON_UNESCAPED_SLASHES)),
                         ['id' => $tc['id'] ?? null, 'function' => ['name' => $name]],
                         ['status' => $apiRes['status'], 'body' => $apiRes['body']]
                     );
+                    chatbot_persist_unanswered_tool_calls($con, $conversation_id, array_slice($toolCalls, $tcIdx + 1), 'skipped');
                     chatbot_message_persist($con, $conversation_id, 'assistant', $finalReply, null, null, null, []);
                     echo json_encode([
                         'ok'                  => true,
@@ -1036,6 +1113,10 @@ try {
                     'expires_at'           => $pop['expires_at'] ?? null,
                     'tool_name'            => $name,
                 ];
+                // Synthetic result first so it directly follows the assistant
+                // tool_calls row; the confirm replay later supersedes it.
+                chatbot_persist_unanswered_tool_calls($con, $conversation_id, [$tc], 'pending_confirmation', 202, (string)$pop['pending_operation_id']);
+                chatbot_persist_unanswered_tool_calls($con, $conversation_id, array_slice($toolCalls, $tcIdx + 1), 'skipped');
                 chatbot_message_persist($con, $conversation_id, 'system_event',
                     "Pending destructive op: $name (id={$pop['pending_operation_id']}) — awaiting user confirmation.",
                     ['id' => $tc['id'] ?? null, 'function' => ['name' => $name, 'arguments' => is_array($args) ? json_encode($args) : $args]],
