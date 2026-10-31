@@ -522,6 +522,22 @@ require 'header.php';
 
 <head>
     <script>
+        // POST to delete_file.php with the CSRF token. A nested <form> is not
+        // allowed inside the main edit form, so the form is built on the fly.
+        function deleteCageFile(fileId) {
+            if (!confirm('Are you sure you want to delete this file?')) return;
+            var f = document.createElement('form');
+            f.method = 'post';
+            f.action = 'delete_file.php';
+            var fields = { csrf_token: <?= json_encode($_SESSION['csrf_token']); ?>, url: 'bc_edit', id: String(fileId) };
+            Object.keys(fields).forEach(function (k) {
+                var i = document.createElement('input');
+                i.type = 'hidden'; i.name = k; i.value = fields[k];
+                f.appendChild(i);
+            });
+            document.body.appendChild(f);
+            f.submit();
+        }
         // Function to navigate back to the previous page
         function goBack() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -1229,14 +1245,9 @@ require 'header.php';
                                                             <a href="<?= htmlspecialchars($file['file_path']); ?>" download="<?= htmlspecialchars($file['file_name']); ?>" class="btn btn-sm btn-outline-primary">
                                                                 <i class="fas fa-cloud-download-alt fa-sm"></i>
                                                             </a>
-                                                            <form method="post" action="delete_file.php" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this file?');">
-                                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']); ?>">
-                                                                <input type="hidden" name="url" value="bc_edit">
-                                                                <input type="hidden" name="id" value="<?= intval($file['id']); ?>">
-                                                                <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete <?= htmlspecialchars($file['file_name']); ?>">
-                                                                    <i class="fas fa-trash fa-sm"></i>
-                                                                </button>
-                                                            </form>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteCageFile(<?= intval($file['id']); ?>)" aria-label="Delete <?= htmlspecialchars($file['file_name']); ?>">
+                                                                <i class="fas fa-trash fa-sm"></i>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 <?php endwhile; ?>

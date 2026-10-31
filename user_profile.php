@@ -23,15 +23,9 @@ if (!isset($_SESSION['username'])) {
     exit; // Exit to ensure no further code is executed
 }
 
-require 'header.php'; // Include the header file (after the auth check so the redirect works)
-
-// Generate CSRF token if not already set
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 // Fetch user details from the database (keyed by id so a shared or renamed
-// username can never resolve to another account).
+// username can never resolve to another account). Done before header.php
+// emits any HTML so the redirect below still works.
 $username = $_SESSION['username'];
 $currentUserId = (int)($_SESSION['user_id'] ?? 0);
 $query = "SELECT * FROM users WHERE id = ?";
@@ -46,6 +40,13 @@ if (!$user) {
     exit;
 }
 $username = $user['username'];
+
+require 'header.php'; // Include the header file (after the auth checks so redirects work)
+
+// Generate CSRF token if not already set
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 $updateMessage = ''; // Initialize message for profile update
 
