@@ -18,6 +18,7 @@ require 'session_config.php';
 require 'dbcon.php';
 require_once 'log_activity.php';
 require_once 'services/roles.php';
+require_once 'includes/cage_access.php';
 
 if (!isset($_SESSION['username'])) {
     $currentUrl = urlencode($_SERVER['REQUEST_URI']);
@@ -80,6 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // A mouse cannot be its own parent (mirrors mouse_edit.php).
     if ($sire_id && $sire_id === $mouse_id) $errors[] = 'A mouse cannot be its own sire.';
     if ($dam_id  && $dam_id  === $mouse_id) $errors[] = 'A mouse cannot be its own dam.';
+    if ($cage_id) {
+        if (!in_array($cage_id, $cageRows, true)) {
+            $errors[] = 'Selected cage does not exist or is archived.';
+        } elseif (!cage_user_can_write_mouse($con, $created_by !== null ? (int)$created_by : null, $_SESSION['role'] ?? null, $cage_id)) {
+            $errors[] = 'Access denied. You can only register mice into cages you are assigned to.';
+        }
+    }
 
     if (!$errors) {
         $check = $con->prepare("SELECT 1 FROM mice WHERE mouse_id = ?");

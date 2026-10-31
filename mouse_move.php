@@ -86,6 +86,12 @@ if ($target_cage !== null) {
         header("Location: mouse_view.php?id=" . urlencode($mouse_id)); exit;
     }
     $chk->close();
+
+    // The user must also be allowed to write to the target cage.
+    if (!cage_user_can_write_mouse($con, $user_id, $_SESSION['role'] ?? null, $target_cage)) {
+        $_SESSION['message'] = 'Access denied. You can only move mice into cages you are assigned to.';
+        header("Location: mouse_view.php?id=" . urlencode($mouse_id)); exit;
+    }
 }
 
 mysqli_begin_transaction($con);

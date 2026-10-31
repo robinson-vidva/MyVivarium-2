@@ -103,6 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $new_cage_id = trim($_POST['new_cage_id'] ?? $id);
+    if ($new_cage_id === '') $new_cage_id = $id;
     $pi_name = !empty($_POST['pi_name']) ? (int)$_POST['pi_name'] : null;
     $room    = !empty($_POST['room'])    ? trim($_POST['room'])   : null;
     $rack    = !empty($_POST['rack'])    ? trim($_POST['rack'])   : null;
@@ -112,12 +113,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Cage-id rename
     $cageIdChanged = false;
+    $con->begin_transaction();
+    try {
     if ($new_cage_id !== $id) {
         $check = $con->prepare("SELECT 1 FROM cages WHERE cage_id = ?");
         $check->bind_param("s", $new_cage_id);
         $check->execute();
         if ($check->get_result()->num_rows > 0) {
             $check->close();
+            $con->rollback();
             $_SESSION['message'] = "Cage ID '" . htmlspecialchars($new_cage_id) . "' already exists.";
             header("Location: hc_edit.php?id=" . urlencode($id));
             exit;
@@ -161,6 +165,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $iiq->execute();
         }
         $iiq->close();
+    }
+    $con->commit();
+    } catch (Exception $e) {
+        $con->rollback();
+        $_SESSION['message'] = 'Update failed: ' . htmlspecialchars($e->getMessage());
+        header("Location: hc_edit.php?id=" . urlencode($cageIdChanged ? $oldId : $id));
+        exit;
     }
 
     // Notifications
