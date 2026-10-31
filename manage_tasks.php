@@ -12,7 +12,6 @@
 
 ob_start(); // Start output buffering
 require 'session_config.php'; // Start the session to use session variables
-require 'header.php'; // Include header file
 require 'dbcon.php'; // Include database connection
 
 // Check if the user is logged in, redirect to login page if not logged in
@@ -20,6 +19,8 @@ if (!isset($_SESSION['name'])) {
     header("Location: index.php"); // Redirect to login page if not logged in
     exit; // Exit script
 }
+
+require 'header.php'; // Include header file (after the auth check so the redirect works)
 
 // Generate CSRF token if not already set
 if (empty($_SESSION['csrf_token'])) {
@@ -37,6 +38,26 @@ $isAdmin = $_SESSION['role'] == 'admin'; // Check if the user is an admin
  * @param string $message The message to display
  * @param string|null $cageId The cage ID to include in the URL
  */
+/**
+ * Load a task the current user may modify: admins may modify any task,
+ * other users only tasks they created or are assigned to (same rule as the
+ * REST API and the task list filter). Returns the row or null.
+ */
+function loadModifiableTask(mysqli $con, int $taskId, $currentUserId, bool $isAdmin): ?array
+{
+    $stmt = $con->prepare("SELECT id, title, description, assigned_by, assigned_to, status, completion_date, cage_id FROM tasks WHERE id = ?");
+    $stmt->bind_param("i", $taskId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) return null;
+    if ($isAdmin) return $row;
+    $uid = (int)$currentUserId;
+    $assignees = array_map('intval', array_filter(explode(',', (string)$row['assigned_to'])));
+    if ((int)$row['assigned_by'] === $uid || in_array($uid, $assignees, true)) return $row;
+    return null;
+}
+
 function redirectToPage($message, $cageId = null)
 {
     $_SESSION['message'] = $message;
@@ -100,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add']) || isset($_POST['edit'])) {
         $title = trim($_POST['title']);
         $description = trim($_POST['description']);
-        $assignedBy = $_POST['assigned_by_id'];
+        $assignedBy = $currentUserId; // author is always the logged-in user
         $assignedTo = implode(',', $_POST['assigned_to'] ?? []);
         $status = $_POST['status'];
         $completionDate = !empty($_POST['completion_date']) ? $_POST['completion_date'] : NULL;
@@ -136,8 +157,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     } elseif (isset($_POST['edit'])) {
         $id = intval($_POST['id']);
-        $stmt = $con->prepare("UPDATE tasks SET title = ?, description = ?, assigned_by = ?, assigned_to = ?, status = ?, completion_date = ?, cage_id = ? WHERE id = ?");
-        $stmt->bind_param("sssssssi", $title, $description, $assignedBy, $assignedTo, $status, $completionDate, $cageId, $id);
+        $existing = loadModifiableTask($con, $id, $currentUserId, $isAdmin);
+        if (!$existing) {
+            redirectToPage("Error: Task not found or you are not allowed to modify it.");
+        }
+        // The author never changes on edit; ignore the submitted value.
+        $assignedBy = $existing['assigned_by'];
+        $stmt = $con->prepare("UPDATE tasks SET title = ?, description = ?, assigned_to = ?, status = ?, completion_date = ?, cage_id = ? WHERE id = ?");
+        $stmt->bind_param("ssssssi", $title, $description, $assignedTo, $status, $completionDate, $cageId, $id);
         if ($stmt->execute()) {
             $task_id = $id; // Use the ID of the task being updated
             $taskAction = 'updated';
@@ -147,13 +174,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (isset($_POST['delete'])) {
         $id = intval($_POST['id']);
 
-        // Fetch task details before deletion for email notification
-        $taskQuery = $con->prepare("SELECT title, description, assigned_by, assigned_to, status, completion_date, cage_id FROM tasks WHERE id = ?");
-        $taskQuery->bind_param("i", $id);
-        $taskQuery->execute();
-        $taskQuery->bind_result($title, $description, $assignedBy, $assignedTo, $status, $completionDate, $cageId);
-        $taskQuery->fetch();
-        $taskQuery->close();
+        // Fetch task details (and check ownership) before deletion
+        $existing = loadModifiableTask($con, $id, $currentUserId, $isAdmin);
+        if (!$existing) {
+            redirectToPage("Error: Task not found or you are not allowed to delete it.");
+        }
+        $title = $existing['title'];
+        $description = $existing['description'];
+        $assignedBy = $existing['assigned_by'];
+        $assignedTo = $existing['assigned_to'];
+        $status = $existing['status'];
+        $completionDate = $existing['completion_date'];
+        $cageId = $existing['cage_id'];
 
         // Now delete the task
         $stmt = $con->prepare("DELETE FROM tasks WHERE id = ?");
@@ -967,16 +999,17 @@ ob_end_flush(); // Flush the output buffer
                         $('#cage_id').val(response.cage_id).trigger('change');
 
                     } else if (action === 'view') {
+                        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
                         const taskDetails = `
-                            <p><strong>ID:</strong> ${response.id}</p>
-                            <p><strong>Title:</strong> ${response.title}</p>
-                            <p><strong>Description/Update:</strong> ${response.description}</p>
-                            <p><strong>Assigned By:</strong> ${response.assigned_by_name || users[response.assigned_by] || response.assigned_by}</p>
-                            <p><strong>Assigned To:</strong> ${response.assigned_to_names || response.assigned_to}</p>
-                            <p><strong>Status:</strong> ${response.status}</p>
-                            <p><strong>Completion Date:</strong> ${response.completion_date}</p>
-                            <p><strong>Creation Date:</strong> ${response.creation_date}</p>
-                            <p><strong>Cage ID:</strong> ${response.cage_id}</p>
+                            <p><strong>ID:</strong> ${esc(response.id)}</p>
+                            <p><strong>Title:</strong> ${esc(response.title)}</p>
+                            <p><strong>Description/Update:</strong> ${esc(response.description)}</p>
+                            <p><strong>Assigned By:</strong> ${esc(response.assigned_by_name || users[response.assigned_by] || response.assigned_by)}</p>
+                            <p><strong>Assigned To:</strong> ${esc(response.assigned_to_names || response.assigned_to)}</p>
+                            <p><strong>Status:</strong> ${esc(response.status)}</p>
+                            <p><strong>Completion Date:</strong> ${esc(response.completion_date)}</p>
+                            <p><strong>Creation Date:</strong> ${esc(response.creation_date)}</p>
+                            <p><strong>Cage ID:</strong> ${esc(response.cage_id)}</p>
                         `;
                         document.getElementById('viewTaskDetails').innerHTML = taskDetails;
                         document.getElementById('viewPopupOverlay').style.display = 'block';

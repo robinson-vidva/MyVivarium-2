@@ -24,6 +24,14 @@ if (isset($_GET['id'])) {
     if ($stmt->execute()) {
         $result = $stmt->get_result();
         $reminder = $result->fetch_assoc();
+        // Non-admins may only read reminders they created or are assigned to
+        if ($reminder && ($_SESSION['role'] ?? '') !== 'admin') {
+            $uid = (int)($_SESSION['user_id'] ?? 0);
+            $assignees = array_map('intval', array_filter(explode(',', (string)$reminder['assigned_to'])));
+            if ((int)$reminder['assigned_by'] !== $uid && !in_array($uid, $assignees, true)) {
+                $reminder = null;
+            }
+        }
         if ($reminder) {
             // Return the reminder details as JSON
             echo json_encode($reminder);

@@ -52,7 +52,7 @@ $taskStatsQuery = "
         SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress,
         SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) AS pending
     FROM tasks
-    WHERE assigned_to = ?
+    WHERE FIND_IN_SET(?, assigned_to)
 ";
 $stmtTaskStats = $con->prepare($taskStatsQuery);
 $stmtTaskStats->bind_param("i", $userId);

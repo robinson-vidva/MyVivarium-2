@@ -42,6 +42,18 @@ if (isset($_GET['id']) && is_numeric($_GET['id'])) {
             // Fetch task data if a matching task is found
             $task = $result->fetch_assoc();
 
+            // Non-admins may only read tasks they created or are assigned to
+            if (($_SESSION['role'] ?? '') !== 'admin') {
+                $uid = (int)($_SESSION['user_id'] ?? 0);
+                $assignees = array_map('intval', array_filter(explode(',', (string)$task['assigned_to'])));
+                if ((int)$task['assigned_by'] !== $uid && !in_array($uid, $assignees, true)) {
+                    $stmt->close();
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'Task not found.']);
+                    exit;
+                }
+            }
+
             // Resolve assigned_by name
             $assignedByName = $task['assigned_by'];
             $nameStmt = $con->prepare("SELECT name FROM users WHERE id = ?");

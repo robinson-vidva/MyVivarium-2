@@ -30,6 +30,25 @@ $currentUserId = $_SESSION['user_id'] ?? null;
 $currentUserName = $_SESSION['name'] ?? '';
 $isAdmin = (($_SESSION['role'] ?? '') === 'admin');
 
+/**
+ * Admins may modify any reminder; other users only reminders they created
+ * or are assigned to (same rule as the REST API). Returns the row or null.
+ */
+function loadModifiableReminder(mysqli $con, int $id, $currentUserId, bool $isAdmin): ?array
+{
+    $stmt = $con->prepare("SELECT id, title, assigned_by, assigned_to FROM reminders WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) return null;
+    if ($isAdmin) return $row;
+    $uid = (int)$currentUserId;
+    $assignees = array_map('intval', array_filter(explode(',', (string)$row['assigned_to'])));
+    if ((int)$row['assigned_by'] === $uid || in_array($uid, $assignees, true)) return $row;
+    return null;
+}
+
 // Function to redirect with a message
 function redirectToPage($message)
 {
@@ -109,6 +128,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     } elseif (isset($_POST['edit'])) {
         $id = (int)$_POST['id'];
+        if (!loadModifiableReminder($con, $id, $currentUserId, $isAdmin)) {
+            redirectToPage("Error: Reminder not found or you are not allowed to modify it.");
+        }
         $stmt = $con->prepare("UPDATE reminders SET cage_id = ?, title = ?, description = ?, assigned_to = ?, recurrence_type = ?, day_of_week = ?, day_of_month = ?, time_of_day = ?, status = ? WHERE id = ?");
         $stmt->bind_param("sssisssssi", $cageId, $title, $description, $assignedTo, $recurrenceType, $dayOfWeek, $dayOfMonth, $timeOfDay, $status, $id);
         if ($stmt->execute()) {
@@ -134,13 +156,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
     } elseif (isset($_POST['archive'])) {
         $id = (int)$_POST['id'];
-        // Fetch reminder details for notification
-        $fetchStmt = $con->prepare("SELECT title, assigned_to FROM reminders WHERE id = ?");
-        $fetchStmt->bind_param("i", $id);
-        $fetchStmt->execute();
-        $fetchStmt->bind_result($archTitle, $archAssignedTo);
-        $fetchStmt->fetch();
-        $fetchStmt->close();
+        $existing = loadModifiableReminder($con, $id, $currentUserId, $isAdmin);
+        if (!$existing) {
+            redirectToPage("Error: Reminder not found or you are not allowed to modify it.");
+        }
+        $archTitle = $existing['title'];
+        $archAssignedTo = $existing['assigned_to'];
 
         $stmt = $con->prepare("UPDATE reminders SET status = 'inactive' WHERE id = ?");
         $stmt->bind_param("i", $id);
@@ -167,13 +188,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
     } elseif (isset($_POST['restore'])) {
         $id = (int)$_POST['id'];
-        // Fetch reminder details for notification
-        $fetchStmt = $con->prepare("SELECT title, assigned_to FROM reminders WHERE id = ?");
-        $fetchStmt->bind_param("i", $id);
-        $fetchStmt->execute();
-        $fetchStmt->bind_result($restTitle, $restAssignedTo);
-        $fetchStmt->fetch();
-        $fetchStmt->close();
+        $existing = loadModifiableReminder($con, $id, $currentUserId, $isAdmin);
+        if (!$existing) {
+            redirectToPage("Error: Reminder not found or you are not allowed to modify it.");
+        }
+        $restTitle = $existing['title'];
+        $restAssignedTo = $existing['assigned_to'];
 
         $stmt = $con->prepare("UPDATE reminders SET status = 'active' WHERE id = ?");
         $stmt->bind_param("i", $id);
@@ -204,13 +224,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
     } elseif (isset($_POST['delete'])) {
         $id = (int)$_POST['id'];
-        // Fetch reminder details for notification before deleting
-        $fetchStmt = $con->prepare("SELECT title, assigned_to FROM reminders WHERE id = ?");
-        $fetchStmt->bind_param("i", $id);
-        $fetchStmt->execute();
-        $fetchStmt->bind_result($delTitle, $delAssignedTo);
-        $fetchStmt->fetch();
-        $fetchStmt->close();
+        $existing = loadModifiableReminder($con, $id, $currentUserId, $isAdmin);
+        if (!$existing) {
+            redirectToPage("Error: Reminder not found or you are not allowed to modify it.");
+        }
+        $delTitle = $existing['title'];
+        $delAssignedTo = $existing['assigned_to'];
 
         $stmt = $con->prepare("DELETE FROM reminders WHERE id = ?");
         $stmt->bind_param("i", $id);
