@@ -69,12 +69,14 @@ if (isset($_GET['clone'])) {
     if ($cloneData) {
         $cu = $con->prepare("SELECT user_id FROM cage_users WHERE cage_id = ?");
         $cu->bind_param("s", $cloneId); $cu->execute();
-        while ($row = $cu->get_result()->fetch_assoc()) $cloneUsers[] = $row['user_id'];
+        $cuRes = $cu->get_result();
+        while ($row = $cuRes->fetch_assoc()) $cloneUsers[] = $row['user_id'];
         $cu->close();
 
         $ci = $con->prepare("SELECT iacuc_id FROM cage_iacuc WHERE cage_id = ?");
         $ci->bind_param("s", $cloneId); $ci->execute();
-        while ($row = $ci->get_result()->fetch_assoc()) $cloneIacuc[] = $row['iacuc_id'];
+        $ciRes = $ci->get_result();
+        while ($row = $ciRes->fetch_assoc()) $cloneIacuc[] = $row['iacuc_id'];
         $ci->close();
     }
 }

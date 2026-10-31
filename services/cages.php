@@ -125,7 +125,8 @@ function holding_get(mysqli $con, int $user_id, string $cage_id): array
     $stmt->bind_param('s', $cage_id);
     $stmt->execute();
     $users = [];
-    while ($r = $stmt->get_result()->fetch_assoc()) $users[] = (int)$r['user_id'];
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) $users[] = (int)$r['user_id'];
     $stmt->close();
     $out['assigned_user_ids'] = $users;
 
@@ -148,7 +149,8 @@ function breeding_get(mysqli $con, int $user_id, string $cage_id): array
     $stmt->bind_param('s', $cage_id);
     $stmt->execute();
     $pairs = [];
-    while ($r = $stmt->get_result()->fetch_assoc()) $pairs[] = $r;
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) $pairs[] = $r;
     $stmt->close();
     $out['pairs'] = $pairs;
 
@@ -156,7 +158,8 @@ function breeding_get(mysqli $con, int $user_id, string $cage_id): array
     $stmt->bind_param('s', $cage_id);
     $stmt->execute();
     $litters = [];
-    while ($r = $stmt->get_result()->fetch_assoc()) $litters[] = $r;
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) $litters[] = $r;
     $stmt->close();
     $out['litters'] = $litters;
 
@@ -288,7 +291,8 @@ function breeding_lineage(mysqli $con, int $user_id, string $cage_id): array
     $stmt->bind_param('s', $cage_id);
     $stmt->execute();
     $litters = [];
-    while ($r = $stmt->get_result()->fetch_assoc()) $litters[] = $r;
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) $litters[] = $r;
     $stmt->close();
 
     // Offspring (alive only) sired/born from this pair.
@@ -358,7 +362,8 @@ function cage_card_data(mysqli $con, int $user_id, string $cage_id, string $kind
         $stmt->bind_param('s', $cage_id);
         $stmt->execute();
         $pairs = [];
-        while ($r = $stmt->get_result()->fetch_assoc()) $pairs[] = $r;
+        $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) $pairs[] = $r;
         $stmt->close();
         $out['pairs'] = $pairs;
 
@@ -375,7 +380,8 @@ function cage_card_data(mysqli $con, int $user_id, string $cage_id, string $kind
         $stmt->bind_param('s', $cage_id);
         $stmt->execute();
         $occupants = [];
-        while ($r = $stmt->get_result()->fetch_assoc()) $occupants[] = $r;
+        $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) $occupants[] = $r;
         $stmt->close();
         $out['occupants'] = $occupants;
     }
@@ -402,17 +408,26 @@ function holding_create(mysqli $con, int $user_id, array $body): array
     $chk->close();
 
     $stmt = $con->prepare("INSERT INTO cages (cage_id, pi_name, quantity, remarks, room, rack) VALUES (?, ?, 0, ?, ?, ?)");
-    $stmt->bind_param('sisss', $cage_id, $pi, $remarks, $room, $rack);
-    $stmt->execute();
-    $stmt->close();
+    mysqli_begin_transaction($con);
+    try {
+        $stmt->bind_param('sisss', $cage_id, $pi, $remarks, $room, $rack);
+        $stmt->execute();
+        $stmt->close();
 
-    // Auto-assign the creator so they have write access. Skip when the
-    // creator is admin (admins already have universal write access).
-    if (!perm_is_admin($con, $user_id)) {
-        $ins = $con->prepare("INSERT INTO cage_users (cage_id, user_id) VALUES (?, ?)");
-        $ins->bind_param('si', $cage_id, $user_id);
-        $ins->execute();
-        $ins->close();
+        // Auto-assign the creator so they have write access. Skip when the
+        // creator is admin (admins already have universal write access).
+        if (!perm_is_admin($con, $user_id)) {
+            $ins = $con->prepare("INSERT INTO cage_users (cage_id, user_id) VALUES (?, ?)");
+            $ins->bind_param('si', $cage_id, $user_id);
+            $ins->execute();
+            $ins->close();
+        }
+        mysqli_commit($con);
+    } catch (Throwable $e) {
+        mysqli_rollback($con);
+        if ($e instanceof ApiException) throw $e;
+        error_log('holding_create failed: ' . $e->getMessage());
+        throw new ApiException('server_error', 'Failed to create holding cage', 500);
     }
 
     return holding_get($con, $user_id, $cage_id);
@@ -489,7 +504,8 @@ function breeding_create(mysqli $con, int $user_id, array $body): array
         mysqli_commit($con);
     } catch (Throwable $e) {
         mysqli_rollback($con);
-        throw new ApiException('server_error', 'Failed to create breeding cage: ' . $e->getMessage(), 500);
+        error_log('breeding_create failed: ' . $e->getMessage());
+        throw new ApiException('server_error', 'Failed to create breeding cage', 500);
     }
 
     return breeding_get($con, $user_id, $cage_id);
@@ -548,7 +564,8 @@ function breeding_update(mysqli $con, int $user_id, string $cage_id, array $body
         throw $e;
     } catch (Throwable $e) {
         mysqli_rollback($con);
-        throw new ApiException('server_error', 'Failed to update breeding cage: ' . $e->getMessage(), 500);
+        error_log('breeding_update failed: ' . $e->getMessage());
+        throw new ApiException('server_error', 'Failed to update breeding cage', 500);
     }
 
     return breeding_get($con, $user_id, $cage_id);
